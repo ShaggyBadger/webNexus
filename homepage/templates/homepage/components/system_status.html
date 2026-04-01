@@ -1,18 +1,7 @@
-<!-- Modular System Status Block -->
-<div class="col-12 mt-4">
-    <div class="p-3 border border-secondary bg-dark shadow-sm">
-        <h3 class="h6 text-muted-custom mono mb-3">// SYSTEM STATUS //</h3>
-        <div class="d-flex justify-content-between mb-2">
-            <span class="text-muted-custom small mono">NET_STATE:</span>
-            <span id="intel-net-state" class="text-tactical-success small mono">CHECKING...</span>
-        </div>
-        <div class="d-flex justify-content-between mb-2">
-            <span class="text-muted-custom small mono">DB_STATUS:</span>
-            <span id="intel-db-status" class="text-tactical-success small mono">PENDING...</span>
-        </div>
-        <div class="d-flex justify-content-between">
-            <span class="text-muted-custom small mono">LATENCY:</span>
-            <span id="intel-latency" class="text-primary small mono">--ms</span>
-        </div>
-    </div>
+<!-- Compact Tactical Telemetry Block -->
+<div id="system-telemetry-block" class="timestamp mono mt-1" style="font-size: 0.6rem; letter-spacing: 1px;">
+    <span class="text-muted-custom">SYS_TELEMETRY:</span>
+    <span id="intel-net-state" class="text-tactical-success">LINK_WAIT</span> //
+    <span id="intel-db-status" class="text-tactical-success">DB_WAIT</span> //
+    <span id="intel-latency" class="text-primary">--ms</span>
 </div>

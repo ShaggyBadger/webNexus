@@ -23,7 +23,7 @@ Consistency is managed through a centralized **Theme Engine** in `context_proces
 
 ### A. Color Palette (Tactical Standard)
 *   **Backgrounds:** Deep charcoal (`#121417`) and dark grays (`#1c1f23`).
-*   **Primary Action:** Tactical Blue (`#4092ff`).
+*   **Primary Action:** Tactical Olive (`#8da35d`).
 *   **Accents:** Warning/Highlight Pink-Red (`#e94560`) and "Caution" Orange.
 *   **Typography:** High-legibility light grays (`#f8f9fa`) for readability in various lighting conditions.
 

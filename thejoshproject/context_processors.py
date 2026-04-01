@@ -5,7 +5,7 @@ def global_config(request):
     return {
         "SITE_NAME": "WebNexus",
         "VERSION": "2.1.0",
-        "PRIMARY_COLOR": "#4092ff",
+        "PRIMARY_COLOR": "#8da35d",
         "BG_COLOR": "#121417",
         "TEXT_COLOR": "#f8f9fa",
         "MUTED_TEXT_COLOR": "#adb5bd",

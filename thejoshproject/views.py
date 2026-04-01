@@ -13,7 +13,7 @@ def health_check(request):
         # Perform a simple query to verify DB connection
         with connection.cursor() as cursor:
             cursor.execute("SELECT 1")
-        status["db_status"] = "SYNC_OK"
+        status["db_status"] = "DB_READY"
     except Exception as e:
         status["db_status"] = "ERROR"
         status["error_details"] = str(e)

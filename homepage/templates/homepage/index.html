@@ -4,6 +4,7 @@
 {% block title %}HQ | {{ SITE_NAME }}{% endblock %}
 
 {% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/tactical_effects.css' %}">
 <style>
     :root {
         --status-online: #50fa7b;
@@ -12,7 +13,7 @@
 
     .eagle-logo {
         height: 50px;
-        filter: drop-shadow(0 0 10px rgba(64, 146, 255, 0.3));
+        filter: drop-shadow(0 0 10px rgba(141, 163, 93, 0.4));
     }
 
     .op-status {
@@ -59,13 +60,18 @@
 {% endblock %}
 
 {% block content %}
+<!-- Tactical UI Overlays -->
+<div class="tactical-grid"></div>
+<div class="scanline"></div>
+<div class="flicker"></div>
+
 <div class="container-fluid px-3 pt-4">
     <!-- Tactical Header -->
     <header class="mb-5">
         <div class="d-flex align-items-center mb-3">
             <img src="{% static 'images/swtoEagle.png' %}" alt="Logo" class="eagle-logo me-3">
             <div>
-                <div class="op-status mono">● SYSTEM ONLINE</div>
+                <div class="op-status mono">● SYSTEM ONLINE // <span id="tactical-clock">00:00:00</span></div>
                 <h1 class="display-5 fw-bold mb-0 mono">{{ SITE_NAME|upper }}</h1>
             </div>
         </div>
@@ -73,16 +79,39 @@
         <div class="border-start border-primary border-3 ps-3 mt-3">
             <div class="timestamp mono">VER: {{ VERSION }}</div>
             {% include 'homepage/components/tactical_loc.html' %}
+            {% include 'homepage/components/system_status.html' %}
         </div>
     </header>
 
+    <!-- Large Layout Spacer -->
+    <div style="height: 60px;"></div>
+
+    <!-- Section Divider -->
+    <div class="d-flex align-items-center mb-4">
+        <div class="flex-grow-1 border-bottom border-secondary opacity-25"></div>
+        <div class="mx-3 mono text-muted-custom small" style="letter-spacing: 3px;">[ COMMAND_GRID ]</div>
+        <div class="flex-grow-1 border-bottom border-secondary opacity-25"></div>
+    </div>
+
     <!-- Main Command Grid -->
-    <div class="row g-3">
+    <div class="row g-4">
         <!-- TankGauge Module -->
         {% include 'homepage/components/app_tankgauge.html' %}
-
-        <!-- System Status Bar -->
-        {% include 'homepage/components/system_status.html' %}
     </div>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    function updateClock() {
+        const now = new Date();
+        const hh = String(now.getHours()).padStart(2, '0');
+        const mm = String(now.getMinutes()).padStart(2, '0');
+        const ss = String(now.getSeconds()).padStart(2, '0');
+        const clockElement = document.getElementById('tactical-clock');
+        if (clockElement) clockElement.innerText = `${hh}:${mm}:${ss}L`;
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+</script>
 {% endblock %}
