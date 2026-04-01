@@ -1,49 +1,88 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}The Josh Project{% endblock %}
+{% block title %}HQ | {{ SITE_NAME }}{% endblock %}
 
-{% block extra_css %}
-<link rel="stylesheet" href="{% static 'homepage/css/homepage.css' %}" />
+{% block extra_head %}
+<style>
+    :root {
+        --status-online: #50fa7b;
+        --status-standby: #ffb86c;
+    }
+
+    .eagle-logo {
+        height: 50px;
+        filter: drop-shadow(0 0 10px rgba(64, 146, 255, 0.3));
+    }
+
+    .op-status {
+        font-size: 0.75rem;
+        letter-spacing: 2px;
+        color: var(--status-online);
+    }
+
+    .tactical-card {
+        background-color: #1c1f23;
+        border: 1px solid var(--navbar-border);
+        border-left: 4px solid var(--primary-color);
+        border-radius: 0;
+        transition: background-color 0.2s ease;
+    }
+
+    .tactical-card:active {
+        background-color: #2c3036;
+        transform: scale(0.98);
+    }
+
+    .card-icon {
+        color: var(--primary-color);
+        font-size: 2.5rem;
+    }
+
+    .btn-tactical {
+        border-radius: 0;
+        padding: 1rem;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+    }
+
+    /* Mobile First Adjustments */
+    @media (max-width: 576px) {
+        .display-5 { font-size: 1.75rem; }
+    }
+
+    .timestamp {
+        font-size: 0.7rem;
+        color: var(--muted-text-color);
+    }
+</style>
 {% endblock %}
 
 {% block content %}
-
-<!-- Header Section -->
-<section class="header-section text-center py-5">
-  <div class="container">
-    <h1 class="display-2 text-header-title mb-3">The Josh Project</h1>
-    <p class="lead text-header-sub mb-4">
-      Exploring the digital realm with innovative applications and solutions.
-    </p>
-  </div>
-</section>
-
-<!-- Main Content Section -->
-<section id="main-content" class="main-content-section py-5">
-  <div class="container">
-    <h2 class="text-center text-main-content-title mb-5">Featured Application</h2>
-    <div class="row g-4 justify-content-center">
-      <!-- TankGauge App Block -->
-      <div class="col-lg-3 col-md-12 col-sm-12">
-        <a href="#" class="app-feature-link d-block text-decoration-none">
-          <div class="app-feature-block p-4 rounded shadow-sm">
-            <div class="d-flex align-items-start">
-              <i class="fas fa-tachometer-alt fa-3x me-4 text-app-icon"></i>
-              <div>
-                <h3 class="h5 text-app-name mb-2">TankGauge Pro</h3>
-                <p class="text-app-description mb-0">
-                  Advanced data visualization and reporting for comprehensive tank level analysis.
-                  Unlock deeper insights into your fluid management.
-                </p>
-              </div>
+<div class="container-fluid px-3 pt-4">
+    <!-- Tactical Header -->
+    <header class="mb-5">
+        <div class="d-flex align-items-center mb-3">
+            <img src="{% static 'images/swtoEagle.png' %}" alt="Logo" class="eagle-logo me-3">
+            <div>
+                <div class="op-status mono">● SYSTEM ONLINE</div>
+                <h1 class="display-5 fw-bold mb-0 mono">{{ SITE_NAME|upper }}</h1>
             </div>
-          </div>
-        </a>
-      </div>
-      <!-- Add more applications here as needed, following the same structure -->
-    </div>
-  </div>
-</section>
+        </div>
+        
+        <div class="border-start border-primary border-3 ps-3 mt-3">
+            <div class="timestamp mono">VER: {{ VERSION }}</div>
+            {% include 'homepage/components/tactical_loc.html' %}
+        </div>
+    </header>
 
+    <!-- Main Command Grid -->
+    <div class="row g-3">
+        <!-- TankGauge Module -->
+        {% include 'homepage/components/app_tankgauge.html' %}
+
+        <!-- System Status Bar -->
+        {% include 'homepage/components/system_status.html' %}
+    </div>
+</div>
 {% endblock %}

@@ -1,298 +1,108 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load custom_filters %}
 
-{% block title %}Fuel Delivery Estimation{% endblock %}
+{% block title %}Fuel Delivery Estimation | {{ SITE_NAME }}{% endblock %}
 
-{% block extra_css %}
-<link
-      rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css"
-    />
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" />
 <style>
-      html {
-        background-color: #121417;
-        height: 100%;
-      }
-      body {
-        min-height: 100%;
-        font-family: 'Inter', sans-serif;
-        background-color: #121417;
-        color: #f8f9fa;
-        margin: 0;
-      }
-
-      /* Ensure all common text elements inherit the light color */
-      p,
-      h1,
-      h2,
-      h3,
-      h4,
-      h5,
-      h6,
-      a,
-      label,
-      th,
-      td {
-        color: #f8f9fa;
-      }
-
-      /* Style for form inputs to ensure they are visible on dark backgrounds */
-      .form-control {
-        background-color: #212529;
-        color: #f8f9fa;
-        border-color: #495057;
-      }
-
-      .form-control:focus {
-        background-color: #212529;
-        color: #f8f9fa;
-        border-color: #80bdff;
-        box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
-      }
-
-      .navbar {
-        background-color: #1c1f23;
-        border-bottom: 1px solid #2c3036;
-      }
-      .navbar-brand,
-      .nav-link {
-        color: #f8f9fa !important;
-        font-weight: 600;
-      }
-      .navbar-toggler-icon {
-        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba(248, 249, 250, 0.75)' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3csvg%3e") !important;
-      }
-
-      .container {
-        padding-top: 2rem;
-        padding-bottom: 2rem;
-      }
-
-      .card {
+    /* TankGauge specific styling */
+    .card {
+        background-color: var(--navbar-bg);
+        border: 1px solid var(--navbar-border);
         border-radius: 1rem;
-        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.2);
-        background-color: #1e2226;
-        border: 1px solid #2b2f35;
-      }
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.4);
+    }
 
-      .card h2,
-      .card p {
-        color: #dee2e6 !important;
-      }
+    .form-control {
+        background-color: var(--bg-color);
+        color: var(--text-color);
+        border: 1px solid var(--navbar-border);
+    }
 
-      .card-planning {
-        background-color: #0d3b66;
-        border-color: #145da0;
-      }
+    .form-control:focus {
+        background-color: var(--bg-color);
+        color: var(--text-color);
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 0.2rem rgba(64, 146, 255, 0.25);
+    }
 
-      .card-delivery {
-        background-color: #204529;
-        border-color: #28a745;
-      }
-
-      .btn-primary,
-      .btn-success {
-        font-weight: 600;
-        padding: 0.75rem;
-      }
-
-      .btn-primary {
-        background-color: #0d6efd;
-        border-color: #0d6efd;
-      }
-
-      .btn-primary:hover {
-        background-color: #0b5ed7;
-        border-color: #0a58ca;
-      }
-
-      .btn-success {
-        background-color: #198754;
-        border-color: #198754;
-      }
-
-      .btn-success:hover {
-        background-color: #157347;
-        border-color: #146c43;
-      }
-
-      .section-heading {
-        color: #f8f9fa;
-      }
-
-      .lead {
-        color: #adb5bd;
-      }
-
-      footer {
-        text-align: center;
-        margin-top: 3rem;
-        font-size: 0.875rem;
-        color: #6c757d;
-      }
-
-      .mono {
-        font-family: 'Courier New', Courier, monospace;
-        font-size: 0.95rem;
-        letter-spacing: 0.5px;
-      }
-    </style>
+    .mono {
+        font-family: 'JetBrains Mono', 'Courier New', Courier, monospace;
+    }
+    
+    .text-accent {
+        color: var(--accent-color);
+    }
+</style>
 {% endblock %}
 
 {% block content %}
 <div class="container mt-5" style="max-width: 600px">
-  <h1 class="text-center fw-bold mono mb-5 mono" style="font-size: 2.5rem">
-    Fuel Delivery Estimation
-  </h1>
-  <form
-    method="POST"
-    action="{% url 'tankgauge:delivery_submit' %}"
-    class="needs-validation"
-    novalidate
-  >
-    {% csrf_token %}
-    <!-- Store Number Input -->
-    <div class="mb-4">
-      <label for="storeNumber" class="form-label mono fw-bold"
-        >Store Number</label
-      >
-      <input
-        type="text"
-        class="form-control form-control-lg"
-        inputmode="numeric"
-        pattern="[0-9]*"
-        id="storeNumber"
-        name="store_number"
-        placeholder="Enter store number"
-        required
-      />
+    <div class="text-center mb-5">
+        <i class="fas fa-gauge-high fa-4x text-accent mb-3"></i>
+        <h1 class="fw-bold mono" style="font-size: 2.5rem">
+            FUEL DELIVERY <span class="text-accent">ESTIMATION</span>
+        </h1>
+        <p class="text-muted-custom">Enter operational parameters to calculate required volume.</p>
     </div>
 
-    <!-- Fuel Switches -->
-    <div class="mb-4">
-      <label class="form-label mono fw-bold mb-3">Select Fuel Types</label>
+    <div class="card p-4">
+        <form method="POST" action="{% url 'tankgauge:delivery_submit' %}" class="needs-validation" novalidate>
+            {% csrf_token %}
+            <!-- Store Number Input -->
+            <div class="mb-4">
+                <label for="storeNumber" class="form-label mono fw-bold">Store Number</label>
+                <input type="text" class="form-control form-control-lg" inputmode="numeric" pattern="[0-9]*"
+                    id="storeNumber" name="store_number" placeholder="Enter store number" required />
+            </div>
 
-      <div class="row g-2 align-items-center mb-3">
-        <div class="col-8">
-          <label class="form-check-label mono fs-5" for="fuel_regular">Regular</label>
-        </div>
-        <div class="col-4 text-end">
-          <div class="form-check form-switch d-inline-block">
-            <input
-              class="form-check-input"
-              type="checkbox"
-              id="fuel_regular"
-              name="fuel_types"
-              value="regular"
-              style="width: 3rem; height: 1.6rem"
-            />
-          </div>
-        </div>
-      </div>
-      
-      <div class="row g-2 align-items-center mb-3">
-        <div class="col-8">
-          <label class="form-check-label mono fs-5" for="fuel_plus">Plus</label>
-        </div>
-        <div class="col-4 text-end">
-          <div class="form-check form-switch d-inline-block">
-            <input
-              class="form-check-input"
-              type="checkbox"
-              id="fuel_plus"
-              name="fuel_types"
-              value="plus"
-              style="width: 3rem; height: 1.6rem"
-            />
-          </div>
-        </div>
-      </div>
+            <!-- Fuel Switches -->
+            <div class="mb-4">
+                <label class="form-label mono fw-bold mb-3">Select Fuel Types</label>
 
-      <div class="row g-2 align-items-center mb-3">
-        <div class="col-8">
-          <label class="form-check-label mono fs-5" for="fuel_premium">Premium</label>
-        </div>
-        <div class="col-4 text-end">
-          <div class="form-check form-switch d-inline-block">
-            <input
-              class="form-check-input"
-              type="checkbox"
-              id="fuel_premium"
-              name="fuel_types"
-              value="premium"
-              style="width: 3rem; height: 1.6rem"
-            />
-          </div>
-        </div>
-      </div>
+                {% for type in "regular,plus,premium,kerosene,diesel"|split:"," %}
+                <div class="row g-2 align-items-center mb-3">
+                    <div class="col-8">
+                        <label class="form-check-label mono fs-5" for="fuel_{{ type }}">{{ type|title }}</label>
+                    </div>
+                    <div class="col-4 text-end">
+                        <div class="form-check form-switch d-inline-block">
+                            <input class="form-check-input" type="checkbox" id="fuel_{{ type }}" name="fuel_types"
+                                value="{{ type }}" style="width: 3rem; height: 1.6rem" />
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
 
-      <div class="row g-2 align-items-center mb-3">
-        <div class="col-8">
-          <label class="form-check-label mono fs-5" for="fuel_kerosene">Kerosene</label>
-        </div>
-        <div class="col-4 text-end">
-          <div class="form-check form-switch d-inline-block">
-            <input
-              class="form-check-input"
-              type="checkbox"
-              id="fuel_kerosene"
-              name="fuel_types"
-              value="kerosene"
-              style="width: 3rem; height: 1.6rem"
-            />
-          </div>
-        </div>
-      </div>
-
-      <div class="row g-2 align-items-center mb-3">
-        <div class="col-8">
-          <label class="form-check-label mono fs-5" for="fuel_diesel">Diesel</label>
-        </div>
-        <div class="col-4 text-end">
-          <div class="form-check form-switch d-inline-block">
-            <input
-              class="form-check-input"
-              type="checkbox"
-              id="fuel_diesel"
-              name="fuel_types"
-              value="diesel"
-              style="width: 3rem; height: 1.6rem"
-            />
-          </div>
-        </div>
-      </div>
-      
+            <!-- Submit Button -->
+            <div class="d-grid">
+                <button type="submit" class="btn btn-primary btn-lg mono fw-bold">INITIALIZE ESTIMATION</button>
+            </div>
+        </form>
     </div>
-
-    <!-- Submit Button -->
-    <div class="d-grid">
-      <button type="submit" class="btn btn-primary btn-lg mono">Submit</button>
-    </div>
-  </form>
 </div>
-
-<script>
-  document.querySelector("form").addEventListener("submit", function (e) {
-    const storeNumber = document.getElementById("storeNumber").value.trim();
-    const fuelCheckboxes = document.querySelectorAll(
-      "input[name='fuel_types']:checked"
-    );
-
-    if (!storeNumber || fuelCheckboxes.length === 0) {
-      e.preventDefault(); // Stop form from submitting
-
-      let msg = "Please do the following before proceeding:
-";
-      if (!storeNumber) msg += "- Enter a store number
-";
-      if (fuelCheckboxes.length === 0) msg += "- Select at least one fuel type";
-
-      alert(msg);
-    }
-  });
-</script>
 {% endblock %}
 
-{% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+{% block extra_scripts %}
+<script>
+    document.querySelector("form").addEventListener("submit", function (e) {
+        const storeNumber = document.getElementById("storeNumber").value.trim();
+        const fuelCheckboxes = document.querySelectorAll(
+            "input[name='fuel_types']:checked"
+        );
+
+        if (!storeNumber || fuelCheckboxes.length === 0) {
+            e.preventDefault();
+
+            let msg = "OPERATIONAL ERROR:\n";
+            if (!storeNumber) msg += "- Store number required\n";
+            if (fuelCheckboxes.length === 0) msg += "- Select at least one fuel type";
+
+            alert(msg);
+        }
+    });
+</script>
 {% endblock %}
