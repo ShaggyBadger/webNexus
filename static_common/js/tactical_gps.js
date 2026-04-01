@@ -82,7 +82,7 @@ const TacticalGPS = {
         const data = await response.json();
         intelDisplay.style.display = "block";
         intelDisplay.innerHTML = `
-                    ZONE: ${data.city.toUpperCase()}, ${data.state.toUpperCase()} // 
+                    ZONE: <span class="text-primary">${data.city.toUpperCase()}, ${data.state.toUpperCase()}</span> // 
                     TARGET: <span class="text-primary">#${data.store_num} (${data.distance_feet.toLocaleString()} FT)
                 </span>`;
       }
