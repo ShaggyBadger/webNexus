@@ -10,21 +10,33 @@
     .card {
         background-color: var(--navbar-bg);
         border: 1px solid var(--navbar-border);
-        border-radius: 1rem;
-        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.4);
+        border-radius: 0.5rem;
+        box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.6);
     }
 
     .form-control {
         background-color: var(--bg-color);
-        color: var(--text-color);
+        color: var(--primary-color);
         border: 1px solid var(--navbar-border);
+        border-radius: 0;
+        font-size: 2rem !important;
+        font-weight: bold;
+        text-align: center;
+        letter-spacing: 4px;
     }
 
     .form-control:focus {
         background-color: var(--bg-color);
-        color: var(--text-color);
+        color: var(--primary-color);
         border-color: var(--primary-color);
-        box-shadow: 0 0 0 0.2rem rgba(64, 146, 255, 0.25);
+        box-shadow: 0 0 15px rgba(141, 163, 93, 0.2);
+    }
+
+    .form-control::placeholder {
+        font-size: 1rem;
+        letter-spacing: normal;
+        opacity: 0.3;
+        font-weight: normal;
     }
 
     .mono {
@@ -35,27 +47,121 @@
         color: var(--accent-color);
     }
 
-    /* Override Bootstrap switches for tactical look */
-    .form-check-input {
-        background-color: var(--bg-color);
-        border-color: var(--navbar-border);
+    /* TACTICAL ROCKER SWITCH */
+    .rocker-container {
+        background: rgba(0, 0, 0, 0.2);
+        border: 1px solid var(--navbar-border);
+        padding: 0.75rem 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        transition: border-color 0.2s;
     }
-    
-    .form-check-input:checked {
+
+    .rocker-container:hover {
+        border-color: var(--muted-text-color);
+    }
+
+    .rocker-switch {
+        width: 3.5rem !important;
+        height: 1.8rem !important;
+        margin-left: 0 !important;
+        cursor: pointer;
+        background-color: #1a1d21 !important;
+        border: 2px solid var(--navbar-border) !important;
+        border-radius: 4px !important;
+        position: relative;
+        appearance: none;
+        -webkit-appearance: none;
+        background-image: none !important;
+        transition: border-color 0.2s;
+    }
+
+    .rocker-switch::after {
+        content: "";
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 1.6rem;
+        height: calc(100% - 4px);
+        background-color: #3a3f47;
+        border-radius: 2px;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+
+    .rocker-switch:checked {
+        background-color: #1a1d21 !important;
+        border-color: var(--primary-color) !important;
+    }
+
+    .rocker-switch:checked::after {
+        left: calc(100% - 1.6rem - 2px);
+        background-color: var(--primary-color);
+    }
+
+    .btn-tactical-lg {
+        border-radius: 0;
+        padding: 1.25rem;
+        letter-spacing: 2px;
         background-color: var(--primary-color);
         border-color: var(--primary-color);
+        color: #121417;
+    }
+
+    .btn-tactical-lg:hover {
+        background-color: #a3b97a;
+        border-color: #a3b97a;
+        color: #121417;
+    }
+
+    .preset-btn {
+        font-size: 0.75rem;
+        border-radius: 0;
+        border-style: solid;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        flex: 1;
+        padding-top: 0.85rem;
+        padding-bottom: 0.85rem;
+        font-weight: bold;
+        transition: all 0.2s ease;
+    }
+
+    .btn-lock-on {
+        border-color: #4092ff;
+        color: #4092ff;
+        background: rgba(64, 146, 255, 0.05);
+    }
+
+    .btn-lock-on:hover {
+        background: #4092ff;
+        color: #121417;
+        box-shadow: 0 0 15px rgba(64, 146, 255, 0.4);
+    }
+
+    .btn-preset-amber {
+        border-color: #ffb86c;
+        color: #ffb86c;
+        background: rgba(255, 184, 108, 0.05);
+    }
+
+    .btn-preset-amber:hover {
+        background: #ffb86c;
+        color: #121417;
+        box-shadow: 0 0 15px rgba(255, 184, 108, 0.4);
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container mt-5" style="max-width: 600px">
+<div class="container mt-5" style="max-width: 800px">
     <div class="text-center mb-5">
         <i class="fas fa-gauge-high fa-4x text-accent mb-3"></i>
         <h1 class="fw-bold mono" style="font-size: 2.5rem">
             FUEL DELIVERY <span class="text-accent">ESTIMATION</span>
         </h1>
-        <p class="text-muted-custom mono small">[ TARGETING SYSTEM INITIALIZED ]</p>
+        <p class="text-muted-custom mono small">[ TANKMETRY_OS V2.1 // CMD: MANUAL_OVERRIDE ]</p>
     </div>
 
     <div class="card p-4">
@@ -63,45 +169,75 @@
             {% csrf_token %}
             
             <!-- Store Number Field -->
-            <div class="mb-4">
-                <label for="{{ form.store_number.id_for_label }}" class="form-label mono fw-bold">STORE_ID</label>
+            <div style="margin-bottom: 2rem;">
+                <label for="{{ form.store_number.id_for_label }}" class="form-label mono fw-bold mb-3">
+                    <i class="fas fa-crosshairs me-2"></i>TARGET_STORE_ID
+                </label>
                 {{ form.store_number }}
+                <div id="direct-intel-status" class="mono text-primary mt-2" style="font-size: 0.7rem; letter-spacing: 1px; visibility: hidden;">
+                    <i class="fas fa-satellite me-1"></i> LINK_ACQUIRED: <span id="direct-intel-id">#----</span> (<span id="direct-intel-dist">-- FT</span>)
+                </div>
                 {% if form.store_number.errors %}
-                    <div class="text-danger small mono mt-1">{{ form.store_number.errors.0 }}</div>
+                    <div class="text-danger small mono mt-2">{{ form.store_number.errors.0 }}</div>
                 {% endif %}
             </div>
 
-            <!-- Fuel Type Selection -->
-            <div class="mb-4">
-                <label class="form-label mono fw-bold mb-3">SELECTION_FUEL_TYPES</label>
+            <!-- Operational Presets -->
+            <div class="mb-5">
+                <label class="mono text-muted-custom mb-3 d-block" style="font-size: 0.65rem; letter-spacing: 2px;">
+                    [ OPERATIONAL_INTEL_PRESETS ]
+                </label>
+                <div class="d-flex gap-3 mb-2">
+                    <button type="button" id="lock-nearest-btn" class="btn preset-btn btn-lock-on">
+                        <i class="fas fa-crosshairs me-1"></i> LOCK_NEAREST_STORE
+                    </button>
+                    <button type="button" id="preset-711-btn" class="btn preset-btn btn-preset-amber">
+                        <i class="fas fa-microchip me-1"></i> 7-11_TANK_STANDARD
+                    </button>
+                </div>
+                <div id="intel-status-line" class="mono text-muted-custom mt-2" style="font-size: 0.6rem; visibility: hidden;">
+                    LINK_READY: <span id="intel-status-id" class="text-primary">#----</span> 
+                    (<span id="intel-status-dist" class="text-primary">-- FT</span>)
+                </div>
+            </div>
+
+            <!-- Tactical Divider -->
+            <div class="d-flex align-items-center mb-5">
+                <div class="flex-grow-1 border-bottom border-secondary opacity-25"></div>
+                <div class="mx-3 mono text-muted-custom small" style="letter-spacing: 3px; font-size: 0.7rem;">[ SELECTION_GRID ]</div>
+                <div class="flex-grow-1 border-bottom border-secondary opacity-25"></div>
+            </div>
+
+            <!-- Fuel Type Grid -->
+            <div class="mb-5">
+                <label class="form-label mono fw-bold mb-4">
+                    <i class="fas fa-filter me-2"></i>OPERATIONAL_FUEL_SELECT
+                </label>
                 
-                {% for choice in form.fuel_types %}
-                <div class="row g-2 align-items-center mb-3">
-                    <div class="col-8">
-                        <label class="form-check-label mono fs-5" for="{{ choice.id_for_label }}">
-                            {{ choice.choice_label|upper }}
-                        </label>
-                    </div>
-                    <div class="col-4 text-end">
-                        <div class="form-check form-switch d-inline-block">
-                            <input class="form-check-input" type="checkbox" name="{{ choice.data.name }}" 
-                                   value="{{ choice.data.value }}" id="{{ choice.id_for_label }}"
-                                   {% if choice.data.selected %}checked{% endif %}
-                                   style="width: 3rem; height: 1.6rem">
+                <div class="row g-3">
+                    {% for choice in form.fuel_types %}
+                    <div class="col-md-6">
+                        <div class="rocker-container">
+                            <label class="mono fs-6 mb-0 text-uppercase" for="{{ choice.id_for_label }}">
+                                {{ choice.choice_label }}
+                            </label>
+                            <div class="form-check form-switch p-0 m-0">
+                                <input class="form-check-input rocker-switch" type="checkbox" 
+                                       name="{{ form.fuel_types.name }}" 
+                                       value="{{ choice.data.value }}" 
+                                       id="{{ choice.id_for_label }}"
+                                       {% if choice.data.selected %}checked{% endif %}>
+                            </div>
                         </div>
                     </div>
+                    {% endfor %}
                 </div>
-                {% endfor %}
-                
-                {% if form.fuel_types.errors %}
-                    <div class="text-danger small mono mt-1">{{ form.fuel_types.errors.0 }}</div>
-                {% endif %}
             </div>
 
             <!-- Submit Button -->
             <div class="d-grid mt-5">
-                <button type="submit" class="btn btn-primary btn-lg mono fw-bold py-3">
-                    [ INITIALIZE ESTIMATION ]
+                <button type="submit" class="btn btn-primary btn-tactical-lg mono fw-bold">
+                    INITIALIZE DATA_FETCH_SEQUENCE
                 </button>
             </div>
         </form>
@@ -111,7 +247,97 @@
 
 {% block extra_scripts %}
 <script>
-    // Minimal Client-side validation to maintain tactical feedback
+    document.addEventListener("DOMContentLoaded", () => {
+        const storeInput = document.querySelector('input[name="store_number"]');
+        const lockNearestBtn = document.getElementById('lock-nearest-btn');
+        const preset711Btn = document.getElementById('preset-711-btn');
+        const intelStatusLine = document.getElementById('intel-status-line');
+        const statusId = document.getElementById('intel-status-id');
+        const statusDist = document.getElementById('intel-status-dist');
+
+        const directIntelStatus = document.getElementById('direct-intel-status');
+        const directIntelId = document.getElementById('direct-intel-id');
+        const directIntelDist = document.getElementById('direct-intel-dist');
+
+        function updateIntelUI(data = null) {
+            // If we have manual data (from a fresh pulse), update the specialized direct-intel display too
+            if (data) {
+                // Main presets bar
+                intelStatusLine.style.visibility = "visible";
+                statusId.innerText = `#${data.store_num}`;
+                statusDist.innerText = "SIGNAL_LOCKED";
+
+                // Specialized Direct Intel below input
+                directIntelStatus.style.visibility = "visible";
+                directIntelId.innerText = `#${data.store_num}`;
+                directIntelDist.innerText = `${data.distance_feet.toLocaleString()} FT`;
+
+                return data.store_num;
+            }
+
+            // Otherwise check localStorage for the presets bar
+            const rawData = localStorage.getItem("webnexus_closest_store_id");
+            if (rawData) {
+                try {
+                    const storeIntel = JSON.parse(rawData);
+                    const ageInMinutes = (Date.now() - storeIntel.timestamp) / 1000 / 60;
+                    
+                    if (ageInMinutes < 30) {
+                        intelStatusLine.style.visibility = "visible";
+                        statusId.innerText = `#${storeIntel.num}`;
+                        statusDist.innerText = "SIGNAL_LOCKED";
+                        return storeIntel.num;
+                    }
+                } catch (e) { console.error("Parse Error:", e); }
+            }
+            
+            // If GPS is granted but no data yet
+            if (localStorage.getItem("webnexus_gps_optin") === "granted") {
+                intelStatusLine.style.visibility = "visible";
+                statusId.innerText = "SEARCHING...";
+                statusDist.innerText = "PULSING";
+            }
+            return null;
+        }
+
+        // Initial UI Update
+        updateIntelUI();
+        setInterval(() => updateIntelUI(), 5000);
+
+        // Action: Lock Nearest
+        lockNearestBtn.addEventListener('click', async () => {
+            const originalText = lockNearestBtn.innerHTML;
+            lockNearestBtn.innerHTML = '<i class="fas fa-satellite-dish fa-spin me-1"></i> ACQUIRING...';
+            lockNearestBtn.disabled = true;
+
+            try {
+                // Trigger fresh pulse from the global TacticalGPS object
+                const data = await TacticalGPS.pulse();
+                storeInput.value = data.store_num;
+                updateIntelUI(data);
+                console.log(`[TACTICAL_INTEL]: FRESH_LOCK_ON_TARGET_${data.store_num}`);
+            } catch (err) {
+                console.warn("Fresh Pulse Failed:", err);
+                // Fallback to whatever is in storage
+                const storedId = updateIntelUI();
+                if (storedId) {
+                    storeInput.value = storedId;
+                } else {
+                    alert("OPERATIONAL ERROR: No GPS Signal Locked. Please ensure GPS Pulse is enabled on Homepage.");
+                }
+            } finally {
+                lockNearestBtn.innerHTML = originalText;
+                lockNearestBtn.disabled = false;
+            }
+        });
+
+        // Action: 7-11 Standard
+        preset711Btn.addEventListener('click', () => {
+            storeInput.value = "7-11_STD";
+            console.log("[TACTICAL_INTEL]: PRESET_CONFIG_LOCKED: 7-11_STANDARD");
+        });
+    });
+
     document.querySelector("form").addEventListener("submit", function (e) {
         const storeNumber = document.querySelector('input[name="store_number"]').value.trim();
         const fuelCheckboxes = document.querySelectorAll('input[name="fuel_types"]:checked');
@@ -119,9 +345,9 @@
         if (!storeNumber || fuelCheckboxes.length === 0) {
             e.preventDefault();
 
-            let msg = "OPERATIONAL ERROR:\n";
-            if (!storeNumber) msg += "- STORE_ID REQUIRED\n";
-            if (fuelCheckboxes.length === 0) msg += "- FUEL_TYPE SELECTION REQUIRED";
+            let msg = "OPERATIONAL ERROR DETECTED:\n";
+            if (!storeNumber) msg += "> TARGET_STORE_ID PARAMETER MISSING\n";
+            if (fuelCheckboxes.length === 0) msg += "> FUEL_TYPE SELECTION REQUIRED";
 
             alert(msg);
         }

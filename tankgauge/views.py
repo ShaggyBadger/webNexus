@@ -1,6 +1,6 @@
 from django.shortcuts import render, redirect
 from django.http import JsonResponse
-from .models import Store
+from .models import Store, StoreTankMapping
 from .forms import DeliveryEstimationForm
 import math
 
@@ -16,20 +16,56 @@ def delivery_form(request):
 def delivery_submit(request):
     """
     Handles form submission for Fuel Delivery Estimation.
+    Queries the database for specific store tanks or returns standard 7-11 defaults.
     """
     if request.method == "POST":
         form = DeliveryEstimationForm(request.POST)
         if form.is_valid():
-            store_number = form.cleaned_data["store_number"]
-            fuel_types = form.cleaned_data["fuel_types"]
-            # Logic for estimation would go here
+            store_number_input = form.cleaned_data["store_number"]
+            selected_fuels = form.cleaned_data["fuel_types"]
+            
+            tanks_found = []
+
+            # CASE A: 7-11 STANDARD PRESET
+            if store_number_input == "7-11_STD":
+                # These are typical 7-11 specs for estimation
+                for fuel in selected_fuels:
+                    tanks_found.append({
+                        "fuel_type": fuel.upper(),
+                        "tank_model": "7-11_STANDARD_DOUBLE_WALL",
+                        "capacity": 10000 if fuel != "plus" else 4000,
+                        "max_depth": 92,
+                        "is_preset": True
+                    })
+            
+            # CASE B: DATABASE LOOKUP
+            else:
+                try:
+                    store = Store.objects.get(store_num=store_number_input)
+                    mappings = StoreTankMapping.objects.filter(
+                        store=store, 
+                        fuel_type__in=selected_fuels
+                    ).select_related('tank_type')
+                    
+                    for m in mappings:
+                        tanks_found.append({
+                            "fuel_type": m.fuel_type.upper(),
+                            "tank_model": m.tank_type.name,
+                            "capacity": m.tank_type.capacity,
+                            "max_depth": m.tank_type.max_depth,
+                            "is_preset": False
+                        })
+                except Store.DoesNotExist:
+                    return JsonResponse({
+                        "status": "error",
+                        "message": f"STORE_ID #{store_number_input} NOT FOUND IN DATABASE"
+                    }, status=404)
+
             return JsonResponse({
                 "status": "success",
-                "message": f"Estimation initialized for Store {store_number}",
-                "data": {
-                    "store_number": store_number,
-                    "fuel_types": fuel_types
-                }
+                "message": "INTEL_ACQUIRED",
+                "store_id": store_number_input,
+                "tanks": tanks_found
             })
         else:
             return render(request, "tankgauge/delivery_form.html", {"form": form})

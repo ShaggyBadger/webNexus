@@ -5,17 +5,19 @@
 
 const TacticalGPS = {
   storageKey: "webnexus_gps_optin",
+  storePersistenceKey: "webnexus_closest_store_id",
 
   init() {
     const optIn = localStorage.getItem(this.storageKey);
-    const displayElement = document.getElementById("loc-ref-display");
-
-    if (!displayElement) return;
-
+    
+    // Always pulse if granted
     if (optIn === "granted") {
-      this.pulse();
+      this.pulse().catch(() => {});
     } else {
-      this.renderOptInButton(displayElement);
+      const displayElement = document.getElementById("loc-ref-display");
+      if (displayElement) {
+        this.renderOptInButton(displayElement);
+      }
     }
   },
 
@@ -31,48 +33,77 @@ const TacticalGPS = {
     });
   },
 
+  /**
+   * Requests GPS permission and returns a promise.
+   */
   requestPermission() {
-    if (!navigator.geolocation) {
-      alert("TACTICAL ERROR: Hardware does not support GPS Pulse.");
-      return;
-    }
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        const err = "HARDWARE_UNSUPPORTED";
+        alert("TACTICAL ERROR: Hardware does not support GPS Pulse.");
+        reject(err);
+        return;
+      }
 
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        localStorage.setItem(this.storageKey, "granted");
-        this.updateUI(position.coords);
-      },
-      (error) => {
-        console.error("GPS Access Denied:", error);
-        alert("ACCESS DENIED: Field coordinates blocked by user.");
-      },
-    );
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          localStorage.setItem(this.storageKey, "granted");
+          try {
+            const data = await this.updateUI(position.coords);
+            resolve(data);
+          } catch (e) {
+            reject(e);
+          }
+        },
+        (error) => {
+          console.error("GPS Access Denied:", error);
+          alert("ACCESS DENIED: Field coordinates blocked by user.");
+          reject(error);
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    });
   },
 
-  pulse() {
-    navigator.geolocation.getCurrentPosition(
-      (position) => this.updateUI(position.coords),
-      (error) => {
-        console.warn("Pulse Failed:", error);
-        const display = document.getElementById("loc-ref-display");
-        if (display) display.innerText = "LOC_REF: SIGNAL_LOST";
-      },
-      { enableHighAccuracy: true, timeout: 10000 },
-    );
+  /**
+   * Triggers a fresh GPS pulse.
+   * If not granted, it will attempt to request permission.
+   */
+  async pulse() {
+    if (localStorage.getItem(this.storageKey) !== "granted") {
+      return await this.requestPermission();
+    }
+
+    return new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          try {
+            const data = await this.updateUI(position.coords);
+            resolve(data);
+          } catch (e) {
+            reject(e);
+          }
+        },
+        (error) => {
+          console.warn("Pulse Failed:", error);
+          const display = document.getElementById("loc-ref-display");
+          if (display) display.innerText = "LOC_REF: SIGNAL_LOST";
+          reject(error);
+        },
+        { enableHighAccuracy: true, timeout: 10000 },
+      );
+    });
   },
 
   async updateUI(coords) {
     // 1. Update Coordinates (Main Line)
     const lat = coords.latitude.toFixed(4);
     const lon = coords.longitude.toFixed(4);
+    
     const refDisplay = document.getElementById("loc-ref-display");
     if (refDisplay) {
       refDisplay.innerHTML = `LOC_REF: <span class="text-primary">${lat}°N, ${lon}°W</span>`;
     }
-
-    // 2. Fetch & Update Intel Overlay (Small Sub-Line)
-    const intelDisplay = document.getElementById("loc-intel-display");
-    if (!intelDisplay) return;
 
     try {
       const response = await fetch(
@@ -80,24 +111,38 @@ const TacticalGPS = {
       );
       if (response.ok) {
         const data = await response.json();
-        intelDisplay.style.display = "block";
-        intelDisplay.innerHTML = `
-                    ZONE: <span class="text-primary">${data.city.toUpperCase()}, ${data.state.toUpperCase()}</span> // 
-                    TARGET: <span class="text-primary">#${data.store_num} (${data.distance_feet.toLocaleString()} FT)
-                </span>`;
+        
+        // PERSISTENCE: Store with timestamp
+        const storeIntel = {
+            num: data.store_num,
+            timestamp: Date.now()
+        };
+        localStorage.setItem(this.storePersistenceKey, JSON.stringify(storeIntel));
+        
+        // 2. Update Intel Overlay (if present)
+        const intelDisplay = document.getElementById("loc-intel-display");
+        if (intelDisplay) {
+          intelDisplay.style.display = "block";
+          intelDisplay.innerHTML = `
+                      ZONE: <span class="text-primary">${data.city.toUpperCase()}, ${data.state.toUpperCase()}</span> // 
+                      TARGET: <span class="text-primary">#${data.store_num} (${data.distance_feet.toLocaleString()} FT)
+                  </span>`;
+        }
+
+        return data;
       }
     } catch (error) {
       console.error("Intel Fetch Failed:", error);
+      throw error;
     }
   },
 };
 
 document.addEventListener("DOMContentLoaded", () => {
   TacticalGPS.init();
-  // Periodic pulse every 10 seconds if already granted
   setInterval(() => {
     if (localStorage.getItem(TacticalGPS.storageKey) === "granted") {
-      TacticalGPS.pulse();
+      TacticalGPS.pulse().catch(() => {});
     }
   }, 10000);
 });
