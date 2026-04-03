@@ -105,6 +105,18 @@
             font-family: 'JetBrains Mono', 'Courier New', Courier, monospace;
         }
 
+        .social-link {
+            color: var(--muted-text-color);
+            font-size: 1.2rem;
+            transition: color 0.2s ease, transform 0.2s ease;
+            display: inline-block;
+        }
+
+        .social-link:hover {
+            color: var(--primary-color);
+            transform: translateY(-2px);
+        }
+
         main {
             flex-grow: 1;
         }
@@ -112,29 +124,14 @@
     {% block extra_head %}{% endblock %}
 </head>
 <body>
-    <header>
-        <div class="command-bar">
-            <!-- Left Side: Brand as Home -->
-            <a href="{% url 'homepage:homepage' %}" class="command-brand">[ {{ SITE_NAME|upper }} ]</a>
-            
-            <!-- Right Side: Secondary Links -->
-            <nav class="d-flex align-items-center">
-                <a href="{% url 'homepage:about' %}" class="command-link">[ ABOUT ]</a>
-                <a href="{% url 'homepage:contact' %}" class="command-link">[ CONTACT ]</a>
-            </nav>
-        </div>
-    </header>
+    {% include 'components/navbar.html' %}
 
     <main>
         {% block content %}
         {% endblock %}
     </main>
 
-    <footer class="py-4 text-center">
-        <div class="container">
-            <p class="text-muted-custom mb-0 small mono">&copy; 2026 {{ SITE_NAME }} // FIELD_OPS_READY</p>
-        </div>
-    </footer>
+    {% include 'components/footer.html' %}
 
     <!-- Bootstrap JS Bundle -->
     <script src="{% static 'css/bootstrap/js/bootstrap.bundle.min.js' %}"></script>

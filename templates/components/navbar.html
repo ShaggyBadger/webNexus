@@ -1,0 +1,12 @@
+<header>
+    <div class="command-bar">
+        <!-- Left Side: Brand as Home -->
+        <a href="{% url 'homepage:homepage' %}" class="command-brand">[ {{ SITE_NAME|upper }} ]</a>
+        
+        <!-- Right Side: Secondary Links -->
+        <nav class="d-flex align-items-center">
+            <a href="{% url 'homepage:about' %}" class="command-link">[ ABOUT ]</a>
+            <a href="{% url 'homepage:contact' %}" class="command-link">[ CONTACT ]</a>
+        </nav>
+    </div>
+</header>

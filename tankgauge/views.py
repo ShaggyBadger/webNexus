@@ -1,6 +1,39 @@
+from django.shortcuts import render, redirect
 from django.http import JsonResponse
 from .models import Store
+from .forms import DeliveryEstimationForm
 import math
+
+
+def delivery_form(request):
+    """
+    Renders the Fuel Delivery Estimation form.
+    """
+    form = DeliveryEstimationForm()
+    return render(request, "tankgauge/delivery_form.html", {"form": form})
+
+
+def delivery_submit(request):
+    """
+    Handles form submission for Fuel Delivery Estimation.
+    """
+    if request.method == "POST":
+        form = DeliveryEstimationForm(request.POST)
+        if form.is_valid():
+            store_number = form.cleaned_data["store_number"]
+            fuel_types = form.cleaned_data["fuel_types"]
+            # Logic for estimation would go here
+            return JsonResponse({
+                "status": "success",
+                "message": f"Estimation initialized for Store {store_number}",
+                "data": {
+                    "store_number": store_number,
+                    "fuel_types": fuel_types
+                }
+            })
+        else:
+            return render(request, "tankgauge/delivery_form.html", {"form": form})
+    return redirect("tankgauge:delivery_form")
 
 
 def haversine(lat1, lon1, lat2, lon2):

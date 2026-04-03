@@ -1,6 +1,5 @@
 {% extends 'base.html' %}
 {% load static %}
-{% load custom_filters %}
 
 {% block title %}Fuel Delivery Estimation | {{ SITE_NAME }}{% endblock %}
 
@@ -35,6 +34,17 @@
     .text-accent {
         color: var(--accent-color);
     }
+
+    /* Override Bootstrap switches for tactical look */
+    .form-check-input {
+        background-color: var(--bg-color);
+        border-color: var(--navbar-border);
+    }
+    
+    .form-check-input:checked {
+        background-color: var(--primary-color);
+        border-color: var(--primary-color);
+    }
 </style>
 {% endblock %}
 
@@ -45,41 +55,54 @@
         <h1 class="fw-bold mono" style="font-size: 2.5rem">
             FUEL DELIVERY <span class="text-accent">ESTIMATION</span>
         </h1>
-        <p class="text-muted-custom">Enter operational parameters to calculate required volume.</p>
+        <p class="text-muted-custom mono small">[ TARGETING SYSTEM INITIALIZED ]</p>
     </div>
 
     <div class="card p-4">
         <form method="POST" action="{% url 'tankgauge:delivery_submit' %}" class="needs-validation" novalidate>
             {% csrf_token %}
-            <!-- Store Number Input -->
+            
+            <!-- Store Number Field -->
             <div class="mb-4">
-                <label for="storeNumber" class="form-label mono fw-bold">Store Number</label>
-                <input type="text" class="form-control form-control-lg" inputmode="numeric" pattern="[0-9]*"
-                    id="storeNumber" name="store_number" placeholder="Enter store number" required />
+                <label for="{{ form.store_number.id_for_label }}" class="form-label mono fw-bold">STORE_ID</label>
+                {{ form.store_number }}
+                {% if form.store_number.errors %}
+                    <div class="text-danger small mono mt-1">{{ form.store_number.errors.0 }}</div>
+                {% endif %}
             </div>
 
-            <!-- Fuel Switches -->
+            <!-- Fuel Type Selection -->
             <div class="mb-4">
-                <label class="form-label mono fw-bold mb-3">Select Fuel Types</label>
-
-                {% for type in "regular,plus,premium,kerosene,diesel"|split:"," %}
+                <label class="form-label mono fw-bold mb-3">SELECTION_FUEL_TYPES</label>
+                
+                {% for choice in form.fuel_types %}
                 <div class="row g-2 align-items-center mb-3">
                     <div class="col-8">
-                        <label class="form-check-label mono fs-5" for="fuel_{{ type }}">{{ type|title }}</label>
+                        <label class="form-check-label mono fs-5" for="{{ choice.id_for_label }}">
+                            {{ choice.choice_label|upper }}
+                        </label>
                     </div>
                     <div class="col-4 text-end">
                         <div class="form-check form-switch d-inline-block">
-                            <input class="form-check-input" type="checkbox" id="fuel_{{ type }}" name="fuel_types"
-                                value="{{ type }}" style="width: 3rem; height: 1.6rem" />
+                            <input class="form-check-input" type="checkbox" name="{{ choice.data.name }}" 
+                                   value="{{ choice.data.value }}" id="{{ choice.id_for_label }}"
+                                   {% if choice.data.selected %}checked{% endif %}
+                                   style="width: 3rem; height: 1.6rem">
                         </div>
                     </div>
                 </div>
                 {% endfor %}
+                
+                {% if form.fuel_types.errors %}
+                    <div class="text-danger small mono mt-1">{{ form.fuel_types.errors.0 }}</div>
+                {% endif %}
             </div>
 
             <!-- Submit Button -->
-            <div class="d-grid">
-                <button type="submit" class="btn btn-primary btn-lg mono fw-bold">INITIALIZE ESTIMATION</button>
+            <div class="d-grid mt-5">
+                <button type="submit" class="btn btn-primary btn-lg mono fw-bold py-3">
+                    [ INITIALIZE ESTIMATION ]
+                </button>
             </div>
         </form>
     </div>
@@ -88,18 +111,17 @@
 
 {% block extra_scripts %}
 <script>
+    // Minimal Client-side validation to maintain tactical feedback
     document.querySelector("form").addEventListener("submit", function (e) {
-        const storeNumber = document.getElementById("storeNumber").value.trim();
-        const fuelCheckboxes = document.querySelectorAll(
-            "input[name='fuel_types']:checked"
-        );
+        const storeNumber = document.querySelector('input[name="store_number"]').value.trim();
+        const fuelCheckboxes = document.querySelectorAll('input[name="fuel_types"]:checked');
 
         if (!storeNumber || fuelCheckboxes.length === 0) {
             e.preventDefault();
 
             let msg = "OPERATIONAL ERROR:\n";
-            if (!storeNumber) msg += "- Store number required\n";
-            if (fuelCheckboxes.length === 0) msg += "- Select at least one fuel type";
+            if (!storeNumber) msg += "- STORE_ID REQUIRED\n";
+            if (fuelCheckboxes.length === 0) msg += "- FUEL_TYPE SELECTION REQUIRED";
 
             alert(msg);
         }
