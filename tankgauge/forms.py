@@ -24,3 +24,23 @@ class DeliveryEstimationForm(forms.Form):
         widget=forms.CheckboxSelectMultiple,
         required=True
     )
+
+class TankDataForm(forms.Form):
+    delivery_gallons = forms.FloatField(
+        label="Delivery Gallons",
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control mono text-primary',
+            'placeholder': 'e.g. 4200',
+            'inputmode': 'numeric',
+            'pattern': '[0-9]*',
+        })
+    )
+    current_inches = forms.FloatField(
+        label="Current Inches",
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control mono text-info',
+            'placeholder': 'e.g. 29',
+            'inputmode': 'numeric',
+            'pattern': '[0-9]*',
+        })
+    )

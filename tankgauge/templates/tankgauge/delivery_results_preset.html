@@ -1,0 +1,149 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Delivery Intel | 7-11 PRESET{% endblock %}
+
+{% block extra_head %}
+<style>
+    .tactical-card {
+        background-color: var(--navbar-bg);
+        border: 1px solid var(--navbar-border);
+        border-radius: 0.25rem;
+        box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.4);
+        position: relative;
+        overflow: hidden;
+        padding: 1.5rem 1rem; /* Top/Bottom: 1.5rem, Left/Right: 1rem */
+    }
+
+    .tactical-card::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 3px;
+        height: 100%;
+        background-color: #ffb86c; /* Amber for presets */
+    }
+
+    .label-tactical {
+        font-size: 0.65rem;
+        letter-spacing: 2px;
+        color: var(--muted-text-color);
+        text-transform: uppercase;
+        margin-bottom: 0.25rem;
+        display: block;
+    }
+
+    .data-value {
+        font-family: 'JetBrains Mono', monospace;
+        font-weight: bold;
+        color: #ffb86c;
+    }
+
+    .tank-header {
+        border-bottom: 1px solid var(--navbar-border);
+        padding-bottom: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .btn-calculate {
+        border-radius: 0;
+        padding: 0.75rem;
+        letter-spacing: 1px;
+        background-color: #ffb86c;
+        border-color: #ffb86c;
+        color: #121417;
+        font-weight: bold;
+    }
+
+    .btn-calculate:hover {
+        background-color: #ffcc91;
+        border-color: #ffcc91;
+    }
+
+    .store-intel-bar {
+        background: rgba(255, 184, 108, 0.05);
+        border: 1px solid rgba(255, 184, 108, 0.2);
+        padding: 1rem;
+        margin-bottom: 2rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4 mt-5" style="max-width: 800px">
+    <div class="text-center mb-5">
+        <h1 class="fw-bold mono display-6">
+            TANK_DELIVERY_<span style="color: #ffb86c;">INTEL</span>
+        </h1>
+        <div class="mono text-muted-custom small">[ PRESET_TARGET: #7-11_STD ]</div>
+    </div>
+
+    <!-- Store Info Bar -->
+    <div class="store-intel-bar mono">
+        <div class="row g-3">
+            <div class="col-6 col-md-4">
+                <span class="label-tactical">CONFIG_TYPE</span>
+                <span class="small">STANDARD_7-11_TANKSET</span>
+            </div>
+            <div class="col-6 col-md-4">
+                <span class="label-tactical">DATA_SOURCE</span>
+                <span class="small">INTERNAL_EMULATOR</span>
+            </div>
+            <div class="col-12 col-md-4">
+                <span class="label-tactical">OPERATIONAL_STATUS</span>
+                <span class="text-warning small">PRESET_MODE_ACTIVE</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tank Cards -->
+    <div id="tank-cards">
+        {% for tank in tanks %}
+        <div class="tactical-card mb-4">
+            <div class="tank-header d-flex justify-content-between align-items-end">
+                <div>
+                    <span class="label-tactical">FUEL_TYPE</span>
+                    <h3 class="data-value mb-0 text-uppercase">{{ tank.fuel_type }}</h3>
+                </div>
+                <div class="text-end">
+                    <span class="label-tactical">TANK_MODEL</span>
+                    <span class="mono small text-muted-custom">{{ tank.tank_model }}</span>
+                </div>
+            </div>
+
+            <div class="row mb-4">
+                <div class="col-6">
+                    <span class="label-tactical">MAX_CAPACITY</span>
+                    <span class="data-value">{{ tank.capacity }} GAL</span>
+                </div>
+                <div class="col-6">
+                    <span class="label-tactical">90_PERCENT_LIMIT</span>
+                    <span class="data-value text-info">{{ tank.ninety_percent }} GAL</span>
+                </div>
+            </div>
+
+            <form method="POST" action="#" class="tank-calc-form">
+                {% csrf_token %}
+                <div class="row g-3 mb-4">
+                    <div class="col-md-6">
+                        <label class="label-tactical">{{ tank.form.delivery_gallons.label }}</label>
+                        {{ tank.form.delivery_gallons }}
+                    </div>
+                    <div class="col-md-6">
+                        <label class="label-tactical">{{ tank.form.current_inches.label }}</label>
+                        {{ tank.form.current_inches }}
+                    </div>
+                </div>
+
+                <div class="d-grid">
+                    <button type="button" class="btn btn-calculate mono">
+                        EXECUTE_CALCULATION_SEQUENCE
+                    </button>
+                </div>
+            </form>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
