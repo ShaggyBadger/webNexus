@@ -1,149 +1,213 @@
-{% extends 'base.html' %}
-{% load static %}
-
-{% block title %}Delivery Intel | {{ store.store_num }}{% endblock %}
-
-{% block extra_head %}
+{% extends 'base.html' %} {% load static %} {% block title %}Delivery Intel | {{
+store.store_num }}{% endblock %} {% block extra_head %}
 <link rel="stylesheet" href="{% static 'tankgauge/css/tankgauge.css' %}" />
-{% endblock %}
-
-{% block content %}
-<div class="container-fluid px-4 mt-5 tankgauge-container" style="max-width: 800px">
-    <div class="text-center mb-5">
-        <h1 class="fw-bold mono display-6">
-            TANK_DELIVERY_<span class="text-accent">INTEL</span>
-        </h1>
-        <div class="mono text-muted-custom small">[ STORE_TARGET: #{{ store.store_num }} ]</div>
+{% endblock %} {% block content %}
+<div
+  class="container-fluid px-4 mt-5 tankgauge-container"
+  style="max-width: 800px"
+>
+  <div class="text-center mb-5">
+    <h1 class="fw-bold mono display-6">
+      TANK_DELIVERY_<span class="text-accent">INTEL</span>
+    </h1>
+    <div class="mono text-muted-custom small">
+      [ STORE_TARGET: #{{ store.store_num }} ]
     </div>
+  </div>
 
-    <!-- Store Info Bar -->
-    <div class="store-intel-bar mono db-mode">
-        <div class="row g-3">
-            <div class="col-6 col-md-3">
-                <span class="label-tactical">STORE_NAME</span>
-                <span class="small">{{ store.store_name|default:"UNKNOWN_LOC" }}</span>
-            </div>
-            <div class="col-6 col-md-3">
-                <span class="label-tactical">LOCATION</span>
-                <span class="small">{{ store.city }}, {{ store.state }}</span>
-            </div>
-            <div class="col-6 col-md-3">
-                <span class="label-tactical">ADDRESS</span>
-                <span class="small">{{ store.address }}</span>
-            </div>
-            <div class="col-6 col-md-3">
-                <span class="label-tactical">OPERATIONAL_STATUS</span>
-                <span class="text-success small">ACTIVE_LINK</span>
-            </div>
+  <!-- Store Info Bar -->
+  <div class="store-intel-bar mono db-mode">
+    <div class="row g-3">
+      <div class="col-6 col-md-3">
+        <span class="label-tactical">STORE_NAME</span>
+        <span class="small">{{ store.store_name|default:"UNKNOWN_LOC" }}</span>
+      </div>
+      <div class="col-6 col-md-3">
+        <span class="label-tactical">LOCATION</span>
+        <span class="small">{{ store.city }}, {{ store.state }}</span>
+      </div>
+      <div class="col-6 col-md-3">
+        <span class="label-tactical">ADDRESS</span>
+        <span class="small">{{ store.address }}</span>
+      </div>
+      <div class="col-6 col-md-3">
+        <span class="label-tactical">OPERATIONAL_STATUS</span>
+        <span class="text-success small">ACTIVE_LINK</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tank Cards -->
+  <div id="tank-cards">
+    {% for tank in tanks %} {% if tank.is_missing or not tank.has_chart %}
+    <div class="tactical-card mb-5" style="border-style: dashed; opacity: 0.8">
+      <div class="specs-list border-0 mb-0">
+        <div class="spec-line">
+          <span class="specs-label">FUEL_TYPE:</span>
+          <span class="specs-value text-accent">{{ tank.fuel_type }}</span>
         </div>
-    </div>
-
-    <!-- Tank Cards -->
-    <div id="tank-cards">
-        {% for tank in tanks %}
-        {% if tank.is_missing or not tank.has_chart %}
-        <div class="tactical-card mb-5" style="border-style: dashed; opacity: 0.8;">
-            <div class="specs-list border-0 mb-0">
-                <div class="spec-line">
-                    <span class="specs-label">FUEL_TYPE:</span>
-                    <span class="specs-value text-accent">{{ tank.fuel_type }}</span>
-                </div>
-                <div class="mt-3 p-3 text-center mono fw-bold" style="background: rgba(255, 184, 108, 0.1); border: 1px solid #ffb86c; color: #ffb86c; font-size: 0.75rem; letter-spacing: 1px;">
-                    <i class="fas fa-exclamation-triangle me-2"></i> 
-                    {% if tank.is_missing %}
-                        DATA_MISSING: FUEL_TYPE NOT MAPPED TO STORE
-                    {% else %}
-                        SYSTEM_ERROR: NO TANK CHART DATA AVAILABLE
-                    {% endif %}
-                </div>
-                <p class="mt-3 text-muted-custom small mono text-center">
-                    [ CALCULATION_SEQUENCE_LOCKED // CONTACT_SYS_ADMIN ]
-                </p>
-            </div>
+        <div
+          class="mt-3 p-3 text-center mono fw-bold"
+          style="
+            background: rgba(255, 184, 108, 0.1);
+            border: 1px solid #ffb86c;
+            color: #ffb86c;
+            font-size: 0.75rem;
+            letter-spacing: 1px;
+          "
+        >
+          <i class="fas fa-exclamation-triangle me-2"></i>
+          {% if tank.is_missing %} DATA_MISSING: FUEL_TYPE NOT MAPPED TO STORE
+          {% else %} SYSTEM_ERROR: NO TANK CHART DATA AVAILABLE {% endif %}
         </div>
-        {% else %}
-        <div class="tactical-card mb-5" data-tank-id="{{ tank.mapping_id }}" data-fuel-type="{{ tank.fuel_type }}" data-max-depth="{{ tank.max_depth }}">
-            <!-- Simplified Data List -->
-            <div class="specs-list">
-                <div class="spec-line">
-                    <span class="specs-label">FUEL_TYPE:</span>
-                    <span class="specs-value text-accent">{{ tank.fuel_type }}</span>
-                </div>
-                <div class="spec-line">
-                    <span class="specs-label">TANK_MODEL:</span>
-                    <span class="specs-value">{{ tank.tank_model }}</span>
-                </div>
-                <div class="spec-line">
-                    <span class="specs-label">MAX_CAPACITY:</span>
-                    <span class="specs-value">{{ tank.capacity }} GAL</span>
-                </div>
-                <div class="spec-line">
-                    <span class="specs-label">MAX_DEPTH:</span>
-                    <span class="specs-value">{{ tank.max_depth }}"</span>
-                </div>
-                <div class="spec-line">
-                    <span class="specs-label">90_LIMIT:</span>
-                    <span class="specs-value text-info">{{ tank.ninety_percent }} GAL</span>
-                </div>
-            </div>
-
-            <div class="row g-3">
-                <div class="col-md-6">
-                    <label class="label-tactical">{{ tank.form.delivery_gallons.label }}</label>
-                    <input type="text" name="{{ tank.form.delivery_gallons.html_name }}" class="form-control form-control-lg mono tankgauge-form-control" 
-                           placeholder="e.g. 4200" inputmode="numeric" id="{{ tank.form.delivery_gallons.id_for_label }}" onfocus="this.select()">
-                </div>
-                <div class="col-md-6" style="margin-top: 1rem !important;">
-                    <label class="label-tactical">{{ tank.form.current_inches.label }} (MAX {{ tank.max_depth }})</label>
-                    <input type="text" name="{{ tank.form.current_inches.html_name }}" class="form-control form-control-lg mono tankgauge-form-control" 
-                           placeholder="e.g. 29" inputmode="decimal" id="{{ tank.form.current_inches.id_for_label }}" onfocus="this.select()">
-                </div>
-            </div>
-
-            <div class="d-grid" style="margin-top: 1.5rem !important;">
-                <button type="button" class="btn btn-calculate mono btn-ajax-calculate">
-                    EXECUTE_CALCULATION_SEQUENCE
-                </button>
-            </div>
-
-            <!-- AJAX Results Area -->
-            <div class="ajax-results mt-4" style="display: none; border-top: 1px dashed rgba(141, 163, 93, 0.2); padding-top: 1.5rem;">
-                <!-- NO-FIT WARNING (HIDDEN BY DEFAULT) -->
-                <div class="no-fit-warning mb-3 p-2 text-center mono fw-bold" style="display: none; background: rgba(255, 85, 85, 0.1); border: 1px solid #ff5555; color: #ff5555; letter-spacing: 2px;">
-                    <i class="fas fa-exclamation-triangle me-2"></i> CRITICAL: POSSIBLE NO-FIT DETECTED
-                </div>
-
-                <span class="label-tactical mb-3">[ DELIVERY_TICKET_INTEL ]</span>
-                <div class="mono small">
-                    <div class="mb-1"><span class="text-muted-custom">START_INCHES:</span> <span class="res-initial-inches text-primary">0</span>"</div>
-                    <div class="mb-1"><span class="text-muted-custom">START_GALLONS:</span> <span class="res-initial-vol text-primary">0</span> G</div>
-                    <div class="mb-1 res-avail-90-line"><span class="specs-label-avail text-muted-custom">90%_WILL_HOLD_GALLONS:</span> <span class="res-avail-90 text-primary">0</span> G</div>
-                    <div class="mb-3"><span class="text-muted-custom">BOL_GALLONS:</span> <span class="res-bol-gallons text-primary">0</span> G</div>
-                    <div class="mb-1"><span class="text-muted-custom">CALCULATED_ENDING_GALLONS:</span> <span class="res-final-vol text-primary">0</span> G</div>
-                    <div class="mb-1"><span class="text-muted-custom">ENDING_INCHES:</span> <span class="res-final-depth text-primary">0</span>"</div>
-                </div>
-            </div>
+        <p class="mt-3 text-muted-custom small mono text-center">
+          [ CALCULATION_SEQUENCE_LOCKED // CONTACT_SYS_ADMIN ]
+        </p>
+      </div>
+    </div>
+    {% else %}
+    <div
+      class="tactical-card mb-5"
+      data-tank-id="{{ tank.mapping_id }}"
+      data-fuel-type="{{ tank.fuel_type }}"
+      data-max-depth="{{ tank.max_depth }}"
+    >
+      <!-- Simplified Data List -->
+      <div class="specs-list">
+        <div class="spec-line">
+          <span class="specs-label">FUEL_TYPE:</span>
+          <span class="specs-value text-accent">{{ tank.fuel_type }}</span>
         </div>
-        {% endif %}
-        {% endfor %}
-    </div>
+        <div class="spec-line">
+          <span class="specs-label">TANK_MODEL:</span>
+          <span class="specs-value">{{ tank.tank_model }}</span>
+        </div>
+        <div class="spec-line">
+          <span class="specs-label">MAX_CAPACITY:</span>
+          <span class="specs-value">{{ tank.capacity }} GAL</span>
+        </div>
+        <div class="spec-line">
+          <span class="specs-label">MAX_DEPTH:</span>
+          <span class="specs-value">{{ tank.max_depth }}"</span>
+        </div>
+        <div class="spec-line">
+          <span class="specs-label">90_LIMIT:</span>
+          <span class="specs-value text-info"
+            >{{ tank.ninety_percent }} GAL</span
+          >
+        </div>
+      </div>
 
-    <!-- Final Submission / Reset -->
-    <div class="d-flex justify-content-center gap-3 mb-5">
-        <a href="javascript:history.back()" class="btn btn-return-tactical mono">
-            <i class="fas fa-arrow-left me-2"></i>RETURN_TO_PARAMETERS
-        </a>
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="label-tactical"
+            >{{ tank.form.delivery_gallons.label }}</label
+          >
+          <input
+            type="text"
+            name="{{ tank.form.delivery_gallons.html_name }}"
+            class="form-control form-control-lg mono tankgauge-form-control"
+            placeholder="e.g. 4200"
+            inputmode="numeric"
+            id="{{ tank.form.delivery_gallons.id_for_label }}"
+            onfocus="this.select()"
+          />
+        </div>
+        <div class="col-md-6" style="margin-top: 1rem !important">
+          <label class="label-tactical"
+            >{{ tank.form.current_inches.label }} (MAX {{ tank.max_depth
+            }})</label
+          >
+          <input
+            type="text"
+            name="{{ tank.form.current_inches.html_name }}"
+            class="form-control form-control-lg mono tankgauge-form-control"
+            placeholder="e.g. 29"
+            inputmode="decimal"
+            id="{{ tank.form.current_inches.id_for_label }}"
+            onfocus="this.select()"
+          />
+        </div>
+      </div>
+
+      <div class="d-grid" style="margin-top: 1.5rem !important">
+        <button type="button" class="btn btn-calculate mono btn-ajax-calculate">
+          EXECUTE_CALCULATION_SEQUENCE
+        </button>
+      </div>
+
+      <!-- AJAX Results Area -->
+      <div
+        class="ajax-results mt-4"
+        style="
+          display: none;
+          border-top: 1px dashed rgba(141, 163, 93, 0.2);
+          padding-top: 1.5rem;
+        "
+      >
+        <!-- NO-FIT WARNING (HIDDEN BY DEFAULT) -->
+        <div
+          class="no-fit-warning mb-3 p-2 text-center mono fw-bold"
+          style="
+            display: none;
+            background: rgba(255, 85, 85, 0.1);
+            border: 1px solid #ff5555;
+            color: #ff5555;
+            letter-spacing: 2px;
+          "
+        >
+          <i class="fas fa-exclamation-triangle me-2"></i> CRITICAL: POSSIBLE
+          NO-FIT DETECTED
+        </div>
+
+        <span class="label-tactical mb-3">[ DELIVERY_TICKET_INTEL ]</span>
+        <div class="mono small">
+          <div class="mb-1">
+            <span class="text-muted-custom">START_INCHES:</span>
+            <span class="res-initial-inches text-primary">0</span>"
+          </div>
+          <div class="mb-1">
+            <span class="text-muted-custom">START_GALLONS:</span>
+            <span class="res-initial-vol text-primary">0</span> G
+          </div>
+          <div class="mb-1 res-avail-90-line">
+            <span class="specs-label-avail text-muted-custom"
+              >90%_WILL_HOLD_GALLONS:</span
+            >
+            <span class="res-avail-90 text-primary">0</span> G
+          </div>
+          <div class="mb-3">
+            <span class="text-muted-custom">BOL_GALLONS:</span>
+            <span class="res-bol-gallons text-primary">0</span> G
+          </div>
+          <div class="mb-1">
+            <span class="text-muted-custom">CALCULATED_ENDING_GALLONS:</span>
+            <span class="res-final-vol text-primary">0</span> G
+          </div>
+          <div class="mb-1">
+            <span class="text-muted-custom">ENDING_INCHES:</span>
+            <span class="res-final-depth text-primary">0</span>"
+          </div>
+        </div>
+      </div>
     </div>
+    {% endif %} {% endfor %}
+  </div>
+
+  <!-- Final Submission / Reset -->
+  <div class="d-flex justify-content-center gap-3 mb-5">
+    <a href="javascript:history.back()" class="btn btn-return-tactical mono">
+      <i class="fas fa-arrow-left me-2"></i>RETURN_TO_PARAMETERS
+    </a>
+  </div>
 </div>
-{% endblock %}
-
-{% block extra_scripts %}
+{% endblock %} {% block extra_scripts %}
 <script src="{% static 'tankgauge/js/tankgauge_intel.js' %}"></script>
 <script>
-    TankGaugeIntel.init({
-        calcUrl: "{% url 'tankgauge:calculate_tank_api' %}",
-        storeId: "{{ store.store_num }}",
-        isPreset: false
-    });
+  TankGaugeIntel.init({
+    calcUrl: "{% url 'tankgauge:calculate_tank_api' %}",
+    storeId: "{{ store.store_num }}",
+    isPreset: false,
+  });
 </script>
 {% endblock %}
