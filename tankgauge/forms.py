@@ -38,7 +38,7 @@ class TankDataForm(forms.Form):
     current_inches = forms.FloatField(
         label="Current Inches",
         widget=forms.NumberInput(attrs={
-            'class': 'form-control mono text-info',
+            'class': 'form-control mono text-primary',
             'placeholder': 'e.g. 29',
             'inputmode': 'numeric',
             'pattern': '[0-9]*',

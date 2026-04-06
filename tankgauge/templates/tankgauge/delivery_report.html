@@ -1,0 +1,135 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Delivery Report | {{ store_id }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    .report-card {
+        background-color: var(--navbar-bg);
+        border: 1px solid var(--navbar-border);
+        border-radius: 0.5rem;
+        box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.6);
+        padding: 2rem;
+        margin-bottom: 2rem;
+    }
+
+    .report-header {
+        border-bottom: 2px solid var(--primary-color);
+        padding-bottom: 1rem;
+        margin-bottom: 2rem;
+    }
+
+    .report-section {
+        margin-bottom: 2rem;
+    }
+
+    .report-label {
+        font-size: 0.75rem;
+        color: var(--muted-text-color);
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        display: block;
+        margin-bottom: 0.5rem;
+    }
+
+    .report-value {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: var(--primary-color);
+    }
+
+    .report-value-sub {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 1rem;
+        color: var(--text-color);
+    }
+
+    .summary-box {
+        background: rgba(141, 163, 93, 0.05);
+        border-left: 4px solid var(--primary-color);
+        padding: 1.5rem;
+        margin-top: 1rem;
+    }
+
+    .btn-tactical {
+        border-radius: 0;
+        padding: 0.75rem 1.5rem;
+        letter-spacing: 1px;
+        font-weight: bold;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4 mt-5" style="max-width: 800px">
+    <div class="text-center mb-5">
+        <h1 class="fw-bold mono display-6">
+            FINAL_DELIVERY_<span class="text-accent">REPORT</span>
+        </h1>
+        <div class="mono text-muted-custom small">[ SEQUENCE_COMPLETE // ID: #{{ report_id }} ]</div>
+    </div>
+
+    <div class="report-header d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <span class="report-label">TARGET_STORE</span>
+            <span class="report-value-sub">#{{ store_id }} - {{ store_name }}</span>
+        </div>
+        <div class="text-end">
+            <span class="report-label">SYSTEM_STATUS</span>
+            <span class="report-value-sub text-success">SEQUENCE_COMPLETE</span>
+        </div>
+    </div>
+
+    {% for res in results %}
+    <div class="report-card">
+        <div class="report-header d-flex justify-content-between align-items-center">
+            <div>
+                <span class="report-label">FUEL_TYPE</span>
+                <span class="report-value text-accent">{{ res.fuel_type|upper }}</span>
+            </div>
+            <div class="text-end">
+                <span class="report-label">TANK_ID</span>
+                <span class="report-value-sub">TC-{{ forloop.counter|add:100 }}</span>
+            </div>
+        </div>
+
+        <div class="row report-section">
+            <div class="col-md-6">
+                <span class="report-label">INITIAL_STATE</span>
+                <div class="report-value">{{ res.initial_inches }}" <span class="report-value-sub">DEPTH</span></div>
+                <div class="report-value">{{ res.initial_gallons }} <span class="report-value-sub">GAL</span></div>
+            </div>
+            <div class="col-md-6">
+                <span class="report-label">DELIVERY_GALLONS</span>
+                <div class="report-value text-info">+ {{ res.delivery_gallons }} <span class="report-value-sub">GAL</span></div>
+            </div>
+        </div>
+
+        <div class="summary-box">
+            <span class="report-label">FINAL_ESTIMATION_RESULT</span>
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <span class="small text-muted-custom d-block mb-1">TOTAL_VOLUME:</span>
+                    <div class="report-value">{{ res.final_gallons }} GAL</div>
+                </div>
+                <div class="col-md-6">
+                    <span class="small text-muted-custom d-block mb-1">CALCULATED_DEPTH:</span>
+                    <div class="report-value text-accent">{{ res.final_inches }}"</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+
+    <div class="d-flex justify-content-center gap-3 mb-5">
+        <a href="javascript:history.back()" class="btn btn-outline-secondary btn-tactical mono">
+            <i class="fas fa-arrow-left me-2"></i>RETURN_TO_PARAMETERS
+        </a>
+        <a href="{% url 'tankgauge:delivery_form' %}" class="btn btn-primary btn-tactical mono" style="background-color: var(--primary-color); border-color: var(--primary-color); color: #121417;">
+            <i class="fas fa-redo me-2"></i>NEW_ESTIMATION
+        </a>
+    </div>
+</div>
+{% endblock %}
