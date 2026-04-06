@@ -1,6 +1,7 @@
 from tankgauge.models import Store
 from django.db.models import Q
 
+
 def get_store_by_any_id(identifier):
     """
     Looks up a store by store_num or riso_num.
@@ -8,7 +9,7 @@ def get_store_by_any_id(identifier):
     """
     if not identifier:
         return None
-    
+
     # Try to convert to int if it's a string
     try:
         val = int(identifier)

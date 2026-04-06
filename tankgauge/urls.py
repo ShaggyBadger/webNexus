@@ -1,5 +1,10 @@
 from django.urls import path
-from .views import closest_store_api, delivery_form, delivery_submit, delivery_report, calculate_tank_api
+from .views import (
+    closest_store_api,
+    delivery_form,
+    delivery_submit,
+    calculate_tank_api,
+)
 
 app_name = "tankgauge"
 
@@ -9,6 +14,5 @@ urlpatterns = [
     # Page views
     path("delivery/", delivery_form, name="delivery_form"),
     path("delivery/submit/", delivery_submit, name="delivery_submit"),
-    path("delivery/report/", delivery_report, name="delivery_report"),
     path("api/calculate-tank/", calculate_tank_api, name="calculate_tank_api"),
 ]

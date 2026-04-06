@@ -4,120 +4,11 @@
 {% block title %}Delivery Intel | {{ store.store_num }}{% endblock %}
 
 {% block extra_head %}
-<style>
-    .tactical-card {
-        background-color: var(--navbar-bg);
-        border: 1px solid var(--navbar-border);
-        border-radius: 0.25rem;
-        box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.4);
-        position: relative;
-        overflow: hidden;
-        padding: 1.5rem 1rem; /* Top/Bottom: 1.5rem, Left/Right: 1rem */
-        margin-bottom: 3rem !important;
-    }
-
-    .tactical-card::before {
-        content: "";
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 3px;
-        height: 100%;
-        background-color: var(--primary-color);
-    }
-
-    .label-tactical {
-        font-size: 0.65rem;
-        letter-spacing: 2px;
-        color: var(--muted-text-color);
-        text-transform: uppercase;
-        margin-bottom: 0.25rem;
-        display: block;
-    }
-
-    .data-value {
-        font-family: 'JetBrains Mono', monospace;
-        font-weight: bold;
-        color: var(--primary-color);
-    }
-
-    .tank-header {
-        border-bottom: 1px solid var(--navbar-border);
-        padding-bottom: 1rem;
-        margin-bottom: 1.5rem;
-    }
-
-    .btn-calculate {
-        border-radius: 0;
-        padding: 0.75rem;
-        letter-spacing: 1px;
-        background-color: var(--accent-color);
-        border-color: var(--accent-color);
-        color: white;
-        font-weight: bold;
-    }
-
-    .btn-calculate:hover {
-        background-color: #ff5e7e;
-        border-color: #ff5e7e;
-    }
-
-    .specs-list {
-        margin-bottom: 1.5rem;
-        padding-bottom: 1rem;
-        border-bottom: 1px solid rgba(141, 163, 93, 0.1);
-        font-size: 0.8rem;
-    }
-
-    .spec-line {
-        margin-bottom: 0.25rem;
-    }
-
-    .specs-label {
-        color: var(--muted-text-color);
-        text-transform: uppercase;
-        letter-spacing: 1px;
-        margin-right: 0.5rem;
-    }
-
-    .specs-value {
-        font-family: 'JetBrains Mono', monospace;
-        color: var(--primary-color);
-        font-weight: bold;
-    }
-
-    .store-intel-bar {
-        background: rgba(141, 163, 93, 0.05);
-        border: 1px solid rgba(141, 163, 93, 0.2);
-        padding: 1rem;
-        margin-bottom: 2rem;
-    }
-
-    .form-control {
-        background-color: var(--bg-color);
-        color: var(--text-color);
-        border: 1px solid var(--navbar-border);
-        border-radius: 0;
-        font-size: 1.25rem;
-        font-weight: bold;
-    }
-
-    .form-control:focus {
-        background-color: var(--bg-color);
-        color: var(--text-color);
-        border-color: var(--primary-color);
-        box-shadow: 0 0 10px rgba(141, 163, 93, 0.2);
-    }
-
-    .form-control::placeholder {
-        color: var(--muted-text-color) !important;
-        opacity: 0.5;
-    }
-</style>
+<link rel="stylesheet" href="{% static 'tankgauge/css/tankgauge.css' %}" />
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid px-4 mt-5" style="max-width: 800px">
+<div class="container-fluid px-4 mt-5 tankgauge-container" style="max-width: 800px">
     <div class="text-center mb-5">
         <h1 class="fw-bold mono display-6">
             TANK_DELIVERY_<span class="text-accent">INTEL</span>
@@ -126,7 +17,7 @@
     </div>
 
     <!-- Store Info Bar -->
-    <div class="store-intel-bar mono">
+    <div class="store-intel-bar mono db-mode">
         <div class="row g-3">
             <div class="col-6 col-md-3">
                 <span class="label-tactical">STORE_NAME</span>
@@ -150,6 +41,27 @@
     <!-- Tank Cards -->
     <div id="tank-cards">
         {% for tank in tanks %}
+        {% if tank.is_missing or not tank.has_chart %}
+        <div class="tactical-card mb-5" style="border-style: dashed; opacity: 0.8;">
+            <div class="specs-list border-0 mb-0">
+                <div class="spec-line">
+                    <span class="specs-label">FUEL_TYPE:</span>
+                    <span class="specs-value text-accent">{{ tank.fuel_type }}</span>
+                </div>
+                <div class="mt-3 p-3 text-center mono fw-bold" style="background: rgba(255, 184, 108, 0.1); border: 1px solid #ffb86c; color: #ffb86c; font-size: 0.75rem; letter-spacing: 1px;">
+                    <i class="fas fa-exclamation-triangle me-2"></i> 
+                    {% if tank.is_missing %}
+                        DATA_MISSING: FUEL_TYPE NOT MAPPED TO STORE
+                    {% else %}
+                        SYSTEM_ERROR: NO TANK CHART DATA AVAILABLE
+                    {% endif %}
+                </div>
+                <p class="mt-3 text-muted-custom small mono text-center">
+                    [ CALCULATION_SEQUENCE_LOCKED // CONTACT_SYS_ADMIN ]
+                </p>
+            </div>
+        </div>
+        {% else %}
         <div class="tactical-card mb-5" data-tank-id="{{ tank.mapping_id }}" data-fuel-type="{{ tank.fuel_type }}" data-max-depth="{{ tank.max_depth }}">
             <!-- Simplified Data List -->
             <div class="specs-list">
@@ -178,15 +90,17 @@
             <div class="row g-3">
                 <div class="col-md-6">
                     <label class="label-tactical">{{ tank.form.delivery_gallons.label }}</label>
-                    {{ tank.form.delivery_gallons }}
+                    <input type="text" name="{{ tank.form.delivery_gallons.html_name }}" class="form-control form-control-lg mono tankgauge-form-control" 
+                           placeholder="e.g. 4200" inputmode="numeric" id="{{ tank.form.delivery_gallons.id_for_label }}" onfocus="this.select()">
                 </div>
-                <div class="col-md-6">
+                <div class="col-md-6" style="margin-top: 1rem !important;">
                     <label class="label-tactical">{{ tank.form.current_inches.label }} (MAX {{ tank.max_depth }})</label>
-                    {{ tank.form.current_inches }}
+                    <input type="text" name="{{ tank.form.current_inches.html_name }}" class="form-control form-control-lg mono tankgauge-form-control" 
+                           placeholder="e.g. 29" inputmode="decimal" id="{{ tank.form.current_inches.id_for_label }}" onfocus="this.select()">
                 </div>
             </div>
 
-            <div class="d-grid mt-4">
+            <div class="d-grid" style="margin-top: 1.5rem !important;">
                 <button type="button" class="btn btn-calculate mono btn-ajax-calculate">
                     EXECUTE_CALCULATION_SEQUENCE
                 </button>
@@ -210,126 +124,26 @@
                 </div>
             </div>
         </div>
+        {% endif %}
         {% endfor %}
     </div>
 
-    <!-- Final Submission (Optional, can be removed if AJAX is primary) -->
-    <div class="text-center mt-5 mb-5">
-        <a href="{% url 'tankgauge:delivery_form' %}" class="btn mono" style="color: rgba(255,255,255,0.8); border: 1px solid rgba(255,255,255,0.3); border-radius: 0; padding: 0.75rem 1.5rem; letter-spacing: 2px;">
-            <i class="fas fa-redo me-2"></i>RESET_ALL_PARAMETERS
+    <!-- Final Submission / Reset -->
+    <div class="d-flex justify-content-center gap-3 mb-5">
+        <a href="javascript:history.back()" class="btn btn-return-tactical mono">
+            <i class="fas fa-arrow-left me-2"></i>RETURN_TO_PARAMETERS
         </a>
     </div>
 </div>
 {% endblock %}
 
 {% block extra_scripts %}
+<script src="{% static 'tankgauge/js/tankgauge_intel.js' %}"></script>
 <script>
-    document.addEventListener("DOMContentLoaded", () => {
-        const calcButtons = document.querySelectorAll(".btn-ajax-calculate");
-
-        calcButtons.forEach(btn => {
-            btn.addEventListener("click", async () => {
-                const card = btn.closest(".tactical-card");
-                const storeId = "{{ store.store_num }}";
-                const fuelType = card.dataset.fuelType;
-                
-                // Get inputs using the form field names (which include prefixes)
-                // We need to find the specific inputs within this card
-                const deliveryInput = card.querySelector('input[name*="delivery_gallons"]');
-                const inchesInput = card.querySelector('input[name*="current_inches"]');
-                
-                const deliveryGallons = deliveryInput.value;
-                const currentInches = parseFloat(inchesInput.value);
-                const maxDepth = parseFloat(card.dataset.maxDepth);
-
-                if (isNaN(currentInches)) {
-                    alert("OPERATIONAL_ERROR: CURRENT_INCHES REQUIRED");
-                    return;
-                }
-                
-                if (currentInches < 0 || currentInches > maxDepth) {
-                    alert(`PARAMETER_ERROR: DEPTH MUST BE BETWEEN 0 AND ${maxDepth} INCHES.`);
-                    return;
-                }
-
-                // UI State: Loading
-                const originalText = btn.innerText;
-                btn.innerHTML = '<i class="fas fa-microchip fa-spin me-2"></i>PROCESSING...';
-                btn.disabled = true;
-
-                try {
-                    const formData = new FormData();
-                    formData.append("store_id", storeId);
-                    formData.append("fuel_type", fuelType);
-                    formData.append("current_inches", currentInches);
-                    formData.append("delivery_gallons", deliveryGallons || 0);
-
-                    const response = await fetch("{% url 'tankgauge:calculate_tank_api' %}", {
-                        method: "POST",
-                        body: formData,
-                        headers: {
-                            "X-CSRFToken": document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-                        }
-                    });
-
-                    if (response.ok) {
-                        const data = await response.json();
-                        
-                        // Update Results UI
-                        const resultsArea = card.querySelector(".ajax-results");
-                        const avail90Val = Math.max(0, data.avail_90);
-                        const avail90El = resultsArea.querySelector(".res-avail-90");
-                        const avail90Line = resultsArea.querySelector(".res-avail-90-line");
-                        const avail90Label = resultsArea.querySelector(".specs-label-avail");
-                        
-                        resultsArea.querySelector(".res-initial-inches").innerText = data.initial_inches;
-                        resultsArea.querySelector(".res-initial-vol").innerText = data.initial_gallons.toLocaleString();
-                        
-                        avail90El.innerText = avail90Val.toLocaleString();
-                        if (data.no_fit_warning) {
-                            avail90Line.style.setProperty("color", "#ff5555", "important");
-                            avail90Line.style.setProperty("font-weight", "900", "important");
-                            avail90El.style.setProperty("color", "#ff5555", "important");
-                            avail90Label.style.setProperty("color", "#ff5555", "important");
-                            avail90Line.classList.add("flicker");
-                        } else {
-                            avail90Line.style.color = "";
-                            avail90Line.style.fontWeight = "";
-                            avail90El.style.color = "";
-                            avail90Label.style.color = "";
-                            avail90Line.classList.remove("flicker");
-                        }
-
-                        resultsArea.querySelector(".res-bol-gallons").innerText = data.delivery_gallons.toLocaleString();
-                        resultsArea.querySelector(".res-final-vol").innerText = data.final_gallons.toLocaleString();
-                        resultsArea.querySelector(".res-final-depth").innerText = data.final_inches;
-                        
-                        // Show/Hide No-Fit Warning
-                        const warningBox = resultsArea.querySelector(".no-fit-warning");
-                        warningBox.style.display = data.no_fit_warning ? "block" : "none";
-                        
-                        resultsArea.style.display = "block";
-                        
-                        // Small animation effect
-                        resultsArea.style.opacity = "0";
-                        setTimeout(() => {
-                            resultsArea.style.transition = "opacity 0.5s ease";
-                            resultsArea.style.opacity = "1";
-                        }, 10);
-
-                    } else {
-                        const err = await response.json();
-                        alert("CALCULATION_ERROR: " + (err.error || "UNKNOWN"));
-                    }
-                } catch (e) {
-                    console.error(e);
-                    alert("SYSTEM_CRITICAL_ERROR: API_COMMUNICATION_FAILED");
-                } finally {
-                    btn.innerText = originalText;
-                    btn.disabled = false;
-                }
-            });
-        });
+    TankGaugeIntel.init({
+        calcUrl: "{% url 'tankgauge:calculate_tank_api' %}",
+        storeId: "{{ store.store_num }}",
+        isPreset: false
     });
 </script>
 {% endblock %}
