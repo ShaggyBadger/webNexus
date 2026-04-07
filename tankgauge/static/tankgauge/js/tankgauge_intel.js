@@ -238,11 +238,11 @@ const TankGaugeIntel = {
             if (anyNoFit) {
                 statusEl.innerText = "CRITICAL_WARNING";
                 statusEl.style.color = "#ff5555";
-                warningEl.style.display = "block";
+                if (warningEl) warningEl.style.display = "block";
             } else {
                 statusEl.innerText = "NOMINAL_CLEAR_TO_PUMP";
                 statusEl.style.color = "#8da35d";
-                warningEl.style.display = "none";
+                if (warningEl) warningEl.style.display = "none";
             }
         }
     },
