@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect
 from django.http import JsonResponse
 from .models import Store, StoreTankMapping, TankType, TankChart
 from .forms import DeliveryEstimationForm, TankDataForm
-from .logic.store_lookup import get_store_by_any_id
+from .logic.tank_lookup import get_store_and_preset_status, get_tank_mapping
 from .logic.calculations import (
     get_volume_from_depth,
     get_depth_from_volume,
@@ -31,51 +31,58 @@ def delivery_submit(request):
             store_number_input = form.cleaned_data["store_number"]
             selected_fuels = form.cleaned_data["fuel_types"]
 
+            store, is_preset = get_store_and_preset_status(store_number_input)
+
+            if not store:
+                return render(
+                    request,
+                    "tankgauge/delivery_form.html",
+                    {
+                        "form": form,
+                        "error_message": f"STORE_ID #{store_number_input} NOT FOUND IN DATABASE",
+                    },
+                )
+
             tanks_found = []
+            for fuel in selected_fuels:
+                mapping = get_tank_mapping(store, fuel)
 
-            # CASE A: 7-11 STANDARD PRESET
-            if store_number_input == "7-11_STD":
-                # Use Store #6949 as the standard for 7-11
-                std_store = Store.objects.filter(store_num=6949).first()
-
-                for fuel in selected_fuels:
-                    mapping = (
-                        StoreTankMapping.objects.filter(
-                            store=std_store, fuel_type=fuel.lower()
-                        )
-                        .select_related("tank_type")
-                        .first()
+                if mapping:
+                    has_chart = TankChart.objects.filter(
+                        tank_type=mapping.tank_type
+                    ).exists()
+                    capacity = mapping.tank_type.capacity or 0
+                    tanks_found.append(
+                        {
+                            "fuel_type": fuel.upper(),
+                            "tank_model": mapping.tank_type.name,
+                            "capacity": capacity,
+                            "max_depth": mapping.tank_type.max_depth,
+                            "ninety_percent": int(capacity * 0.9),
+                            "form": TankDataForm(
+                                auto_id=f"tank_{mapping.id if not is_preset else fuel}_%s",
+                                prefix=f"tank_{mapping.id if not is_preset else fuel}",
+                            ),
+                            "is_preset": is_preset,
+                            "mapping_id": mapping.id if not is_preset else None,
+                            "has_chart": has_chart,
+                            "error": None if has_chart else "MISSING_CHART_DATA",
+                        }
+                    )
+                else:
+                    tanks_found.append(
+                        {
+                            "fuel_type": fuel.upper(),
+                            "is_missing": True,
+                            "error": (
+                                "TANK_NOT_FOUND_IN_PRESET"
+                                if is_preset
+                                else "TANK_NOT_MAPPED_TO_STORE"
+                            ),
+                        }
                     )
 
-                    if mapping:
-                        has_chart = TankChart.objects.filter(
-                            tank_type=mapping.tank_type
-                        ).exists()
-                        capacity = mapping.tank_type.capacity or 0
-                        tanks_found.append(
-                            {
-                                "fuel_type": fuel.upper(),
-                                "tank_model": mapping.tank_type.name,
-                                "capacity": capacity,
-                                "max_depth": mapping.tank_type.max_depth,
-                                "ninety_percent": int(capacity * 0.9),
-                                "form": TankDataForm(
-                                    auto_id=f"tank_{fuel}_%s", prefix=f"tank_{fuel}"
-                                ),
-                                "is_preset": True,
-                                "has_chart": has_chart,
-                                "error": None if has_chart else "MISSING_CHART_DATA",
-                            }
-                        )
-                    else:
-                        tanks_found.append(
-                            {
-                                "fuel_type": fuel.upper(),
-                                "is_missing": True,
-                                "error": "TANK_NOT_FOUND_IN_PRESET",
-                            }
-                        )
-
+            if is_preset:
                 context = {
                     "store_num": "7-11_STD",
                     "tanks": tanks_found,
@@ -85,68 +92,9 @@ def delivery_submit(request):
                 return render(
                     request, "tankgauge/delivery_results_preset.html", context
                 )
-
-            # CASE B: DATABASE LOOKUP
             else:
-                store = get_store_by_any_id(store_number_input)
-                if store:
-                    for fuel in selected_fuels:
-                        mapping = (
-                            StoreTankMapping.objects.filter(
-                                store=store, fuel_type=fuel.lower()
-                            )
-                            .select_related("tank_type")
-                            .first()
-                        )
-
-                        if mapping:
-                            has_chart = TankChart.objects.filter(
-                                tank_type=mapping.tank_type
-                            ).exists()
-                            capacity = mapping.tank_type.capacity or 0
-                            tanks_found.append(
-                                {
-                                    "fuel_type": fuel.upper(),
-                                    "tank_model": mapping.tank_type.name,
-                                    "capacity": capacity,
-                                    "max_depth": mapping.tank_type.max_depth,
-                                    "ninety_percent": int(capacity * 0.9),
-                                    "form": TankDataForm(
-                                        auto_id=f"tank_{mapping.id}_%s",
-                                        prefix=f"tank_{mapping.id}",
-                                    ),
-                                    "is_preset": False,
-                                    "mapping_id": mapping.id,
-                                    "has_chart": has_chart,
-                                    "error": (
-                                        None if has_chart else "MISSING_CHART_DATA"
-                                    ),
-                                }
-                            )
-                        else:
-                            tanks_found.append(
-                                {
-                                    "fuel_type": fuel.upper(),
-                                    "is_missing": True,
-                                    "error": "TANK_NOT_MAPPED_TO_STORE",
-                                }
-                            )
-
-                    context = {"store": store, "tanks": tanks_found, "is_preset": False}
-                    return render(
-                        request, "tankgauge/delivery_results_db.html", context
-                    )
-
-                else:
-                    # In case of manual entry failure, return to form with error
-                    return render(
-                        request,
-                        "tankgauge/delivery_form.html",
-                        {
-                            "form": form,
-                            "error_message": f"STORE_ID #{store_number_input} NOT FOUND IN DATABASE",
-                        },
-                    )
+                context = {"store": store, "tanks": tanks_found, "is_preset": False}
+                return render(request, "tankgauge/delivery_results_db.html", context)
         else:
             return render(request, "tankgauge/delivery_form.html", {"form": form})
     return redirect("tankgauge:delivery_form")
@@ -236,23 +184,12 @@ def calculate_tank_api(request):
     except (ValueError, TypeError):
         return JsonResponse({"error": "Invalid numerical input"}, status=400)
 
-    # Tank lookup logic (similar to delivery_report)
-    tank_type = None
-    if store_id == "7-11_STD":
-        std_store = Store.objects.filter(store_num=6949).first()
-        mapping = StoreTankMapping.objects.filter(
-            store=std_store, fuel_type=fuel_type.lower()
-        ).first()
-        if mapping:
-            tank_type = mapping.tank_type
-    else:
-        store = get_store_by_any_id(store_id)
-        if store:
-            mapping = StoreTankMapping.objects.filter(
-                store=store, fuel_type=fuel_type.lower()
-            ).first()
-            if mapping:
-                tank_type = mapping.tank_type
+    # Tank lookup logic using helpers
+    store, _ = get_store_and_preset_status(store_id)
+    mapping = get_tank_mapping(store, fuel_type)
+    
+    if mapping:
+        tank_type = mapping.tank_type
 
     if not tank_type:
         return JsonResponse({"error": "Tank chart not found"}, status=404)
