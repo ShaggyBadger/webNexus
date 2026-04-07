@@ -6,11 +6,13 @@ const TankGaugeIntel = {
     calcUrl: '',
     storeId: '',
     isPreset: false,
+    calculatedTanks: {}, // Store results for mission summary
 
     init(config) {
         this.calcUrl = config.calcUrl;
         this.storeId = config.storeId;
         this.isPreset = config.isPreset || false;
+        this.calculatedTanks = {};
 
         document.addEventListener("DOMContentLoaded", () => {
             this.bindCalcButtons();
@@ -74,31 +76,42 @@ const TankGaugeIntel = {
             formData.append("current_inches", currentInches);
             formData.append("delivery_gallons", deliveryGallons);
 
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+            if (!csrfToken) {
+                console.error("CSRF Token Missing from Meta Tag");
+            }
+
             const response = await fetch(this.calcUrl, {
                 method: "POST",
                 body: formData,
                 headers: {
-                    "X-CSRFToken": document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                    "X-CSRFToken": csrfToken || ""
                 }
             });
 
             if (response.ok) {
                 const data = await response.json();
-                this.updateResultsUI(card, data);
+                this.updateResultsUI(card, data, fuelType);
             } else {
-                const err = await response.json();
-                alert("CALCULATION_ERROR: " + (err.error || "UNKNOWN"));
+                const errText = await response.text();
+                console.error("API Error Response:", response.status, errText);
+                let errorMessage = "UNKNOWN_API_ERROR";
+                try {
+                    const errJson = JSON.parse(errText);
+                    errorMessage = errJson.error || errorMessage;
+                } catch(e) {}
+                alert("CALCULATION_ERROR: " + errorMessage);
             }
         } catch (e) {
-            console.error(e);
-            alert("SYSTEM_CRITICAL_ERROR: API_COMMUNICATION_FAILED");
+            console.error("Fetch Exception:", e);
+            alert("SYSTEM_CRITICAL_ERROR: API_COMMUNICATION_FAILED (Check Console)");
         } finally {
             btn.innerText = originalText;
             btn.disabled = false;
         }
     },
 
-    updateResultsUI(card, data) {
+    updateResultsUI(card, data, fuelType) {
         const resultsArea = card.querySelector(".ajax-results");
         const avail90Val = Math.max(0, data.avail_90);
         
@@ -128,6 +141,12 @@ const TankGaugeIntel = {
         resultsArea.querySelector(".res-final-vol").innerText = data.final_gallons.toLocaleString();
         resultsArea.querySelector(".res-final-depth").innerText = data.final_inches;
         
+        // Track results for Mission Summary
+        this.calculatedTanks[fuelType] = {
+            delivery: data.delivery_gallons,
+            noFit: data.no_fit_warning
+        };
+
         const warningBox = resultsArea.querySelector(".no-fit-warning");
         if (warningBox) warningBox.style.display = data.no_fit_warning ? "block" : "none";
         
@@ -137,6 +156,41 @@ const TankGaugeIntel = {
             resultsArea.style.transition = "opacity 0.5s ease";
             resultsArea.style.opacity = "1";
         }, 10);
+
+        this.updateMissionSummary();
+    },
+
+    updateMissionSummary() {
+        const summaryBox = document.getElementById("mission-summary");
+        if (!summaryBox) return;
+
+        let totalVol = 0;
+        let anyNoFit = false;
+        let tankCount = 0;
+
+        for (const fuel in this.calculatedTanks) {
+            totalVol += this.calculatedTanks[fuel].delivery;
+            if (this.calculatedTanks[fuel].noFit) anyNoFit = true;
+            tankCount++;
+        }
+
+        if (tankCount > 0) {
+            summaryBox.style.display = "block";
+            document.getElementById("summary-total-vol").innerText = totalVol.toLocaleString() + " G";
+            
+            const statusEl = document.getElementById("summary-status");
+            const warningEl = document.getElementById("summary-warning");
+
+            if (anyNoFit) {
+                statusEl.innerText = "CRITICAL_WARNING";
+                statusEl.style.color = "#ff5555";
+                warningEl.style.display = "block";
+            } else {
+                statusEl.innerText = "NOMINAL_CLEAR_TO_PUMP";
+                statusEl.style.color = "#8da35d";
+                warningEl.style.display = "none";
+            }
+        }
     },
 
     bindFormPresets() {
