@@ -108,57 +108,6 @@
 {% block extra_scripts %}
 <script src="{% static 'tankgauge/js/tankgauge_intel.js' %}"></script>
 <script>
-    window.updateIntelUI = function(data = null) {
-        const intelStatusLine = document.getElementById('intel-status-line');
-        const statusId = document.getElementById('intel-status-id');
-        const statusDist = document.getElementById('intel-status-dist');
-        const directIntelStatus = document.getElementById('direct-intel-status');
-        const directIntelId = document.getElementById('direct-intel-id');
-        const directIntelDist = document.getElementById('direct-intel-dist');
-
-        if (data) {
-            intelStatusLine.style.visibility = "visible";
-            statusId.innerText = `#${data.store_num}`;
-            statusDist.innerText = "SIGNAL_LOCKED";
-            directIntelStatus.style.visibility = "visible";
-            directIntelId.innerText = `#${data.store_num}`;
-            directIntelDist.innerText = `${data.distance_feet.toLocaleString()} FT`;
-            return data.store_num;
-        }
-
-        const rawData = localStorage.getItem("webnexus_closest_store_id");
-        if (rawData) {
-            try {
-                const storeIntel = JSON.parse(rawData);
-                const ageInMinutes = (Date.now() - storeIntel.timestamp) / 1000 / 60;
-                if (ageInMinutes < 30) {
-                    intelStatusLine.style.visibility = "visible";
-                    statusId.innerText = `#${storeIntel.num}`;
-                    statusDist.innerText = "SIGNAL_LOCKED";
-                    return storeIntel.num;
-                }
-            } catch (e) {}
-        }
-        
-        if (localStorage.getItem("webnexus_gps_optin") === "granted") {
-            intelStatusLine.style.visibility = "visible";
-            statusId.innerText = "SEARCHING...";
-            statusDist.innerText = "PULSING";
-        }
-        return null;
-    };
-
     TankGaugeIntel.init({});
-    updateIntelUI();
-    setInterval(() => updateIntelUI(), 5000);
-
-    document.querySelector("form").addEventListener("submit", function (e) {
-        const storeNumber = document.querySelector('input[name="store_number"]').value.trim();
-        const fuelCheckboxes = document.querySelectorAll('input[name="fuel_types"]:checked');
-        if (!storeNumber || fuelCheckboxes.length === 0) {
-            e.preventDefault();
-            alert("OPERATIONAL ERROR: TARGET_STORE_ID and FUEL_TYPE SELECTION REQUIRED");
-        }
-    });
 </script>
 {% endblock %}

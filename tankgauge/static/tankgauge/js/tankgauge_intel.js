@@ -1,5 +1,6 @@
 /**
  * TankGauge Delivery Intel Logic
+ * Ported to modular structure.
  */
 
 const TankGaugeIntel = {
@@ -7,19 +8,36 @@ const TankGaugeIntel = {
     storeId: '',
     isPreset: false,
     calculatedTanks: {}, // Store results for mission summary
+    intelInterval: null,
 
+    /**
+     * Entry point for all TankGauge pages.
+     */
     init(config) {
-        this.calcUrl = config.calcUrl;
-        this.storeId = config.storeId;
+        this.calcUrl = config.calcUrl || '';
+        this.storeId = config.storeId || '';
         this.isPreset = config.isPreset || false;
         this.calculatedTanks = {};
 
         document.addEventListener("DOMContentLoaded", () => {
-            this.bindCalcButtons();
-            this.bindFormPresets();
+            // 1. Logic for RESULTS pages (DB and Preset)
+            if (document.getElementById('tank-cards')) {
+                this.bindCalcButtons();
+            }
+
+            // 2. Logic for the INITIAL PARAMETERS form
+            if (document.getElementById('lock-nearest-btn') || document.getElementById('preset-711-btn')) {
+                this.bindFormPresets();
+                this.bindMainFormValidation();
+                this.updateIntelUI();
+                this.startIntelPulse();
+            }
         });
     },
 
+    /**
+     * RESULTS PAGE: Bind calculation buttons
+     */
     bindCalcButtons() {
         const calcButtons = document.querySelectorAll(".btn-ajax-calculate");
         calcButtons.forEach(btn => {
@@ -27,6 +45,9 @@ const TankGaugeIntel = {
         });
     },
 
+    /**
+     * RESULTS PAGE: Execute the AJAX calculation
+     */
     async executeCalculation(btn) {
         const card = btn.closest(".tactical-card");
         this.clearErrors(card);
@@ -56,7 +77,7 @@ const TankGaugeIntel = {
             }
         }
 
-        // 2. Delivery Gallons Validation (must be integer >= 0)
+        // 2. Delivery Gallons Validation
         let deliveryGallons = 0;
         if (deliveryValue !== "") {
             if (!/^\d+$/.test(deliveryValue)) {
@@ -83,9 +104,6 @@ const TankGaugeIntel = {
             formData.append("delivery_gallons", deliveryGallons);
 
             const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-            if (!csrfToken) {
-                console.error("CSRF Token Missing from Meta Tag");
-            }
 
             const response = await fetch(this.calcUrl, {
                 method: "POST",
@@ -141,6 +159,9 @@ const TankGaugeIntel = {
         });
     },
 
+    /**
+     * RESULTS PAGE: Update the UI with calculation results
+     */
     updateResultsUI(card, data, fuelType) {
         const resultsArea = card.querySelector(".ajax-results");
         const avail90Val = Math.max(0, data.avail_90);
@@ -190,6 +211,9 @@ const TankGaugeIntel = {
         this.updateMissionSummary();
     },
 
+    /**
+     * RESULTS PAGE: Update the final Mission Summary box
+     */
     updateMissionSummary() {
         const summaryBox = document.getElementById("mission-summary");
         if (!summaryBox) return;
@@ -223,6 +247,9 @@ const TankGaugeIntel = {
         }
     },
 
+    /**
+     * FORM PAGE: Bind "Lock Nearest" and "7-11 Standard" presets
+     */
     bindFormPresets() {
         const storeInput = document.querySelector('input[name="store_number"]');
         if (!storeInput) return;
@@ -237,16 +264,15 @@ const TankGaugeIntel = {
                 lockNearestBtn.disabled = true;
 
                 try {
+                    // TacticalGPS is global from base.html
                     const data = await TacticalGPS.pulse();
                     storeInput.value = data.store_num;
-                    if (window.updateIntelUI) window.updateIntelUI(data);
+                    this.updateIntelUI(data);
                 } catch (err) {
                     console.warn("Fresh Pulse Failed:", err);
-                    if (window.updateIntelUI) {
-                        const storedId = window.updateIntelUI();
-                        if (storedId) storeInput.value = storedId;
-                        else alert("OPERATIONAL ERROR: No GPS Signal Locked.");
-                    }
+                    const storedId = this.updateIntelUI();
+                    if (storedId) storeInput.value = storedId;
+                    else alert("OPERATIONAL ERROR: No GPS Signal Locked.");
                 } finally {
                     lockNearestBtn.innerHTML = originalText;
                     lockNearestBtn.disabled = false;
@@ -257,7 +283,81 @@ const TankGaugeIntel = {
         if (preset711Btn) {
             preset711Btn.addEventListener('click', () => {
                 storeInput.value = "7-11_STD";
+                // Hide intel line for explicit manual override
+                document.getElementById('intel-status-line').style.visibility = "hidden";
             });
         }
+    },
+
+    /**
+     * FORM PAGE: Bind submission validation
+     */
+    bindMainFormValidation() {
+        const form = document.querySelector("form");
+        if (!form) return;
+
+        form.addEventListener("submit", (e) => {
+            const storeNumber = document.querySelector('input[name="store_number"]').value.trim();
+            const fuelCheckboxes = document.querySelectorAll('input[name="fuel_types"]:checked');
+            if (!storeNumber || fuelCheckboxes.length === 0) {
+                e.preventDefault();
+                alert("OPERATIONAL ERROR: TARGET_STORE_ID and FUEL_TYPE SELECTION REQUIRED");
+            }
+        });
+    },
+
+    /**
+     * FORM PAGE: Update the "Signal Locked" UI feedback
+     */
+    updateIntelUI(data = null) {
+        const intelStatusLine = document.getElementById('intel-status-line');
+        const statusId = document.getElementById('intel-status-id');
+        const statusDist = document.getElementById('intel-status-dist');
+        const directIntelStatus = document.getElementById('direct-intel-status');
+        const directIntelId = document.getElementById('direct-intel-id');
+        const directIntelDist = document.getElementById('direct-intel-dist');
+
+        if (!intelStatusLine) return null;
+
+        if (data) {
+            intelStatusLine.style.visibility = "visible";
+            statusId.innerText = `#${data.store_num}`;
+            statusDist.innerText = "SIGNAL_LOCKED";
+            if (directIntelStatus) {
+                directIntelStatus.style.visibility = "visible";
+                directIntelId.innerText = `#${data.store_num}`;
+                directIntelDist.innerText = `${data.distance_feet.toLocaleString()} FT`;
+            }
+            return data.store_num;
+        }
+
+        const rawData = localStorage.getItem("webnexus_closest_store_id");
+        if (rawData) {
+            try {
+                const storeIntel = JSON.parse(rawData);
+                const ageInMinutes = (Date.now() - storeIntel.timestamp) / 1000 / 60;
+                if (ageInMinutes < 30) {
+                    intelStatusLine.style.visibility = "visible";
+                    statusId.innerText = `#${storeIntel.num}`;
+                    statusDist.innerText = "SIGNAL_LOCKED";
+                    return storeIntel.num;
+                }
+            } catch (e) {}
+        }
+        
+        if (localStorage.getItem("webnexus_gps_optin") === "granted") {
+            intelStatusLine.style.visibility = "visible";
+            statusId.innerText = "SEARCHING...";
+            statusDist.innerText = "PULSING";
+        }
+        return null;
+    },
+
+    /**
+     * FORM PAGE: Start the 5-second pulse for Intel UI
+     */
+    startIntelPulse() {
+        if (this.intelInterval) clearInterval(this.intelInterval);
+        this.intelInterval = setInterval(() => this.updateIntelUI(), 5000);
     }
 };
