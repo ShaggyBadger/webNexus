@@ -112,6 +112,7 @@ store.store_num }}{% endblock %} {% block extra_head %}
             id="{{ tank.form.delivery_gallons.id_for_label }}"
             onfocus="this.select()"
           />
+          <div class="error-feedback mono small text-tactical-danger mt-1" style="display: none; font-size: 0.65rem;"></div>
         </div>
         <div class="col-md-6" style="margin-top: 1rem !important">
           <label class="label-tactical"
@@ -127,6 +128,7 @@ store.store_num }}{% endblock %} {% block extra_head %}
             id="{{ tank.form.current_inches.id_for_label }}"
             onfocus="this.select()"
           />
+          <div class="error-feedback mono small text-tactical-danger mt-1" style="display: none; font-size: 0.65rem;"></div>
         </div>
       </div>
 

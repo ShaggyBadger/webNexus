@@ -100,24 +100,7 @@ def delivery_submit(request):
     return redirect("tankgauge:delivery_form")
 
 
-def haversine(lat1, lon1, lat2, lon2):
-    """
-    Calculate the great circle distance between two points
-    on the earth (specified in decimal degrees)
-    """
-    # convert decimal degrees to radians
-    lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
-
-    # haversine formula
-    dlon = lon2 - lon1
-    dlat = lat2 - lat1
-    a = (
-        math.sin(dlat / 2) ** 2
-        + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
-    )
-    c = 2 * math.asin(math.sqrt(a))
-    r = 3956  # Radius of earth in miles. Use 6371 for kilometers
-    return c * r
+from .logic.utils import haversine
 
 
 def closest_store_api(request):
@@ -187,7 +170,7 @@ def calculate_tank_api(request):
     # Tank lookup logic using helpers
     store, _ = get_store_and_preset_status(store_id)
     mapping = get_tank_mapping(store, fuel_type)
-    
+
     if mapping:
         tank_type = mapping.tank_type
 

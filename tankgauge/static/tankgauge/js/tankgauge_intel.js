@@ -29,6 +29,8 @@ const TankGaugeIntel = {
 
     async executeCalculation(btn) {
         const card = btn.closest(".tactical-card");
+        this.clearErrors(card);
+
         const fuelType = card.dataset.fuelType;
         const deliveryInput = card.querySelector('input[name*="delivery_gallons"]');
         const inchesInput = card.querySelector('input[name*="current_inches"]');
@@ -37,33 +39,37 @@ const TankGaugeIntel = {
         const inchesValue = inchesInput.value.trim();
         const maxDepth = parseFloat(card.dataset.maxDepth);
 
+        let hasError = false;
+
         // 1. Current Inches Validation
         if (inchesValue === "") {
-            alert("OPERATIONAL_ERROR: CURRENT_INCHES REQUIRED");
-            return;
-        }
-        
-        // Strict number check (allows decimals, no letters)
-        if (!/^\d*\.?\d+$/.test(inchesValue)) {
-            alert("PARAMETER_ERROR: CURRENT_INCHES MUST BE A POSITIVE NUMBER.");
-            return;
-        }
-
-        const currentInches = parseFloat(inchesValue);
-        if (currentInches < 0 || currentInches > maxDepth) {
-            alert(`PARAMETER_ERROR: DEPTH MUST BE BETWEEN 0 AND ${maxDepth}.`);
-            return;
+            this.showError(inchesInput, "OPERATIONAL_ERROR: CURRENT_INCHES REQUIRED");
+            hasError = true;
+        } else if (!/^\d*\.?\d+$/.test(inchesValue)) {
+            this.showError(inchesInput, "PARAMETER_ERROR: NUMERIC ONLY");
+            hasError = true;
+        } else {
+            const currentInches = parseFloat(inchesValue);
+            if (currentInches < 0 || currentInches > maxDepth) {
+                this.showError(inchesInput, `RANGE_ERROR: 0 - ${maxDepth}`);
+                hasError = true;
+            }
         }
 
         // 2. Delivery Gallons Validation (must be integer >= 0)
         let deliveryGallons = 0;
         if (deliveryValue !== "") {
             if (!/^\d+$/.test(deliveryValue)) {
-                alert("PARAMETER_ERROR: DELIVERY_GALLONS MUST BE A POSITIVE INTEGER (NO DECIMALS/STRINGS).");
-                return;
+                this.showError(deliveryInput, "PARAMETER_ERROR: POSITIVE INTEGER ONLY");
+                hasError = true;
+            } else {
+                deliveryGallons = parseInt(deliveryValue);
             }
-            deliveryGallons = parseInt(deliveryValue);
         }
+
+        if (hasError) return;
+
+        const currentInches = parseFloat(inchesValue);
 
         const originalText = btn.innerText;
         btn.innerHTML = '<i class="fas fa-microchip fa-spin me-2"></i>PROCESSING...';
@@ -109,6 +115,30 @@ const TankGaugeIntel = {
             btn.innerText = originalText;
             btn.disabled = false;
         }
+    },
+
+    showError(input, message) {
+        input.classList.add("is-invalid");
+        input.style.borderColor = "#ff5555";
+        input.style.boxShadow = "0 0 10px rgba(255, 85, 85, 0.3)";
+        const feedback = input.parentNode.querySelector(".error-feedback");
+        if (feedback) {
+            feedback.innerText = message;
+            feedback.style.display = "block";
+        }
+    },
+
+    clearErrors(card) {
+        const inputs = card.querySelectorAll(".tankgauge-form-control");
+        inputs.forEach(input => {
+            input.classList.remove("is-invalid");
+            input.style.borderColor = "";
+            input.style.boxShadow = "";
+            const feedback = input.parentNode.querySelector(".error-feedback");
+            if (feedback) {
+                feedback.style.display = "none";
+            }
+        });
     },
 
     updateResultsUI(card, data, fuelType) {

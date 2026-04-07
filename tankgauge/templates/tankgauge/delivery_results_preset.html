@@ -88,11 +88,13 @@
                     <label class="label-tactical">{{ tank.form.delivery_gallons.label }}</label>
                     <input type="text" name="{{ tank.form.delivery_gallons.html_name }}" class="form-control form-control-lg mono tankgauge-form-control" 
                            placeholder="e.g. 4200" inputmode="numeric" id="{{ tank.form.delivery_gallons.id_for_label }}" onfocus="this.select()">
+                    <div class="error-feedback mono small text-tactical-danger mt-1" style="display: none; font-size: 0.65rem;"></div>
                 </div>
                 <div class="col-md-6" style="margin-top: 1rem !important;">
                     <label class="label-tactical">{{ tank.form.current_inches.label }} (MAX {{ tank.max_depth }})</label>
                     <input type="text" name="{{ tank.form.current_inches.html_name }}" class="form-control form-control-lg mono tankgauge-form-control" 
                            placeholder="e.g. 29" inputmode="decimal" id="{{ tank.form.current_inches.id_for_label }}" onfocus="this.select()">
+                    <div class="error-feedback mono small text-tactical-danger mt-1" style="display: none; font-size: 0.65rem;"></div>
                 </div>
             </div>
 
