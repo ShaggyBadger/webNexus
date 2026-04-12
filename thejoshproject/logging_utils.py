@@ -34,12 +34,16 @@ class LoggingMiddleware:
         else:
             ip = request.META.get('REMOTE_ADDR', '0.0.0.0')
 
-        # 2. Capture User and Metadata
+        # 2. Capture User and Metadata (Safe check for request.user)
         _thread_locals.ip = ip
         _thread_locals.ua = request.META.get('HTTP_USER_AGENT', 'UNKNOWN_UA')
         _thread_locals.method = request.method
         _thread_locals.path = request.path
-        _thread_locals.user = request.user.username if request.user.is_authenticated else "ANONYMOUS"
+        
+        # Safety catch: request.user only exists after AuthenticationMiddleware
+        user = getattr(request, 'user', None)
+        _thread_locals.user = user.username if user and user.is_authenticated else "ANONYMOUS"
+        
         _thread_locals.referrer = request.META.get('HTTP_REFERER', 'NO_REFERRER')
 
         response = self.get_response(request)
