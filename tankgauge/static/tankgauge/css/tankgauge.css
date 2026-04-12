@@ -252,6 +252,14 @@
   font-weight: bold !important;
 }
 
+@media (max-width: 576px) {
+  .btn-calculate {
+    padding: 0.5rem !important;
+    font-size: 0.75rem !important;
+    letter-spacing: 0.5px !important;
+  }
+}
+
 .btn-calculate:hover {
   background-color: #ff5e7e !important;
   border-color: #ff5e7e !important;

@@ -39,7 +39,7 @@ def delivery_submit(request):
             try:
                 store, is_preset = get_store_and_preset_status(store_number_input)
             except Exception as e:
-                logger.error(f"DATABASE_CONNECTION_ERROR during store lookup: {e}", exc_info=True)
+                logger.error("DATABASE_CONNECTION_ERROR", extra={"store_id": store_number_input, "error": str(e)}, exc_info=True)
                 return render(
                     request,
                     "tankgauge/delivery_form.html",
@@ -50,7 +50,7 @@ def delivery_submit(request):
                 )
 
             if not store:
-                logger.warning(f"STORE_NOT_FOUND: User entered ID #{store_number_input}")
+                logger.warning("STORE_NOT_FOUND", extra={"store_id": store_number_input})
                 return render(
                     request,
                     "tankgauge/delivery_form.html",
@@ -60,7 +60,7 @@ def delivery_submit(request):
                     },
                 )
 
-            logger.info(f"FETCHING_DATA for Store #{store_number_input} (Preset: {is_preset})")
+            logger.info("FETCHING_DATA", extra={"store_id": store_number_input, "is_preset": is_preset, "fuels": selected_fuels})
             tanks_found = []
             for fuel in selected_fuels:
                 try:
@@ -101,7 +101,7 @@ def delivery_submit(request):
                             }
                         )
                 except Exception as e:
-                    logger.error(f"TANK_MAPPING_ERROR for Store #{store_number_input}, Fuel {fuel}: {e}", exc_info=True)
+                    logger.error("TANK_MAPPING_ERROR", extra={"store_id": store_number_input, "fuel": fuel, "error": str(e)}, exc_info=True)
                     tanks_found.append({
                         "fuel_type": fuel.upper(),
                         "is_missing": True,
@@ -146,7 +146,7 @@ def closest_store_api(request):
     try:
         stores = Store.objects.exclude(lat__isnull=True).exclude(lon__isnull=True)
     except Exception as e:
-        logger.error(f"DATABASE_ERROR during closest_store lookup: {e}", exc_info=True)
+        logger.error("DATABASE_ERROR_CLOSEST_STORE", extra={"lat": user_lat, "lon": user_lon, "error": str(e)}, exc_info=True)
         return JsonResponse({"error": "Database error"}, status=500)
 
     closest_store = None
@@ -167,7 +167,12 @@ def closest_store_api(request):
         else:
             distance_display = f"{distance_feet:,} FT"
 
-        logger.info(f"GEOLOCATION_SUCCESS: Lat {user_lat}, Lon {user_lon} -> Store #{closest_store.store_num} ({distance_display})")
+        logger.info("GEOLOCATION_SUCCESS", extra={
+            "lat": user_lat,
+            "lon": user_lon,
+            "store_num": closest_store.store_num,
+            "distance": distance_display
+        })
 
         return JsonResponse(
             {
@@ -207,11 +212,11 @@ def calculate_tank_api(request):
         store, _ = get_store_and_preset_status(store_id)
         mapping = get_tank_mapping(store, fuel_type)
     except Exception as e:
-        logger.error(f"DATABASE_ERROR during AJAX calculation: {e}", exc_info=True)
+        logger.error("DATABASE_ERROR_AJAX_CALC", extra={"store_id": store_id, "fuel": fuel_type, "error": str(e)}, exc_info=True)
         return JsonResponse({"error": "Database connection error"}, status=500)
 
     if not mapping or not mapping.tank_type:
-        logger.warning(f"CALC_MISSING_MAPPING: Store #{store_id}, Fuel {fuel_type}")
+        logger.warning("CALC_MISSING_MAPPING", extra={"store_id": store_id, "fuel": fuel_type})
         return JsonResponse({"error": "Tank mapping or type not found"}, status=404)
 
     tank_type = mapping.tank_type
@@ -219,8 +224,14 @@ def calculate_tank_api(request):
     # Perform calculation
     try:
         result = perform_tank_calc(tank_type, fuel_type, current_inches, delivery_gallons)
-        logger.info(f"CALC_SUCCESS: Store #{store_id}, Fuel {fuel_type}, Inches {current_inches}, Gallons {delivery_gallons}")
+        logger.info("CALC_SUCCESS", extra={
+            "store_id": store_id,
+            "fuel": fuel_type,
+            "inches": current_inches,
+            "gallons": delivery_gallons,
+            "result": result
+        })
         return JsonResponse(result)
     except Exception as e:
-        logger.error(f"CALCULATION_LOGIC_FAILURE: {e}", exc_info=True)
+        logger.error("CALCULATION_LOGIC_FAILURE", extra={"store_id": store_id, "fuel": fuel_type, "error": str(e)}, exc_info=True)
         return JsonResponse({"error": f"Calculation failed: {str(e)}"}, status=500)

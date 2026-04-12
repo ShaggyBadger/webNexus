@@ -93,7 +93,7 @@ const TankGaugeIntel = {
         const currentInches = parseFloat(inchesValue);
 
         const originalText = btn.innerText;
-        btn.innerHTML = '<i class="fas fa-microchip fa-spin me-2"></i>PROCESSING...';
+        btn.innerHTML = 'PROCESSING...';
         btn.disabled = true;
 
         try {

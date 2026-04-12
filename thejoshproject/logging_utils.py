@@ -1,5 +1,6 @@
 import logging
 import threading
+import json
 
 # Thread-local storage to hold request-specific metadata
 _thread_locals = threading.local()
@@ -47,3 +48,35 @@ class TacticalFilter(logging.Filter):
         record.ip = meta['ip']
         record.ua = meta['ua']
         return True
+
+class TacticalJSONFormatter(logging.Formatter):
+    """
+    Custom JSON formatter for structured logging.
+    """
+    def format(self, record):
+        # 1. Define Standard Fields
+        log_record = {
+            "timestamp": self.formatTime(record, self.datefmt),
+            "level": record.levelname,
+            "ip": getattr(record, 'ip', '0.0.0.0'),
+            "ua": getattr(record, 'ua', 'UNKNOWN_UA'),
+            "logger": record.name,
+            "line": record.lineno,
+            "message": record.getMessage(),
+        }
+
+        # 2. Capture and append 'extra' fields
+        standard_fields = [
+            'args', 'asctime', 'created', 'exc_info', 'exc_text', 'filename',
+            'funcName', 'levelname', 'levelno', 'lineno', 'module',
+            'msecs', 'message', 'msg', 'name', 'pathname', 'process',
+            'processName', 'relativeCreated', 'stack_info', 'thread', 'threadName'
+        ]
+        
+        # Any field in record.__dict__ NOT in standard_fields is an 'extra' field
+        for key, value in record.__dict__.items():
+            if key not in standard_fields and key not in log_record:
+                log_record[key] = value
+
+        # 3. Return as single-line JSON
+        return json.dumps(log_record)

@@ -139,6 +139,9 @@ LOGGING = {
             "format": "[{asctime}] {levelname} [{ip}] [{ua}] [{name}:{lineno}] {message}",
             "style": "{",
         },
+        "json": {
+            "()": "thejoshproject.logging_utils.TacticalJSONFormatter",
+        },
     },
     "filters": {
         "tactical_filter": {
@@ -152,7 +155,7 @@ LOGGING = {
             "filename": BASE_DIR / "logs/webnexus.log",
             "maxBytes": 1024 * 1024 * 5,  # 5 MB
             "backupCount": 5,
-            "formatter": "tactical",
+            "formatter": "json",
             "filters": ["tactical_filter"],
         },
         "console": {
