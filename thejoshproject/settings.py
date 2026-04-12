@@ -40,12 +40,12 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    "thejoshproject.logging_utils.LoggingMiddleware",  # Tactical Logging Middleware (MUST BE TOP)
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "thejoshproject.logging_utils.LoggingMiddleware",  # Tactical Logging Middleware (BELOW AUTH)
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
