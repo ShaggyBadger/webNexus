@@ -114,6 +114,15 @@
   border-color: var(--primary-color) !important;
   color: #121417 !important;
   font-weight: bold !important;
+  width: 100%;
+}
+
+@media (max-width: 576px) {
+  .btn-tactical-lg {
+    padding: 1rem !important;
+    font-size: 0.85rem !important;
+    letter-spacing: 1px !important;
+  }
 }
 
 .btn-tactical-lg:hover {
