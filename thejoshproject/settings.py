@@ -40,6 +40,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    "thejoshproject.logging_utils.LoggingMiddleware",  # Tactical Logging Middleware (MUST BE TOP)
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -135,8 +136,13 @@ LOGGING = {
     "disable_existing_loggers": False,
     "formatters": {
         "tactical": {
-            "format": "[{asctime}] {levelname} [{name}:{lineno}] {message}",
+            "format": "[{asctime}] {levelname} [{ip}] [{ua}] [{name}:{lineno}] {message}",
             "style": "{",
+        },
+    },
+    "filters": {
+        "tactical_filter": {
+            "()": "thejoshproject.logging_utils.TacticalFilter",
         },
     },
     "handlers": {
@@ -147,10 +153,12 @@ LOGGING = {
             "maxBytes": 1024 * 1024 * 5,  # 5 MB
             "backupCount": 5,
             "formatter": "tactical",
+            "filters": ["tactical_filter"],
         },
         "console": {
             "class": "logging.StreamHandler",
             "formatter": "tactical",
+            "filters": ["tactical_filter"],
         },
     },
     "loggers": {

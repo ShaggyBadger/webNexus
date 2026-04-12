@@ -144,3 +144,7 @@ GEMINI.md
 
 # other stuff
 *.png
+
+#  logs
+*.log
+*.log*
