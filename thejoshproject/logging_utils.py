@@ -1,22 +1,27 @@
 import logging
 import threading
 import json
+import datetime
 
 # Thread-local storage to hold request-specific metadata
 _thread_locals = threading.local()
 
 def get_current_request_meta():
     """
-    Retrieves the IP and User-Agent from the current thread's storage.
+    Retrieves request metadata from the current thread's storage.
     """
     return {
         'ip': getattr(_thread_locals, 'ip', '0.0.0.0'),
-        'ua': getattr(_thread_locals, 'ua', 'UNKNOWN_UA')
+        'ua': getattr(_thread_locals, 'ua', 'UNKNOWN_UA'),
+        'method': getattr(_thread_locals, 'method', 'UNKNOWN_METHOD'),
+        'path': getattr(_thread_locals, 'path', 'UNKNOWN_PATH'),
+        'user': getattr(_thread_locals, 'user', 'ANONYMOUS'),
+        'referrer': getattr(_thread_locals, 'referrer', 'NO_REFERRER')
     }
 
 class LoggingMiddleware:
     """
-    Middleware to capture IP and User-Agent for every request.
+    Middleware to capture comprehensive request metadata for tactical logging.
     """
     def __init__(self, get_response):
         self.get_response = get_response
@@ -29,54 +34,74 @@ class LoggingMiddleware:
         else:
             ip = request.META.get('REMOTE_ADDR', '0.0.0.0')
 
-        # 2. Capture User-Agent
-        ua = request.META.get('HTTP_USER_AGENT', 'UNKNOWN_UA')
-
-        # 3. Store in thread-local for the logger to find later
+        # 2. Capture User and Metadata
         _thread_locals.ip = ip
-        _thread_locals.ua = ua
+        _thread_locals.ua = request.META.get('HTTP_USER_AGENT', 'UNKNOWN_UA')
+        _thread_locals.method = request.method
+        _thread_locals.path = request.path
+        _thread_locals.user = request.user.username if request.user.is_authenticated else "ANONYMOUS"
+        _thread_locals.referrer = request.META.get('HTTP_REFERER', 'NO_REFERRER')
 
         response = self.get_response(request)
         return response
 
 class TacticalFilter(logging.Filter):
     """
-    Logging filter that injects 'ip' and 'ua' into every log record.
+    Logging filter that injects all captured request metadata into the log record.
     """
     def filter(self, record):
         meta = get_current_request_meta()
-        record.ip = meta['ip']
-        record.ua = meta['ua']
+        for key, value in meta.items():
+            setattr(record, key, value)
         return True
 
-class TacticalJSONFormatter(logging.Formatter):
+class TacticalJSONMinimalFormatter(logging.Formatter):
     """
-    Custom JSON formatter for structured logging.
+    Clean, high-level JSON log formatter (Timestamp, Level, IP, Message).
     """
     def format(self, record):
-        # 1. Define Standard Fields
+        timestamp = datetime.datetime.fromtimestamp(record.created).isoformat()
         log_record = {
-            "timestamp": self.formatTime(record, self.datefmt),
+            "timestamp": timestamp,
+            "level": record.levelname,
+            "ip": getattr(record, 'ip', '0.0.0.0'),
+            "message": record.getMessage()
+        }
+        return json.dumps(log_record)
+
+class TacticalJSONFullFormatter(logging.Formatter):
+    """
+    Deep-dive JSON log formatter with full tactical intel (UA, Method, Path, User, Referrer).
+    """
+    def format(self, record):
+        timestamp = datetime.datetime.fromtimestamp(record.created).isoformat()
+        
+        # 1. Base Metadata
+        log_record = {
+            "timestamp": timestamp,
             "level": record.levelname,
             "ip": getattr(record, 'ip', '0.0.0.0'),
             "ua": getattr(record, 'ua', 'UNKNOWN_UA'),
+            "method": getattr(record, 'method', 'UNKNOWN_METHOD'),
+            "path": getattr(record, 'path', 'UNKNOWN_PATH'),
+            "user": getattr(record, 'user', 'ANONYMOUS'),
+            "referrer": getattr(record, 'referrer', 'NO_REFERRER'),
             "logger": record.name,
             "line": record.lineno,
             "message": record.getMessage(),
         }
 
-        # 2. Capture and append 'extra' fields
+        # 2. Append 'extra' metadata from the view
         standard_fields = [
             'args', 'asctime', 'created', 'exc_info', 'exc_text', 'filename',
             'funcName', 'levelname', 'levelno', 'lineno', 'module',
             'msecs', 'message', 'msg', 'name', 'pathname', 'process',
-            'processName', 'relativeCreated', 'stack_info', 'thread', 'threadName'
+            'processName', 'relativeCreated', 'stack_info', 'thread', 'threadName',
+            'ip', 'ua', 'method', 'path', 'user', 'referrer'
         ]
         
-        # Any field in record.__dict__ NOT in standard_fields is an 'extra' field
         for key, value in record.__dict__.items():
             if key not in standard_fields and key not in log_record:
                 log_record[key] = value
 
-        # 3. Return as single-line JSON
         return json.dumps(log_record)

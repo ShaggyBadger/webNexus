@@ -139,8 +139,11 @@ LOGGING = {
             "format": "[{asctime}] {levelname} [{ip}] [{ua}] [{name}:{lineno}] {message}",
             "style": "{",
         },
-        "json": {
-            "()": "thejoshproject.logging_utils.TacticalJSONFormatter",
+        "json_minimal": {
+            "()": "thejoshproject.logging_utils.TacticalJSONMinimalFormatter",
+        },
+        "json_full": {
+            "()": "thejoshproject.logging_utils.TacticalJSONFullFormatter",
         },
     },
     "filters": {
@@ -149,13 +152,22 @@ LOGGING = {
         },
     },
     "handlers": {
-        "file": {
+        "file_minimal": {
             "level": "INFO",
             "class": "logging.handlers.RotatingFileHandler",
             "filename": BASE_DIR / "logs/webnexus.log",
             "maxBytes": 1024 * 1024 * 5,  # 5 MB
             "backupCount": 5,
-            "formatter": "json",
+            "formatter": "json_minimal",
+            "filters": ["tactical_filter"],
+        },
+        "file_full": {
+            "level": "INFO",
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": BASE_DIR / "logs/webnexus_full.log",
+            "maxBytes": 1024 * 1024 * 5,  # 5 MB
+            "backupCount": 5,
+            "formatter": "json_full",
             "filters": ["tactical_filter"],
         },
         "console": {
@@ -166,12 +178,12 @@ LOGGING = {
     },
     "loggers": {
         "django": {
-            "handlers": ["file", "console"],
+            "handlers": ["file_minimal", "file_full", "console"],
             "level": "INFO",
             "propagate": True,
         },
         "tankgauge": {
-            "handlers": ["file", "console"],
+            "handlers": ["file_minimal", "file_full", "console"],
             "level": "INFO",
             "propagate": True,
         },
