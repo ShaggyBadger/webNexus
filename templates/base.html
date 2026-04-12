@@ -54,7 +54,7 @@
             justify-content: space-between;
         }
 
-        .command-link {
+        .command-link-compact {
             font-family: 'JetBrains Mono', monospace;
             font-size: 0.65rem;
             text-transform: uppercase;
@@ -62,11 +62,18 @@
             color: var(--muted-text-color);
             text-decoration: none;
             transition: color 0.2s ease;
-            margin-left: 1.5rem;
+            padding: 0 4px;
         }
 
-        .command-link:hover {
+        .command-link-compact:hover {
             color: var(--primary-color);
+        }
+
+        .command-bracket, .command-separator {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.65rem;
+            color: var(--navbar-border);
+            user-select: none;
         }
 
         .command-brand {

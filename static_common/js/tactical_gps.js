@@ -122,10 +122,11 @@ const TacticalGPS = {
         // 2. Update Intel Overlay (if present)
         const intelDisplay = document.getElementById("loc-intel-display");
         if (intelDisplay) {
+          const distanceStr = data.distance_display || `${data.distance_feet.toLocaleString()} FT`;
           intelDisplay.style.display = "block";
           intelDisplay.innerHTML = `
                       ZONE: <span class="text-primary">${data.city.toUpperCase()}, ${data.state.toUpperCase()}</span> // 
-                      TARGET: <span class="text-primary">#${data.store_num} (${data.distance_feet.toLocaleString()} FT)
+                      TARGET: <span class="text-primary">#${data.store_num} (${distanceStr})
                   </span>`;
         }
 

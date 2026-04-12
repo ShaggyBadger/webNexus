@@ -326,7 +326,7 @@ const TankGaugeIntel = {
             if (directIntelStatus) {
                 directIntelStatus.style.visibility = "visible";
                 directIntelId.innerText = `#${data.store_num}`;
-                directIntelDist.innerText = `${data.distance_feet.toLocaleString()} FT`;
+                directIntelDist.innerText = data.distance_display || `${data.distance_feet.toLocaleString()} FT`;
             }
             return data.store_num;
         }

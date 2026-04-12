@@ -1,3 +1,6 @@
+import logging
+import math
+import random
 from django.shortcuts import render, redirect
 from django.http import JsonResponse
 from .models import Store, StoreTankMapping, TankType, TankChart
@@ -8,8 +11,10 @@ from .logic.calculations import (
     get_depth_from_volume,
     perform_tank_calc,
 )
-import math
-import random
+from .logic.utils import haversine
+
+# Initialize logger for this module
+logger = logging.getLogger(__name__)
 
 
 def delivery_form(request):
@@ -31,9 +36,21 @@ def delivery_submit(request):
             store_number_input = form.cleaned_data["store_number"]
             selected_fuels = form.cleaned_data["fuel_types"]
 
-            store, is_preset = get_store_and_preset_status(store_number_input)
+            try:
+                store, is_preset = get_store_and_preset_status(store_number_input)
+            except Exception as e:
+                logger.error(f"DATABASE_CONNECTION_ERROR during store lookup: {e}", exc_info=True)
+                return render(
+                    request,
+                    "tankgauge/delivery_form.html",
+                    {
+                        "form": form,
+                        "error_message": f"SYSTEM_ERROR: DATABASE_OFFLINE or CONNECTION_FAILURE",
+                    },
+                )
 
             if not store:
+                logger.warning(f"STORE_NOT_FOUND: User entered ID #{store_number_input}")
                 return render(
                     request,
                     "tankgauge/delivery_form.html",
@@ -43,44 +60,53 @@ def delivery_submit(request):
                     },
                 )
 
+            logger.info(f"FETCHING_DATA for Store #{store_number_input} (Preset: {is_preset})")
             tanks_found = []
             for fuel in selected_fuels:
-                mapping = get_tank_mapping(store, fuel)
-
-                if mapping:
-                    has_chart = TankChart.objects.filter(
-                        tank_type=mapping.tank_type
-                    ).exists()
-                    capacity = mapping.tank_type.capacity or 0
-                    tanks_found.append(
-                        {
-                            "fuel_type": fuel.upper(),
-                            "tank_model": mapping.tank_type.name,
-                            "capacity": capacity,
-                            "max_depth": mapping.tank_type.max_depth,
-                            "ninety_percent": int(capacity * 0.9),
-                            "form": TankDataForm(
-                                auto_id=f"tank_{mapping.id if not is_preset else fuel}_%s",
-                                prefix=f"tank_{mapping.id if not is_preset else fuel}",
-                            ),
-                            "is_preset": is_preset,
-                            "mapping_id": mapping.id if not is_preset else None,
-                            "has_chart": has_chart,
-                            "error": None if has_chart else "MISSING_CHART_DATA",
-                        }
-                    )
-                else:
-                    tanks_found.append(
-                        {
-                            "fuel_type": fuel.upper(),
-                            "is_missing": True,
-                            "error": (
-                                "TANK_NOT_FOUND_IN_PRESET"
-                                if is_preset
-                                else "TANK_NOT_MAPPED_TO_STORE"
-                            ),
-                        }
-                    )
+                try:
+                    mapping = get_tank_mapping(store, fuel)
+                    
+                    if mapping and mapping.tank_type:
+                        has_chart = TankChart.objects.filter(
+                            tank_type=mapping.tank_type
+                        ).exists()
+                        capacity = mapping.tank_type.capacity or 0
+                        tanks_found.append(
+                            {
+                                "fuel_type": fuel.upper(),
+                                "tank_model": mapping.tank_type.name,
+                                "capacity": capacity,
+                                "max_depth": mapping.tank_type.max_depth,
+                                "ninety_percent": int(capacity * 0.9),
+                                "form": TankDataForm(
+                                    auto_id=f"tank_{mapping.id if not is_preset else fuel}_%s",
+                                    prefix=f"tank_{mapping.id if not is_preset else fuel}",
+                                ),
+                                "is_preset": is_preset,
+                                "mapping_id": mapping.id if not is_preset else None,
+                                "has_chart": has_chart,
+                                "error": None if has_chart else "MISSING_CHART_DATA",
+                            }
+                        )
+                    else:
+                        tanks_found.append(
+                            {
+                                "fuel_type": fuel.upper(),
+                                "is_missing": True,
+                                "error": (
+                                    "TANK_NOT_FOUND_IN_PRESET"
+                                    if is_preset
+                                    else "TANK_NOT_MAPPED_TO_STORE"
+                                ),
+                            }
+                        )
+                except Exception as e:
+                    logger.error(f"TANK_MAPPING_ERROR for Store #{store_number_input}, Fuel {fuel}: {e}", exc_info=True)
+                    tanks_found.append({
+                        "fuel_type": fuel.upper(),
+                        "is_missing": True,
+                        "error": "SYSTEM_FETCH_ERROR"
+                    })
 
             if is_preset:
                 context = {
@@ -100,9 +126,6 @@ def delivery_submit(request):
     return redirect("tankgauge:delivery_form")
 
 
-from .logic.utils import haversine
-
-
 def closest_store_api(request):
     """
     Tactical Intel: Returns the closest store based on GPS coordinates.
@@ -116,11 +139,15 @@ def closest_store_api(request):
     try:
         user_lat = float(lat)
         user_lon = float(lon)
-    except ValueError:
+    except (ValueError, TypeError):
         return JsonResponse({"error": "Invalid coordinates"}, status=400)
 
     # Fetch all stores with coordinates
-    stores = Store.objects.exclude(lat__isnull=True).exclude(lon__isnull=True)
+    try:
+        stores = Store.objects.exclude(lat__isnull=True).exclude(lon__isnull=True)
+    except Exception as e:
+        logger.error(f"DATABASE_ERROR during closest_store lookup: {e}", exc_info=True)
+        return JsonResponse({"error": "Database error"}, status=500)
 
     closest_store = None
     min_distance_miles = float("inf")
@@ -133,6 +160,15 @@ def closest_store_api(request):
 
     if closest_store:
         distance_feet = round(min_distance_miles * 5280)
+        
+        # Tactical Distance Formatting
+        if min_distance_miles >= 1:
+            distance_display = f"{min_distance_miles:.1f} MI"
+        else:
+            distance_display = f"{distance_feet:,} FT"
+
+        logger.info(f"GEOLOCATION_SUCCESS: Lat {user_lat}, Lon {user_lon} -> Store #{closest_store.store_num} ({distance_display})")
+
         return JsonResponse(
             {
                 "store_num": closest_store.store_num,
@@ -140,8 +176,7 @@ def closest_store_api(request):
                 "city": closest_store.city,
                 "state": closest_store.state,
                 "distance_feet": distance_feet,
-                # Reverse Geocoding would ideally go here, but for now we'll
-                # return the nearest store's location as a proxy or use a free API.
+                "distance_display": distance_display,
                 "user_location_proxy": f"{closest_store.city}, {closest_store.state}",
             }
         )
@@ -168,15 +203,24 @@ def calculate_tank_api(request):
         return JsonResponse({"error": "Invalid numerical input"}, status=400)
 
     # Tank lookup logic using helpers
-    store, _ = get_store_and_preset_status(store_id)
-    mapping = get_tank_mapping(store, fuel_type)
+    try:
+        store, _ = get_store_and_preset_status(store_id)
+        mapping = get_tank_mapping(store, fuel_type)
+    except Exception as e:
+        logger.error(f"DATABASE_ERROR during AJAX calculation: {e}", exc_info=True)
+        return JsonResponse({"error": "Database connection error"}, status=500)
 
-    if mapping:
-        tank_type = mapping.tank_type
+    if not mapping or not mapping.tank_type:
+        logger.warning(f"CALC_MISSING_MAPPING: Store #{store_id}, Fuel {fuel_type}")
+        return JsonResponse({"error": "Tank mapping or type not found"}, status=404)
 
-    if not tank_type:
-        return JsonResponse({"error": "Tank chart not found"}, status=404)
+    tank_type = mapping.tank_type
 
     # Perform calculation
-    result = perform_tank_calc(tank_type, fuel_type, current_inches, delivery_gallons)
-    return JsonResponse(result)
+    try:
+        result = perform_tank_calc(tank_type, fuel_type, current_inches, delivery_gallons)
+        logger.info(f"CALC_SUCCESS: Store #{store_id}, Fuel {fuel_type}, Inches {current_inches}, Gallons {delivery_gallons}")
+        return JsonResponse(result)
+    except Exception as e:
+        logger.error(f"CALCULATION_LOGIC_FAILURE: {e}", exc_info=True)
+        return JsonResponse({"error": f"Calculation failed: {str(e)}"}, status=500)
