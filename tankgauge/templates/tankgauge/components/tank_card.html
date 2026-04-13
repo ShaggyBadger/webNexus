@@ -84,32 +84,26 @@
         [ {% if mode == 'preset' %}PRESET{% else %}DELIVERY_TICKET{% endif %}_INTEL ]
     </span>
     
-    <div class="mono small">
-      <div class="mb-1">
-        <span class="text-muted-custom">START_INCHES:</span>
-        <span class="res-initial-inches text-primary">0</span>"
-      </div>
-      <div class="mb-1">
-        <span class="text-muted-custom">START_GALLONS:</span>
-        <span class="res-initial-vol text-primary">0</span> G
-      </div>
-      <div class="mb-1 res-avail-90-line">
-        <span class="specs-label-avail text-muted-custom">90%_WILL_HOLD_GALLONS:</span>
-        <span class="res-avail-90 text-primary">0</span> G
-      </div>
-      <div class="mb-3">
-        <span class="text-muted-custom">BOL_GALLONS:</span>
-        <span class="res-bol-gallons text-primary">0</span> G
-      </div>
-      <div class="mb-1">
-        <span class="text-muted-custom">CALCULATED_ENDING_GALLONS:</span>
-        <span class="res-final-vol text-primary">0</span> G
-      </div>
-      <div class="mb-1">
-        <span class="text-muted-custom">ENDING_INCHES:</span>
-        <span class="res-final-depth text-primary">0</span>"
-      </div>
-    </div>
+    <table class="table table-borderless table-sm mono small mb-0 text-white">
+      <tbody>
+        <tr>
+          <td class="text-muted-custom py-1 ps-0">START GAL</td>
+          <td class="text-end py-1 pe-0"><span class="res-initial-vol text-primary">0</span> G</td>
+        </tr>
+        <tr class="res-avail-90-line">
+          <td class="text-muted-custom py-1 ps-0 specs-label-avail">90% HOLD</td>
+          <td class="text-end py-1 pe-0"><span class="res-avail-90 text-primary">0</span> G</td>
+        </tr>
+        <tr>
+          <td class="text-muted-custom py-1 ps-0">END GAL</td>
+          <td class="text-end py-1 pe-0"><span class="res-final-vol text-primary">0</span> G</td>
+        </tr>
+        <tr>
+          <td class="text-muted-custom py-1 ps-0">END INCH</td>
+          <td class="text-end py-1 pe-0"><span class="res-final-depth text-primary">0</span>"</td>
+        </tr>
+      </tbody>
+    </table>
   </div>
 </div>
 {% endif %}

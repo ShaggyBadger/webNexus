@@ -164,33 +164,46 @@ const TankGaugeIntel = {
      */
     updateResultsUI(card, data, fuelType) {
         const resultsArea = card.querySelector(".ajax-results");
+        if (!resultsArea) return;
+
         const avail90Val = Math.max(0, data.avail_90);
         
         const avail90El = resultsArea.querySelector(".res-avail-90");
         const avail90Line = resultsArea.querySelector(".res-avail-90-line");
         const avail90Label = resultsArea.querySelector(".specs-label-avail");
         
-        resultsArea.querySelector(".res-initial-inches").innerText = data.initial_inches;
-        resultsArea.querySelector(".res-initial-vol").innerText = data.initial_gallons.toLocaleString();
-        avail90El.innerText = avail90Val.toLocaleString();
+        const initialInchesEl = resultsArea.querySelector(".res-initial-inches");
+        if (initialInchesEl) initialInchesEl.innerText = data.initial_inches;
+
+        const initialVolEl = resultsArea.querySelector(".res-initial-vol");
+        if (initialVolEl) initialVolEl.innerText = data.initial_gallons.toLocaleString();
+
+        if (avail90El) avail90El.innerText = avail90Val.toLocaleString();
         
-        if (data.no_fit_warning) {
-            avail90Line.style.setProperty("color", "#ff5555", "important");
-            avail90Line.style.setProperty("font-weight", "900", "important");
-            avail90El.style.setProperty("color", "#ff5555", "important");
-            if (avail90Label) avail90Label.style.setProperty("color", "#ff5555", "important");
-            avail90Line.classList.add("flicker");
-        } else {
-            avail90Line.style.color = "";
-            avail90Line.style.fontWeight = "";
-            avail90El.style.color = "";
-            if (avail90Label) avail90Label.style.color = "";
-            avail90Line.classList.remove("flicker");
+        if (avail90Line) {
+            if (data.no_fit_warning) {
+                avail90Line.style.setProperty("color", "#ff5555", "important");
+                avail90Line.style.setProperty("font-weight", "900", "important");
+                if (avail90El) avail90El.style.setProperty("color", "#ff5555", "important");
+                if (avail90Label) avail90Label.style.setProperty("color", "#ff5555", "important");
+                avail90Line.classList.add("flicker");
+            } else {
+                avail90Line.style.color = "";
+                avail90Line.style.fontWeight = "";
+                if (avail90El) avail90El.style.color = "";
+                if (avail90Label) avail90Label.style.color = "";
+                avail90Line.classList.remove("flicker");
+            }
         }
 
-        resultsArea.querySelector(".res-bol-gallons").innerText = data.delivery_gallons.toLocaleString();
-        resultsArea.querySelector(".res-final-vol").innerText = data.final_gallons.toLocaleString();
-        resultsArea.querySelector(".res-final-depth").innerText = data.final_inches;
+        const bolGallonsEl = resultsArea.querySelector(".res-bol-gallons");
+        if (bolGallonsEl) bolGallonsEl.innerText = data.delivery_gallons.toLocaleString();
+
+        const finalVolEl = resultsArea.querySelector(".res-final-vol");
+        if (finalVolEl) finalVolEl.innerText = data.final_gallons.toLocaleString();
+
+        const finalDepthEl = resultsArea.querySelector(".res-final-depth");
+        if (finalDepthEl) finalDepthEl.innerText = data.final_inches;
         
         // Track results for Mission Summary
         this.calculatedTanks[fuelType] = {
