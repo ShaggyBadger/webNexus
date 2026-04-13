@@ -1,11 +1,113 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}About | {{ SITE_NAME }}{% endblock %}
 
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'homepage/css/homepage.css' %}">
+{% endblock %}
+
 {% block content %}
 <div class="container py-5">
-    <h1 class="mono">[ ABOUT_OPS ]</h1>
-    <hr class="border-secondary">
-    <p class="mono text-muted-custom">Operational intelligence and system mission parameters.</p>
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="mono mb-0">[ COMMAND_CENTER ]</h1>
+            <p class="mono text-muted-custom small">TACTICAL_LOG_v2.3.1_RELEASE</p>
+            <hr class="border-secondary opacity-25">
+        </div>
+    </div>
+
+    <!-- Main Content: Mission & Commander -->
+    <div class="row g-4 mb-5">
+        <!-- Mission Section -->
+        <div class="col-lg-8">
+            <div class="tactical-card">
+                <span class="tactical-header">THE_MISSION</span>
+                
+                <div class="patton-quote mb-4">
+                    "A good plan violently executed now is better than a perfect plan executed next week."
+                </div>
+
+                <div class="mono text-light mb-4">
+                    <p>webNexus is not built for aesthetics; it is built for the trenches. It is built on the principle that if a tool isn't solving a real-world, field-level problem, it doesn't belong in the command center.</p>
+                    
+                    <p>This project was born out of operational necessity. I build these tools because I use them on a daily basis in my job. They are forged in the field, refined through real-world deployment, and designed for maximum efficiency under pressure.</p>
+                    
+                    <p>The mission is simple: consolidate critical field data into a single, reliable point of command. If these tools work for me, they can work for you. We don't settle for 'good enough'—we build for victory.</p>
+                </div>
+                
+                <div class="d-flex align-items-center gap-3">
+                    <div class="status-item flex-grow-1">
+                        <span class="status-label">OBJECTIVE</span>
+                        <span class="status-value text-primary">FIELD_SUPREMACY</span>
+                    </div>
+                    <div class="status-item flex-grow-1">
+                        <span class="status-label">PRIORITY</span>
+                        <span class="status-value">MISSION_CRITICAL</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Commander Section -->
+        <div class="col-lg-4">
+            <div class="tactical-card">
+                <span class="tactical-header">COMMANDER_INTEL</span>
+                
+                <div class="commander-img-container">
+                    <!-- Placeholder for the 'awesome picture' -->
+                    <img src="{% static 'homepage/images/josh.jpg' %}" alt="Commander" class="commander-img img-fluid" onerror="this.src='https://via.placeholder.com/280x350/1c1f23/8da35d?text=PROFILE_IMAGE_MISSING';">
+                </div>
+
+                <div class="mono small">
+                    <div class="mb-3">
+                        <span class="status-label d-block">DESIGNATION</span>
+                        <span class="status-value">LEAD_OPERATOR</span>
+                    </div>
+                    <div class="mb-3">
+                        <span class="status-label d-block">OPERATIONAL_SCOPE</span>
+                        <span class="status-value">SOLO_DEPLOYMENT</span>
+                    </div>
+                    <div>
+                        <span class="status-label d-block">BIO</span>
+                        <p class="text-muted-custom mb-0">Driven by field experience. Building tools for those who actually do the work. One man with courage makes a majority.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- System Parameters Section -->
+    <div class="row">
+        <div class="col-12">
+            <div class="tactical-card">
+                <span class="tactical-header">SYSTEM_PARAMETERS</span>
+                
+                <div class="system-status-grid">
+                    <div class="status-item">
+                        <span class="status-label">VERSION</span>
+                        <span class="status-value">{{ VERSION }}</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">STATUS</span>
+                        <span class="status-value text-tactical-success">OPERATIONAL</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">DB_CONNECTION</span>
+                        <span class="status-value text-tactical-success">LOCKED</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">LOCATION_SERVICES</span>
+                        <span class="status-value">ACTIVE</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">ENCRYPTION</span>
+                        <span class="status-value text-tactical-success">SHA-256</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}

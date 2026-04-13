@@ -102,3 +102,154 @@ body {
 }
 
 
+
+/* About Page Tactical Components */
+.tactical-card {
+    background-color: var(--navbar-bg);
+    border: 1px solid var(--navbar-border);
+    border-radius: 4px;
+    padding: 1.5rem;
+    position: relative;
+    overflow: hidden;
+    height: 100%;
+}
+
+.tactical-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background-color: var(--primary-color);
+}
+
+.tactical-header {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    font-weight: bold;
+    color: var(--primary-color);
+    letter-spacing: 2px;
+    margin-bottom: 1.25rem;
+    display: block;
+    text-transform: uppercase;
+}
+
+.commander-img-container {
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+
+.commander-img {
+    width: 100%;
+    max-width: 280px;
+    border: 1px solid var(--navbar-border);
+    padding: 6px;
+    background-color: var(--bg-color);
+    filter: grayscale(0.5) contrast(1.1);
+    transition: filter 0.3s ease;
+}
+
+.commander-img:hover {
+    filter: grayscale(0) contrast(1.1);
+}
+
+.system-status-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.status-item {
+    padding: 0.75rem;
+    border: 1px dashed var(--navbar-border);
+    background-color: rgba(255, 255, 255, 0.02);
+}
+
+.status-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6rem;
+    color: var(--muted-text-color);
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 0.25rem;
+}
+
+.status-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    color: var(--accent-color);
+    font-weight: bold;
+}
+
+.patton-quote {
+    font-style: italic;
+    border-left: 2px solid var(--navbar-border);
+    padding-left: 1rem;
+    margin-bottom: 1.5rem;
+    color: var(--muted-text-color);
+}
+
+/* Mobile-First Optimizations */
+@media (max-width: 768px) {
+    .container {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+    
+    .tactical-card {
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .commander-img {
+        max-width: 220px;
+        margin: 0 auto;
+        display: block;
+    }
+
+    .system-status-grid {
+        grid-template-columns: 1fr 1fr; /* 2 columns on small mobile */
+        gap: 0.5rem;
+    }
+
+    .status-item {
+        padding: 0.5rem;
+    }
+
+    .status-value {
+        font-size: 0.75rem;
+    }
+}
+
+/* Extra small screens (360px-450px) - as per GUIDING_PRINCIPLES.md */
+@media (max-width: 450px) {
+    .command-brand {
+        font-size: 0.65rem;
+        letter-spacing: 1px;
+    }
+
+    .command-link-compact {
+        font-size: 0.55rem;
+    }
+
+    .tactical-header {
+        font-size: 0.65rem;
+        margin-bottom: 1rem;
+    }
+
+    .patton-quote {
+        font-size: 0.85rem;
+        margin-bottom: 1rem;
+    }
+
+    .mono p {
+        font-size: 0.8rem;
+        line-height: 1.4;
+    }
+
+    .system-status-grid {
+        grid-template-columns: 1fr; /* Single column on very small screens */
+    }
+}
