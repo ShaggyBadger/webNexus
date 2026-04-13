@@ -6,7 +6,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token }}">
     <title>{% block title %}{{ SITE_NAME }}{% endblock %}</title>
-    
+
+    <!-- Mobile-Specific Meta Tags (iOS / Android) -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#121417">
+    <meta name="apple-mobile-web-app-title" content="WebNexus">
+
     <!-- Favicon & Mobile App Icon -->
     <link rel="icon" type="image/png" href="{% static 'images/swtoEagle.png' %}">
     <link rel="apple-touch-icon" href="{% static 'images/swtoEagle.png' %}">
