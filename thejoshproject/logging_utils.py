@@ -64,7 +64,7 @@ class TacticalJSONMinimalFormatter(logging.Formatter):
     Clean, high-level JSON log formatter (Timestamp, Level, IP, Message).
     """
     def format(self, record):
-        timestamp = datetime.datetime.fromtimestamp(record.created).isoformat()
+        timestamp = datetime.datetime.fromtimestamp(record.created, datetime.timezone.utc).isoformat()
         log_record = {
             "timestamp": timestamp,
             "level": record.levelname,
@@ -78,7 +78,7 @@ class TacticalJSONFullFormatter(logging.Formatter):
     Deep-dive JSON log formatter with full tactical intel (UA, Method, Path, User, Referrer).
     """
     def format(self, record):
-        timestamp = datetime.datetime.fromtimestamp(record.created).isoformat()
+        timestamp = datetime.datetime.fromtimestamp(record.created, datetime.timezone.utc).isoformat()
         
         # 1. Base Metadata
         log_record = {
