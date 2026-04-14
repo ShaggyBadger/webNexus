@@ -5,7 +5,7 @@ from django.shortcuts import render, redirect
 from django.http import JsonResponse
 from .models import Store, StoreTankMapping, TankType, TankChart
 from .forms import DeliveryEstimationForm, TankDataForm
-from .logic.tank_lookup import get_store_and_preset_status, get_tank_mapping
+from .logic.tank_lookup import get_store_and_preset_status, get_tank_mapping, get_all_tank_mappings
 from .logic.calculations import (
     get_volume_from_depth,
     get_depth_from_volume,
@@ -64,30 +64,43 @@ def delivery_submit(request):
             tanks_found = []
             for fuel in selected_fuels:
                 try:
-                    mapping = get_tank_mapping(store, fuel)
+                    mappings = get_all_tank_mappings(store, fuel)
                     
-                    if mapping and mapping.tank_type:
-                        has_chart = TankChart.objects.filter(
-                            tank_type=mapping.tank_type
-                        ).exists()
-                        capacity = mapping.tank_type.capacity or 0
-                        tanks_found.append(
-                            {
-                                "fuel_type": fuel.upper(),
-                                "tank_model": mapping.tank_type.name,
-                                "capacity": capacity,
-                                "max_depth": mapping.tank_type.max_depth,
-                                "ninety_percent": int(capacity * 0.9),
-                                "form": TankDataForm(
-                                    auto_id=f"tank_{mapping.id if not is_preset else fuel}_%s",
-                                    prefix=f"tank_{mapping.id if not is_preset else fuel}",
-                                ),
-                                "is_preset": is_preset,
-                                "mapping_id": mapping.id if not is_preset else None,
-                                "has_chart": has_chart,
-                                "error": None if has_chart else "MISSING_CHART_DATA",
-                            }
-                        )
+                    if mappings:
+                        num_mappings = len(mappings)
+                        for idx, mapping in enumerate(mappings):
+                            if mapping.tank_type:
+                                has_chart = TankChart.objects.filter(
+                                    tank_type=mapping.tank_type
+                                ).exists()
+                                capacity = mapping.tank_type.capacity or 0
+                                tanks_found.append(
+                                    {
+                                        "fuel_type": fuel.upper(),
+                                        "tank_index": idx + 1 if num_mappings > 1 else None,
+                                        "tank_model": mapping.tank_type.name,
+                                        "capacity": capacity,
+                                        "max_depth": mapping.tank_type.max_depth,
+                                        "ninety_percent": int(capacity * 0.9),
+                                        "form": TankDataForm(
+                                            auto_id=f"tank_{mapping.id if not is_preset else fuel}_%s",
+                                            prefix=f"tank_{mapping.id if not is_preset else fuel}",
+                                        ),
+                                        "is_preset": is_preset,
+                                        "mapping_id": mapping.id if not is_preset else None,
+                                        "has_chart": has_chart,
+                                        "error": None if has_chart else "MISSING_CHART_DATA",
+                                    }
+                                )
+                            else:
+                                tanks_found.append(
+                                    {
+                                        "fuel_type": fuel.upper(),
+                                        "tank_index": idx + 1 if num_mappings > 1 else None,
+                                        "is_missing": True,
+                                        "error": "TANK_TYPE_NOT_DEFINED",
+                                    }
+                                )
                     else:
                         tanks_found.append(
                             {
@@ -198,6 +211,7 @@ def calculate_tank_api(request):
 
     store_id = request.POST.get("store_id")
     fuel_type = request.POST.get("fuel_type")
+    tank_id = request.POST.get("tank_id")
 
     try:
         current_inches = float(request.POST.get("current_inches", 0))
@@ -209,10 +223,13 @@ def calculate_tank_api(request):
 
     # Tank lookup logic using helpers
     try:
-        store, _ = get_store_and_preset_status(store_id)
-        mapping = get_tank_mapping(store, fuel_type)
+        if tank_id and tank_id.isdigit():
+            mapping = StoreTankMapping.objects.filter(id=int(tank_id)).select_related("tank_type").first()
+        else:
+            store, _ = get_store_and_preset_status(store_id)
+            mapping = get_tank_mapping(store, fuel_type)
     except Exception as e:
-        logger.error("DATABASE_ERROR_AJAX_CALC", extra={"store_id": store_id, "fuel": fuel_type, "error": str(e)}, exc_info=True)
+        logger.error("DATABASE_ERROR_AJAX_CALC", extra={"store_id": store_id, "fuel": fuel_type, "tank_id": tank_id, "error": str(e)}, exc_info=True)
         return JsonResponse({"error": "Database connection error"}, status=500)
 
     if not mapping or not mapping.tank_type:

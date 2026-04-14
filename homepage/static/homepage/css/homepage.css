@@ -104,6 +104,13 @@ body {
 
 
 /* About Page Tactical Components */
+.about-title {
+    font-size: clamp(1.5rem, 8vw, 2.5rem);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 .tactical-card {
     background-color: var(--navbar-bg);
     border: 1px solid var(--navbar-border);

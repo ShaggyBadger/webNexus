@@ -16,7 +16,7 @@ def get_store_and_preset_status(store_id):
 
 def get_tank_mapping(store, fuel_type):
     """
-    Retrieves the StoreTankMapping for a given store and fuel type.
+    Retrieves the first StoreTankMapping for a given store and fuel type.
     """
     if not store or not fuel_type:
         return None
@@ -25,4 +25,18 @@ def get_tank_mapping(store, fuel_type):
         StoreTankMapping.objects.filter(store=store, fuel_type=fuel_type.lower())
         .select_related("tank_type")
         .first()
+    )
+
+
+def get_all_tank_mappings(store, fuel_type):
+    """
+    Retrieves all StoreTankMappings for a given store and fuel type.
+    """
+    if not store or not fuel_type:
+        return []
+
+    return (
+        StoreTankMapping.objects.filter(store=store, fuel_type=fuel_type.lower())
+        .select_related("tank_type")
+        .all()
     )

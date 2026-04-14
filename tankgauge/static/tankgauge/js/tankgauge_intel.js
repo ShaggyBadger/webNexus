@@ -53,6 +53,7 @@ const TankGaugeIntel = {
         this.clearErrors(card);
 
         const fuelType = card.dataset.fuelType;
+        const tankId = card.dataset.tankId;
         const deliveryInput = card.querySelector('input[name*="delivery_gallons"]');
         const inchesInput = card.querySelector('input[name*="current_inches"]');
         
@@ -100,6 +101,7 @@ const TankGaugeIntel = {
             const formData = new FormData();
             formData.append("store_id", this.storeId);
             formData.append("fuel_type", fuelType);
+            formData.append("tank_id", tankId);
             formData.append("current_inches", currentInches);
             formData.append("delivery_gallons", deliveryGallons);
 
@@ -166,6 +168,7 @@ const TankGaugeIntel = {
         const resultsArea = card.querySelector(".ajax-results");
         if (!resultsArea) return;
 
+        const tankId = card.dataset.tankId;
         const avail90Val = Math.max(0, data.avail_90);
         
         const avail90El = resultsArea.querySelector(".res-avail-90");
@@ -206,7 +209,8 @@ const TankGaugeIntel = {
         if (finalDepthEl) finalDepthEl.innerText = data.final_inches;
         
         // Track results for Mission Summary
-        this.calculatedTanks[fuelType] = {
+        const trackKey = tankId || fuelType;
+        this.calculatedTanks[trackKey] = {
             delivery: data.delivery_gallons,
             noFit: data.no_fit_warning
         };
@@ -235,9 +239,9 @@ const TankGaugeIntel = {
         let anyNoFit = false;
         let tankCount = 0;
 
-        for (const fuel in this.calculatedTanks) {
-            totalVol += this.calculatedTanks[fuel].delivery;
-            if (this.calculatedTanks[fuel].noFit) anyNoFit = true;
+        for (const key in this.calculatedTanks) {
+            totalVol += this.calculatedTanks[key].delivery;
+            if (this.calculatedTanks[key].noFit) anyNoFit = true;
             tankCount++;
         }
 
