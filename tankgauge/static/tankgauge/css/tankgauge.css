@@ -332,6 +332,23 @@
   border-top-color: rgba(255, 184, 108, 0.2);
 }
 
+.ajax-results .res-pop {
+  color: #ffcc00 !important;
+  font-weight: 900 !important;
+  text-shadow: 0 0 5px rgba(255, 204, 0, 0.2);
+}
+
+.tactical-table-striped tbody tr:nth-child(even) {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.tactical-table-striped td {
+  padding-top: 0.5rem !important;
+  padding-bottom: 0.5rem !important;
+  padding-left: 0.5rem !important;
+  padding-right: 0.5rem !important;
+}
+
 /* --- Animations & Utilities --- */
 .flicker {
   animation: flickerAnimation 1.5s infinite;
