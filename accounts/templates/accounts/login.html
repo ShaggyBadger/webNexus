@@ -26,6 +26,21 @@
         margin-top: 0.25rem;
         letter-spacing: 1px;
     }
+    /* Amber Tactical Button Override for Signup */
+    .btn-enlist {
+        border-color: var(--accent-color) !important;
+        color: var(--accent-color) !important;
+        background: rgba(255, 184, 108, 0.05) !important;
+        border-radius: 0 !important;
+        padding: 0.75rem !important;
+        font-size: 0.8rem;
+        transition: all 0.2s ease;
+    }
+    .btn-enlist:hover {
+        background: var(--accent-color) !important;
+        color: #121417 !important;
+        box-shadow: 0 0 15px rgba(255, 184, 108, 0.3) !important;
+    }
 </style>
 {% endblock %}
 
@@ -45,7 +60,7 @@
             
             {% if messages %}
                 {% for message in messages %}
-                    <div class="alert {% if message.tags == 'error' %}alert-danger{% else %}alert-success{% endif %} mono small mb-4" 
+                    <div class="alert {% if message.tags == 'error' %}alert-danger{% else %}alert-success{% endif %} mono small mb-4 text-center" 
                          style="background: rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.1);">
                         <i class="fas {% if message.tags == 'error' %}fa-exclamation-triangle{% else %}fa-check-circle{% endif %} me-2"></i> 
                         {{ message }}
@@ -79,12 +94,17 @@
                 </button>
             </div>
         </form>
-    </div>
 
-    <div class="text-center mt-4">
-        <p class="mono small text-muted-custom">
-            NEW AGENT? <a href="{% url 'accounts:signup' %}" class="text-accent text-decoration-none">ENLIST_HERE</a>
-        </p>
+        <hr class="border-secondary opacity-25 my-4">
+
+        <div class="text-center">
+            <span class="mono x-small text-muted-custom d-block mb-3">[ NEW AGENT REGISTRATION ]</span>
+            <div class="d-grid">
+                <a href="{% url 'accounts:signup' %}" class="btn btn-outline-warning btn-enlist mono fw-bold">
+                    ENLIST_NEW_AGENT
+                </a>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}

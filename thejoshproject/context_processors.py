@@ -10,7 +10,7 @@ def global_config(request):
         "TEXT_COLOR": "#f8f9fa",
         "MUTED_TEXT_COLOR": "#adb5bd",
         "FONT_FAMILY": "'JetBrains Mono', monospace",
-        "ACCENT_COLOR": "#e94560",
+        "ACCENT_COLOR": "#ffb86c",
         "NAVBAR_BG": "#1c1f23",
         "NAVBAR_BORDER": "#2c3036",
     }
