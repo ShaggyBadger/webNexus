@@ -23,5 +23,6 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("", include("homepage.urls")),
     path("tankgauge/", include("tankgauge.urls")),
+    path("accounts/", include("accounts.urls")),
     path("system/health/", health_check, name="health_check"),
 ]

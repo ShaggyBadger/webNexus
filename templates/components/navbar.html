@@ -3,12 +3,19 @@
         <!-- Left Side: Brand as Home -->
         <a href="{% url 'homepage:homepage' %}" class="command-brand">[ {{ SITE_NAME|upper }} ]</a>
         
-        <!-- Right Side: Secondary Links consolidated for Mobile-First -->
         <nav class="d-flex align-items-center command-nav">
             <span class="command-bracket">[</span>
-            <a href="{% url 'homepage:about' %}" class="command-link-compact">ABOUT</a>
+            {% if user.is_authenticated %}
+                <a href="{% url 'accounts:profile' %}" class="command-link-compact">AGENT PROFILE</a>
+                <span class="command-separator">/</span>
+                <a href="{% url 'accounts:logout' %}" class="command-link-compact">LOGOUT</a>
+            {% else %}
+                <a href="{% url 'accounts:login' %}" class="command-link-compact">LOGIN</a>
+                <span class="command-separator">/</span>
+                <a href="{% url 'accounts:signup' %}" class="command-link-compact">SIGNUP</a>
+            {% endif %}
             <span class="command-separator">/</span>
-            <a href="{% url 'homepage:contact' %}" class="command-link-compact">CONTACT</a>
+            <a href="{% url 'homepage:about' %}" class="command-link-compact">ABOUT</a>
             <span class="command-bracket">]</span>
         </nav>
     </div>

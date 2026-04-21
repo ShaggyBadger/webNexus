@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}webNexus // Access Grid{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'tankgauge/css/tankgauge.css' %}" />
+<style>
+    .tactical-input {
+        background-color: var(--bg-color) !important;
+        color: var(--primary-color) !important;
+        border: 1px solid var(--navbar-border) !important;
+        border-radius: 0 !important;
+        font-family: "JetBrains Mono", monospace !important;
+        padding: 0.75rem 1rem !important;
+    }
+    .tactical-input:focus {
+        border-color: var(--primary-color) !important;
+        box-shadow: 0 0 10px rgba(141, 163, 93, 0.2) !important;
+        outline: none;
+    }
+    .helptext {
+        font-size: 0.65rem;
+        color: var(--muted-text-color);
+        display: block;
+        margin-top: 0.25rem;
+        letter-spacing: 1px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4 mt-5 tankgauge-container" style="max-width: 500px">
+    <div class="text-center mb-5">
+        <i class="fas fa-shield-halved fa-4x text-accent mb-3"></i>
+        <h1 class="mono tankgauge-title">
+            IDENTITY <span class="text-accent">VERIFICATION</span>
+        </h1>
+        <p class="text-muted-custom mono small">[ SECURITY_PROTOCOL_V4.2 // STATUS: LOCKED ]</p>
+    </div>
+
+    <div class="card p-4 tankgauge-card">
+        <form method="POST">
+            {% csrf_token %}
+            
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert {% if message.tags == 'error' %}alert-danger{% else %}alert-success{% endif %} mono small mb-4" 
+                         style="background: rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.1);">
+                        <i class="fas {% if message.tags == 'error' %}fa-exclamation-triangle{% else %}fa-check-circle{% endif %} me-2"></i> 
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            {% for field in form %}
+                <div class="mb-4">
+                    <label for="{{ field.id_for_label }}" class="form-label mono small fw-bold mb-2">
+                        <i class="fas {% if 'username' in field.name %}fa-user-secret{% else %}fa-key{% endif %} me-2"></i>{{ field.label|upper }}
+                    </label>
+                    <input type="{{ field.field.widget.input_type|default:'text' }}" 
+                           name="{{ field.name }}" 
+                           id="{{ field.id_for_label }}"
+                           class="form-control tactical-input w-100"
+                           {% if field.field.required %}required{% endif %}
+                           {% if field.value %}value="{{ field.value }}"{% endif %}>
+                    {% if field.help_text %}
+                        <span class="helptext mono uppercase">[ {{ field.help_text|upper }} ]</span>
+                    {% endif %}
+                    {% for error in field.errors %}
+                        <div class="error-feedback mono mt-1">{{ error|upper }}</div>
+                    {% endfor %}
+                </div>
+            {% endfor %}
+
+            <div class="d-grid mt-5">
+                <button type="submit" class="btn btn-primary btn-tactical-lg mono fw-bold">
+                    INITIALIZE_IDENTITY_SYNC
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <div class="text-center mt-4">
+        <p class="mono small text-muted-custom">
+            NEW AGENT? <a href="{% url 'accounts:signup' %}" class="text-accent text-decoration-none">ENLIST_HERE</a>
+        </p>
+    </div>
+</div>
+{% endblock %}
