@@ -11,8 +11,6 @@
                 <a href="{% url 'accounts:logout' %}" class="command-link-compact">LOGOUT</a>
             {% else %}
                 <a href="{% url 'accounts:login' %}" class="command-link-compact">LOGIN</a>
-                <span class="command-separator">/</span>
-                <a href="{% url 'accounts:signup' %}" class="command-link-compact">SIGNUP</a>
             {% endif %}
             <span class="command-separator">/</span>
             <a href="{% url 'homepage:about' %}" class="command-link-compact">ABOUT</a>
