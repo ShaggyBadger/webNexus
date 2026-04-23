@@ -20,6 +20,16 @@ class Store(models.Model):
     install_date = models.DateField(null=True, blank=True)
     overfill_protection = models.CharField(max_length=255, null=True, blank=True)
 
+    # Tactical linkage to the site intelligence system
+    location = models.OneToOneField(
+        'siteintel.Location', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='store_canonical',
+        help_text="Canonical link to Site Intelligence"
+    )
+
     def __str__(self):
         return f"{self.store_num} - {self.store_name}"
 
@@ -46,6 +56,11 @@ class StoreTankMapping(models.Model):
         TankType, on_delete=models.CASCADE, related_name="store_mappings"
     )
     fuel_type = models.CharField(max_length=20, null=True, blank=True)
+    tank_index = models.IntegerField(
+        null=True, 
+        blank=True, 
+        help_text="The physical tank number (1, 2, 3...) from on-site ATG."
+    )
 
     def __str__(self):
         return f"{self.store} - {self.tank_type} ({self.fuel_type})"

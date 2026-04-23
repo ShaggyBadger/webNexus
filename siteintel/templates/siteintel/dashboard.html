@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}SITE_INTEL_DASHBOARD | {{ SITE_NAME }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    .store-card {
+        background-color: rgba(18, 20, 23, 0.9);
+        border: 1px solid var(--navbar-border);
+        border-left: 3px solid var(--primary-color);
+        margin-bottom: 0.75rem;
+        transition: transform 0.1s ease, border-color 0.2s ease;
+    }
+    .store-card:hover {
+        border-color: var(--primary-color);
+        background-color: rgba(28, 32, 36, 0.95);
+    }
+    .store-num {
+        font-family: 'JetBrains Mono', monospace;
+        font-weight: bold;
+        color: var(--primary-color);
+    }
+    .store-meta {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.65rem;
+        color: var(--muted-text-color);
+        text-transform: uppercase;
+    }
+    .search-bar-tactical {
+        background-color: var(--navbar-bg);
+        border: 1px solid var(--navbar-border);
+        color: var(--text-color);
+        font-family: 'JetBrains Mono', monospace;
+        border-radius: 0;
+    }
+    .search-bar-tactical:focus {
+        background-color: #1c1f23;
+        border-color: var(--primary-color);
+        color: var(--text-color);
+        box-shadow: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mono text-primary m-0">[ SITE_INTEL_HUB ]</h2>
+        <div class="d-flex gap-2">
+            <a href="{% url 'siteintel:proposal_list' %}" class="btn btn-outline-secondary btn-sm mono">
+                [ MY_PROPOSALS ]
+            </a>
+            <a href="{% url 'siteintel:proposal_create' %}" class="btn btn-primary btn-sm mono">
+                [ + NEW_SITE ]
+            </a>
+        </div>
+    </div>
+
+    <!-- Search / Filter -->
+    <div class="mb-4">
+        <form method="get" class="input-group">
+            <input type="text" name="q" class="form-control search-bar-tactical" placeholder="SEARCH_BY_ID_OR_NAME..." value="{{ request.GET.q }}">
+            <button class="btn btn-outline-primary mono" type="submit">[ EXECUTE_QUERY ]</button>
+        </form>
+    </div>
+
+    <!-- Store Grid -->
+    <div class="row">
+        {% for store in stores %}
+        <div class="col-12">
+            <div class="store-card p-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="store-num">#{{ store.store_num }}</span>
+                            <h5 class="m-0 text-white" style="font-size: 1rem;">{{ store.store_name|default:"UNIDENTIFIED_LOC" }}</h5>
+                        </div>
+                        <div class="store-meta mt-1">
+                            {{ store.city }}, {{ store.state }} // RISO: {{ store.riso_num|default:"---" }} // TANKS: <span class="text-primary">{{ store.tank_mappings.count }}</span>
+                        </div>
+                    </div>
+                    <div>
+                        <a href="{% url 'siteintel:proposal_create' %}?store_num={{ store.store_num }}" class="btn btn-outline-primary btn-sm mono py-1 px-3" style="font-size: 0.7rem;">
+                            [ UPDATE_INTEL ]
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12 text-center py-5">
+            <div class="mono text-muted-custom">NO SITES MATCHING QUERY PARAMETERS</div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Pagination -->
+    {% if is_paginated %}
+    <nav class="mt-4">
+        <ul class="pagination justify-content-center mono" style="font-size: 0.75rem;">
+            {% if page_obj.has_previous %}
+                <li class="page-item"><a class="page-link bg-dark text-primary border-secondary" href="?page={{ page_obj.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">[ PREV ]</a></li>
+            {% endif %}
+            
+            <li class="page-item disabled"><span class="page-link bg-dark text-muted-custom border-secondary">PAGE {{ page_obj.number }} OF {{ page_obj.paginator.num_pages }}</span></li>
+            
+            {% if page_obj.has_next %}
+                <li class="page-item"><a class="page-link bg-dark text-primary border-secondary" href="?page={{ page_obj.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">[ NEXT ]</a></li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+{% endblock %}

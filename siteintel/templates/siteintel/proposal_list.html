@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}PROPOSALS_TRACKER | {{ SITE_NAME }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    .proposal-card {
+        background-color: rgba(18, 20, 23, 0.9);
+        border: 1px solid var(--navbar-border);
+        margin-bottom: 1rem;
+        transition: border-color 0.2s ease;
+    }
+    .proposal-card:hover {
+        border-color: var(--primary-color);
+    }
+    .proposal-status {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.7rem;
+        padding: 4px 8px;
+        text-transform: uppercase;
+    }
+    .status-PENDING { color: var(--accent-color); border: 1px solid var(--accent-color); }
+    .status-APPROVED { color: #50fa7b; border: 1px solid #50fa7b; }
+    .status-REJECTED { color: #ff5555; border: 1px solid #ff5555; }
+    
+    .proposal-meta {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.65rem;
+        color: var(--muted-text-color);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mono text-primary m-0">[ PROPOSALS_TRACKER ]</h2>
+        <a href="{% url 'siteintel:proposal_create' %}" class="btn btn-primary btn-sm mono">
+            [ + NEW PROPOSAL ]
+        </a>
+    </div>
+
+    {% if proposals %}
+        <div class="row">
+            {% for proposal in proposals %}
+            <div class="col-12">
+                <div class="proposal-card p-3">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h5 class="text-white mb-1">
+                                {{ proposal.store_name|default:"UNIDENTIFIED SITE" }}
+                                <span class="ms-2 mono text-muted-custom" style="font-size: 0.8rem;">
+                                    #{{ proposal.store_num|default:"???" }}
+                                </span>
+                            </h5>
+                            <div class="proposal-meta">
+                                SUBMITTED: {{ proposal.submitted_at|date:"Y-m-d H:i" }} // 
+                                RISO: {{ proposal.riso_num|default:"N/A" }}
+                            </div>
+                        </div>
+                        <div class="proposal-status status-{{ proposal.status }}">
+                            {{ proposal.get_status_display }}
+                        </div>
+                    </div>
+                    
+                    <div class="mt-3">
+                        <div class="mono text-muted-custom mb-1" style="font-size: 0.65rem;">TANK_CONFIG:</div>
+                        <div class="d-flex flex-wrap gap-2">
+                            {% for tank in proposal.tank_updates.all %}
+                                <div class="badge bg-dark border border-secondary mono" style="font-size: 0.6rem; font-weight: normal;">
+                                    T{{ tank.tank_index }}: {{ tank.fuel_type }} ({{ tank.reported_capacity }}G)
+                                    {% if tank.is_unverified %}
+                                        <span class="text-tactical-warning">!! UNVERIFIED !!</span>
+                                    {% endif %}
+                                </div>
+                            {% empty %}
+                                <span class="text-muted-custom mono" style="font-size: 0.6rem;">NO TANK DATA RECORDED</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="text-center py-5">
+            <div class="mono text-muted-custom mb-3">NO ACTIVE PROPOSALS FOUND IN YOUR LOGS</div>
+            <a href="{% url 'siteintel:proposal_create' %}" class="btn btn-outline-primary mono">
+                [ INITIALIZE FIRST PROPOSAL ]
+            </a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

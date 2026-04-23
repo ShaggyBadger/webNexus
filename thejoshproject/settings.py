@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     "homepage",
     "tankgauge",
     "accounts",
+    "siteintel",
 ]
 
 
