@@ -50,23 +50,21 @@ class StoreUpdateCreateView(LoginRequiredMixin, CreateView):
                     for mapping in mappings:
                         initial_tanks.append({
                             'tank_index': mapping.tank_index,
-                            'fuel_type': mapping.fuel_type,
+                            'fuel_type': mapping.fuel_type.lower() if mapping.fuel_type else '',
                             'reported_capacity': mapping.tank_type.capacity if mapping.tank_type else 0,
-                            'tank_type': mapping.tank_type,
+                            'tank_type': mapping.tank_type, # Pass the object itself
                         })
             
+            logger.info(f"Initial Tanks for Store {store_num}: {initial_tanks}")
+            
             if initial_tanks:
-                # We use extra=0 if we have existing data to avoid a blank row unless requested
-                TankUpdateFormSetFactory = forms.inlineformset_factory(
-                    StoreUpdate, 
-                    TankUpdate, 
-                    form=TankUpdateForm, 
-                    extra=0, 
-                    can_delete=True
+                # TACTICAL: Create a one-off factory. 
+                # InlineFormSet needs extra to be set to the length of initial if instance is None
+                CustomFormSet = forms.inlineformset_factory(
+                    StoreUpdate, TankUpdate, form=TankUpdateForm, 
+                    extra=len(initial_tanks), can_delete=True
                 )
-                data['tank_formset'] = TankUpdateFormSetFactory(initial=initial_tanks)
-                # We need to manually set the initial count for the management form
-                data['tank_formset'].extra = 0
+                data['tank_formset'] = CustomFormSet(initial=initial_tanks)
             else:
                 data['tank_formset'] = TankUpdateFormSet()
                 
@@ -142,24 +140,30 @@ def tank_type_search_api(request):
     """
     TACTICAL INTEL:
     AJAX endpoint for the 'Tank Picker'.
-    Queries TankType records within a +/- 10% tolerance of the reported capacity.
+    Queries TankType records within a +/- 10% tolerance of the reported capacity
+    and/or matching a text query.
     """
     capacity = request.GET.get('capacity')
-    if not capacity:
-        return JsonResponse({'error': 'Capacity is required'}, status=400)
+    query = request.GET.get('q')
     
-    try:
-        cap_val = int(capacity)
-    except ValueError:
-        return JsonResponse({'error': 'Invalid capacity value'}, status=400)
+    if not capacity and not query:
+        return JsonResponse({'error': 'Capacity or Query is required'}, status=400)
     
-    lower_bound = cap_val * 0.9
-    upper_bound = cap_val * 1.1
+    filters = Q()
     
-    matches = TankType.objects.filter(
-        capacity__gte=lower_bound,
-        capacity__lte=upper_bound
-    ).values('id', 'name', 'manufacturer', 'capacity', 'max_depth')
+    if capacity:
+        try:
+            cap_val = int(capacity)
+            lower_bound = cap_val * 0.9
+            upper_bound = cap_val * 1.1
+            filters &= Q(capacity__gte=lower_bound, capacity__lte=upper_bound)
+        except ValueError:
+            pass # Ignore invalid capacity if query is present
+            
+    if query:
+        filters &= (Q(name__icontains=query) | Q(manufacturer__icontains=query) | Q(model__icontains=query))
+    
+    matches = TankType.objects.filter(filters).values('id', 'name', 'manufacturer', 'capacity', 'max_depth')[:20]
     
     return JsonResponse({'results': list(matches)})
 
@@ -185,6 +189,7 @@ def store_lookup_api(request):
                 'tank_index': m.tank_index,
                 'fuel_type': m.fuel_type,
                 'capacity': m.tank_type.capacity if m.tank_type else 0,
+                'max_depth': m.tank_type.max_depth if m.tank_type else 0,
                 'tank_type_id': m.tank_type.id if m.tank_type else None,
                 'tank_type_name': m.tank_type.name if m.tank_type else 'UNKNOWN'
             })

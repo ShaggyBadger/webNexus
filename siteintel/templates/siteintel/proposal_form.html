@@ -33,12 +33,42 @@
     }
     .tank-entry {
         border-left: 2px solid var(--navbar-border);
-        padding-left: 1rem;
+        padding: 1rem;
         margin-bottom: 1.5rem;
         position: relative;
+        background: rgba(255, 255, 255, 0.02);
     }
     .tank-entry.active {
         border-left-color: var(--primary-color);
+        background: rgba(255, 255, 255, 0.04);
+    }
+    .locked-tank-display {
+        background: rgba(64, 146, 255, 0.1);
+        border: 1px solid var(--primary-color);
+        padding: 0.5rem 0.75rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        min-height: 58px;
+    }
+    .tank-info-main {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.85rem;
+        color: var(--primary-color);
+        font-weight: bold;
+        line-height: 1.2;
+    }
+    .tank-info-sub {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.6rem;
+        color: var(--muted-text-color);
+        text-transform: uppercase;
+        margin-top: 2px;
+    }
+    .change-tank-btn {
+        font-size: 0.6rem;
+        padding: 2px 8px;
+        letter-spacing: 1px;
     }
     .remove-tank {
         position: absolute;
@@ -162,7 +192,8 @@
                             {% for tank_form in tank_formset %}
                             <div class="tank-entry" data-index="{{ forloop.counter0 }}">
                                 {{ tank_form.id }}
-                                <div class="row g-3">
+                                {% with assigned_tank=tank_form.instance.tank_type|default:tank_form.initial.tank_type %}
+                                <div class="row g-3 align-items-end">
                                     <div class="col-md-2">
                                         <label class="form-label">ATG Index</label>
                                         {{ tank_form.tank_index }}
@@ -171,35 +202,43 @@
                                         <label class="form-label">Fuel Type</label>
                                         {{ tank_form.fuel_type }}
                                     </div>
-                                    <div class="col-md-3">
-                                        <label class="form-label">Capacity (GAL)</label>
-                                        {{ tank_form.reported_capacity }}
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label class="form-label">Database Chart Match</label>
-                                        <div class="position-relative">
+                                    <div class="col-md-7">
+                                        <!-- Search State -->
+                                        <div class="tank-search-container {% if assigned_tank %}d-none{% endif %}">
+                                            <label class="form-label">Search Capacity (GAL)</label>
                                             <div class="input-group input-group-sm">
-                                                <input type="text" class="form-control mono tank-type-search" placeholder="Search charts..." autocomplete="off">
+                                                {{ tank_form.reported_capacity }}
                                                 <span class="input-group-text bg-dark text-primary"><i class="fas fa-search"></i></span>
                                             </div>
                                             <div class="search-results-overlay d-none"></div>
-                                            {{ tank_form.tank_type }}
-                                            <div class="selected-chart-info mt-1 mono" style="font-size: 0.65rem; color: var(--primary-color);">
-                                                {% if tank_form.instance.tank_type %}
-                                                    SELECTED: {{ tank_form.instance.tank_type.name }}
-                                                {% else %}
-                                                    NO CHART SELECTED
-                                                {% endif %}
+                                            <div class="form-check mt-1">
+                                                {{ tank_form.is_unverified }}
+                                                <label class="form-check-label mono" style="font-size: 0.6rem; color: var(--muted-text-color);">
+                                                    CHART NOT FOUND (UNVERIFIED)
+                                                </label>
                                             </div>
                                         </div>
-                                        <div class="form-check mt-1">
-                                            {{ tank_form.is_unverified }}
-                                            <label class="form-check-label mono" style="font-size: 0.6rem; color: var(--muted-text-color);">
-                                                CHART NOT FOUND (UNVERIFIED)
-                                            </label>
+                                        
+                                        <!-- Locked State -->
+                                        <div class="locked-tank-display {% if not assigned_tank %}d-none{% endif %}">
+                                            <div class="tank-info-container">
+                                                <div class="tank-info-main">
+                                                    {% if assigned_tank %}{{ assigned_tank.name }}{% else %}SIGNAL_LOCKED: TANK_CHART{% endif %}
+                                                </div>
+                                                <div class="tank-info-sub">
+                                                    {% if assigned_tank %}
+                                                        {{ assigned_tank.capacity }} GAL // {{ assigned_tank.max_depth }}" DEPTH
+                                                    {% else %}
+                                                        NAME // MAX_GAL // MAX_INCH
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                            <button type="button" class="btn btn-outline-warning btn-sm change-tank-btn mono">[ CHANGE ]</button>
                                         </div>
+                                        {{ tank_form.tank_type }}
                                     </div>
                                 </div>
+                                {% endwith %}
                                 {% if tank_formset.can_delete %}
                                     <div class="form-check d-none">
                                         {{ tank_form.DELETE }}
@@ -231,10 +270,9 @@
     </div>
 </div>
 
-<!-- Empty template for new tank forms -->
 <div id="empty-tank-form" class="d-none">
     <div class="tank-entry" data-index="__prefix__">
-        <div class="row g-3">
+        <div class="row g-3 align-items-end">
             <div class="col-md-2">
                 <label class="form-label">ATG Index</label>
                 {{ tank_formset.empty_form.tank_index }}
@@ -243,29 +281,32 @@
                 <label class="form-label">Fuel Type</label>
                 {{ tank_formset.empty_form.fuel_type }}
             </div>
-            <div class="col-md-3">
-                <label class="form-label">Capacity (GAL)</label>
-                {{ tank_formset.empty_form.reported_capacity }}
-            </div>
-            <div class="col-md-4">
-                <label class="form-label">Database Chart Match</label>
-                <div class="position-relative">
+            <div class="col-md-7">
+                <!-- Search State -->
+                <div class="tank-search-container">
+                    <label class="form-label">Search Capacity (GAL)</label>
                     <div class="input-group input-group-sm">
-                        <input type="text" class="form-control mono tank-type-search" placeholder="Search charts..." autocomplete="off">
+                        {{ tank_formset.empty_form.reported_capacity }}
                         <span class="input-group-text bg-dark text-primary"><i class="fas fa-search"></i></span>
                     </div>
                     <div class="search-results-overlay d-none"></div>
-                    {{ tank_formset.empty_form.tank_type }}
-                    <div class="selected-chart-info mt-1 mono" style="font-size: 0.65rem; color: var(--primary-color);">
-                        NO CHART SELECTED
+                    <div class="form-check mt-1">
+                        {{ tank_formset.empty_form.is_unverified }}
+                        <label class="form-check-label mono" style="font-size: 0.6rem; color: var(--muted-text-color);">
+                            CHART NOT FOUND (UNVERIFIED)
+                        </label>
                     </div>
                 </div>
-                <div class="form-check mt-1">
-                    {{ tank_formset.empty_form.is_unverified }}
-                    <label class="form-check-label mono" style="font-size: 0.6rem; color: var(--muted-text-color);">
-                        CHART NOT FOUND (UNVERIFIED)
-                    </label>
+                
+                <!-- Locked State -->
+                <div class="locked-tank-display d-none">
+                    <div class="tank-info-container">
+                        <div class="tank-info-main">SIGNAL_LOCKED: TANK_CHART</div>
+                        <div class="tank-info-sub">NAME // MAX_GAL // MAX_INCH</div>
+                    </div>
+                    <button type="button" class="btn btn-outline-warning btn-sm change-tank-btn mono">[ CHANGE ]</button>
                 </div>
+                {{ tank_formset.empty_form.tank_type }}
             </div>
         </div>
         <button type="button" class="btn btn-outline-danger btn-sm remove-tank mono py-0 px-1" style="font-size: 0.6rem;">
@@ -291,10 +332,10 @@
         let map, marker;
 
         const initMap = (lat, lon) => {
-            const defaultLat = lat || 38.8977; // DC
-            const defaultLon = lon || -77.0365;
-            // Tighter initial zoom if location is known (18), otherwise overview (4)
-            const zoom = lat ? 18 : 4;
+            const defaultLat = lat || 35.7596; // NC Center Fallback
+            const defaultLon = lon || -79.0193;
+            // Tighter initial zoom if location is known (18), otherwise moderate (7) for NC
+            const zoom = lat ? 18 : 7;
 
             if (!map) {
                 map = L.map('map').setView([defaultLat, defaultLon], zoom);
@@ -332,7 +373,7 @@
             
             // If we have a map, update view. Use provided zoom or current map zoom.
             // If current zoom is too far out (overview), zoom in to tactical level (18).
-            const currentZoom = map ? map.getZoom() : 4;
+            const currentZoom = map ? map.getZoom() : 7;
             const targetZoom = zoom || (currentZoom < 15 ? 18 : currentZoom);
 
             if (marker) marker.setLatLng([lat, lon]);
@@ -346,7 +387,20 @@
         if (latInput.value && lonInput.value) {
             initMap(parseFloat(latInput.value), parseFloat(lonInput.value));
         } else {
-            initMap();
+            initMap(); // Start with NC fallback
+            
+            // TACTICAL: Automatic Geolocation Attempt for new sites
+            if ("geolocation" in navigator) {
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => {
+                        updateLocation(pos.coords.latitude, pos.coords.longitude, 18);
+                    },
+                    (err) => {
+                        console.warn("Auto-GPS Pulse Failed: User denied or signal lost.");
+                    },
+                    { enableHighAccuracy: true, timeout: 5000 }
+                );
+            }
         }
 
         // 2. GPS CAPTURE
@@ -409,29 +463,46 @@
                         updateLocation(data.lat, data.lon);
                     }
                     
-                    // Clear and rebuild Tank Formset if tanks exist in response
-                    // SKIP if this is the initial load from URL (server already prepopulated)
-                    if (!isInitialLoad && data.tanks && data.tanks.length > 0) {
-                        formsetContainer.innerHTML = '';
-                        totalForms.value = 0;
+                    // Rebuild or Update Tank Formset
+                    if (data.tanks && data.tanks.length > 0) {
+                        if (!isInitialLoad) {
+                            // Only clear if this is a fresh lookup by store number
+                            formsetContainer.innerHTML = '';
+                            totalForms.value = "0";
+                        }
                         
+                        const existingEntries = formsetContainer.querySelectorAll('.tank-entry');
+
                         data.tanks.forEach((tank, idx) => {
-                            addBtn.click(); // Create new form
-                            const entry = formsetContainer.lastElementChild;
+                            let entry;
+                            if (!isInitialLoad) {
+                                addBtn.click(); // Create new form
+                                entry = formsetContainer.lastElementChild;
+                            } else {
+                                // Match by index if on initial load (Django already rendered them)
+                                entry = existingEntries[idx];
+                            }
+                            
+                            if (!entry) return;
                             
                             // Fill values
                             entry.querySelector('input[name$="-tank_index"]').value = tank.tank_index;
                             
                             // TACTICAL: Handle both input and select for fuel_type (migration safety)
                             const fuelField = entry.querySelector('[name$="-fuel_type"]');
-                            if (fuelField) fuelField.value = tank.fuel_type;
+                            if (fuelField) {
+                                const normalizedFuel = (tank.fuel_type || '').toLowerCase();
+                                fuelField.value = normalizedFuel;
+                            }
                             
                             entry.querySelector('input[name$="-reported_capacity"]').value = tank.capacity;
                             
                             if (tank.tank_type_id) {
                                 entry.querySelector('input[name$="-tank_type"]').value = tank.tank_type_id;
-                                entry.querySelector('.selected-chart-info').innerText = `SELECTED: ${tank.tank_type_name}`;
-                                entry.querySelector('.tank-type-search').value = tank.tank_type_name;
+                                // Force locked state if we have a match
+                                if (entry.setLockedState) {
+                                    entry.setLockedState(tank.tank_type_name, tank.capacity, tank.max_depth);
+                                }
                             }
                         });
                     }
@@ -466,13 +537,9 @@
             div.innerHTML = newForm;
             const node = div.firstElementChild;
             
-            node.querySelectorAll('input, select, textarea').forEach(input => {
-                const name = input.getAttribute('name');
-                if (name) {
-                    input.setAttribute('name', name.replace('empty_form', formIdx));
-                    input.setAttribute('id', input.getAttribute('id').replace('empty_form', formIdx));
-                }
-            });
+            // TACTICAL: The replace(/__prefix__/g, formIdx) already handles most of this,
+            // but we ensure the container correctly tracks the new index for selection.
+            node.setAttribute('data-index', formIdx);
 
             formsetContainer.appendChild(node);
             totalForms.value = formIdx + 1;
@@ -497,20 +564,39 @@
             }
         };
 
-        // 5. TANK PICKER (AJAX)
+        // 5. TANK PICKER (AJAX + TWO-STATE UI)
         const initTankPicker = (entry) => {
-            const searchInput = entry.querySelector('.tank-type-search');
-            const resultsOverlay = entry.querySelector('.search-results-overlay');
+            const searchContainer = entry.querySelector('.tank-search-container');
+            const lockedDisplay = entry.querySelector('.locked-tank-display');
             const capacityInput = entry.querySelector('input[name$="-reported_capacity"]');
+            const resultsOverlay = entry.querySelector('.search-results-overlay');
             const tankTypeInput = entry.querySelector('input[name$="-tank_type"]');
-            const infoDisplay = entry.querySelector('.selected-chart-info');
+            const changeBtn = entry.querySelector('.change-tank-btn');
+            const infoMain = entry.querySelector('.tank-info-main');
+            const infoSub = entry.querySelector('.tank-info-sub');
             const unverifiedCheck = entry.querySelector('input[name$="-is_unverified"]');
 
-            searchInput.addEventListener('input', async (e) => {
-                const query = e.target.value;
-                const cap = capacityInput.value;
-                
-                if (query.length < 1 || !cap) {
+            // TACTICAL: Export methods to entry for external control (fetchStoreData)
+            entry.setLockedState = (name, capacity, depth) => {
+                infoMain.innerText = name;
+                infoSub.innerText = `${capacity} GAL // ${depth}" DEPTH`;
+                searchContainer.classList.add('d-none');
+                lockedDisplay.classList.remove('d-none');
+            };
+
+            entry.setSearchState = () => {
+                searchContainer.classList.remove('d-none');
+                lockedDisplay.classList.add('d-none');
+            };
+
+            // Handle initial state if tank_type is already set by server
+            if (tankTypeInput.value && !lockedDisplay.classList.contains('d-none')) {
+                // Info is already in the DOM from Django template
+            }
+
+            capacityInput.addEventListener('input', async (e) => {
+                const cap = e.target.value;
+                if (!cap || cap.length < 2) {
                     resultsOverlay.classList.add('d-none');
                     return;
                 }
@@ -524,11 +610,10 @@
                             data.results.forEach(match => {
                                 const item = document.createElement('div');
                                 item.className = 'search-item';
-                                item.innerHTML = `<span class="text-primary">${match.name}</span> (${match.capacity} GAL) - ${match.manufacturer}`;
+                                item.innerHTML = `<span class="text-primary">${match.name}</span> (${match.capacity} GAL / ${match.max_depth}")`;
                                 item.addEventListener('click', () => {
                                     tankTypeInput.value = match.id;
-                                    searchInput.value = match.name;
-                                    infoDisplay.innerText = `SELECTED: ${match.name}`;
+                                    entry.setLockedState(match.name, match.capacity, match.max_depth);
                                     resultsOverlay.classList.add('d-none');
                                     unverifiedCheck.checked = false;
                                 });
@@ -536,7 +621,7 @@
                             });
                             resultsOverlay.classList.remove('d-none');
                         } else {
-                            resultsOverlay.innerHTML = '<div class="p-2 text-muted" style="font-size: 0.7rem;">NO MATCHES IN +/- 10% TOLERANCE</div>';
+                            resultsOverlay.innerHTML = '<div class="p-2 text-muted" style="font-size: 0.7rem;">NO MATCHES FOUND</div>';
                             resultsOverlay.classList.remove('d-none');
                         }
                     }
@@ -545,15 +630,15 @@
                 }
             });
 
+            changeBtn.addEventListener('click', () => {
+                tankTypeInput.value = '';
+                entry.setSearchState();
+                capacityInput.focus();
+            });
+
             document.addEventListener('click', (e) => {
                 if (!entry.contains(e.target)) {
                     resultsOverlay.classList.add('d-none');
-                }
-            });
-            
-            capacityInput.addEventListener('change', () => {
-                if (!tankTypeInput.value) {
-                    searchInput.dispatchEvent(new Event('input'));
                 }
             });
         };
