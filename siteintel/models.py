@@ -131,23 +131,28 @@ class StoreUpdate(models.Model):
         OPERATIONAL FLOW:
         Transitions proposed field intelligence into the canonical system of record.
         Ensures atomicity across Location, Store, and StoreTankMapping models.
+        
+        This method is the final 'Commit' of a field agent's verified observations.
         """
         if self.status != 'APPROVED':
-            logger.warning(f"Attempted to apply unapproved StoreUpdate ID {self.id}")
+            logger.warning(f"SYNC_HALTED: Attempted to apply unapproved StoreUpdate ID {self.id}")
             raise ValueError("Only approved updates can be applied to canonical data.")
 
         with transaction.atomic():
-            # 1. Ensure Location exists and is linked
-            # Use proposed location_type or fallback to "Store"
+            # 1. SITE_CLASSIFICATION: Determine the operational role of this site.
             if self.location_type:
                 location_type = self.location_type
+                logger.info(f"SYNC_STEP: Using proposed LocationType '{location_type.name}' for Update {self.id}")
             else:
                 loc_type_name = "Gas Station"
-                location_type, _ = LocationType.objects.get_or_create(
+                location_type, created = LocationType.objects.get_or_create(
                     name=loc_type_name,
                     defaults={'description': "Retail fuel site or convenience store."}
                 )
+                if created:
+                    logger.info(f"SYNC_STEP: Created fallback LocationType '{loc_type_name}'")
 
+            # 2. GEOSPATIAL_FOUNDATION: Create or update the parent Location record.
             if not self.location:
                 self.location = Location.objects.create(
                     name=self.store_name or f"Store #{self.store_num}",
@@ -159,8 +164,9 @@ class StoreUpdate(models.Model):
                     lat=self.lat,
                     lon=self.lon
                 )
+                logger.info(f"SYNC_STEP: Created new canonical Location for Update {self.id}")
             else:
-                # Update existing location
+                # Synchronize existing location with verified field data
                 self.location.name = self.store_name or self.location.name
                 self.location.location_type = location_type
                 self.location.address = self.address or self.location.address
@@ -170,10 +176,11 @@ class StoreUpdate(models.Model):
                 self.location.lat = self.lat or self.location.lat
                 self.location.lon = self.lon or self.location.lon
                 self.location.save()
+                logger.info(f"SYNC_STEP: Updated existing Location ID {self.location.id}")
 
-            # 2. Ensure Store exists and is linked to Location
+            # 3. CANONICAL_STORE: Create or update the specialized Store record.
             if not self.store:
-                # Check for existing store by store_num or riso_num to prevent duplicates
+                # Check for existing store by physical IDs to prevent digital fragmentation
                 existing_store = None
                 if self.store_num:
                     existing_store = Store.objects.filter(store_num=self.store_num).first()
@@ -182,6 +189,7 @@ class StoreUpdate(models.Model):
                 
                 if existing_store:
                     self.store = existing_store
+                    logger.info(f"SYNC_STEP: Linked Update {self.id} to existing Store #{self.store.store_num}")
                 else:
                     self.store = Store.objects.create(
                         store_num=self.store_num,
@@ -196,8 +204,9 @@ class StoreUpdate(models.Model):
                         lon=self.lon,
                         location=self.location
                     )
+                    logger.info(f"SYNC_STEP: Created new Store record for Update {self.id}")
             else:
-                # Update existing store
+                # Update existing store specialized metadata
                 self.store.store_num = self.store_num or self.store.store_num
                 self.store.riso_num = self.riso_num or self.store.riso_num
                 self.store.store_name = self.store_name or self.store.store_name
@@ -210,15 +219,15 @@ class StoreUpdate(models.Model):
                 self.store.lon = self.lon or self.store.lon
                 self.store.location = self.location
                 self.store.save()
+                logger.info(f"SYNC_STEP: Updated Store specialized metadata for #{self.store.store_num}")
 
-            # 3. Synchronize Tank Mappings (Non-Destructive Upsert)
+            # 4. TANK_SYNCHRONIZATION: Surgical 'Upsert' of physical tank hardware.
             tank_updates = self.tank_updates.all()
             if tank_updates.exists():
-                # Keep track of which physical tanks are in this approved proposal
                 proposed_indices = []
                 
                 for tu in tank_updates:
-                    StoreTankMapping.objects.update_or_create(
+                    mapping, created = StoreTankMapping.objects.update_or_create(
                         store=self.store,
                         tank_index=tu.tank_index,
                         defaults={
@@ -227,13 +236,20 @@ class StoreUpdate(models.Model):
                         }
                     )
                     proposed_indices.append(tu.tank_index)
+                    status_str = "CREATED" if created else "UPDATED"
+                    logger.info(f"SYNC_STEP: {status_str} mapping for Store #{self.store.store_num} Tank {tu.tank_index}")
                 
-                # MIRRORING DELETIONS: 
-                # Remove canonical mappings that were NOT included in this proposal.
-                # This ensures the database matches the field agent's final verified layout.
-                StoreTankMapping.objects.filter(store=self.store).exclude(tank_index__in=proposed_indices).delete()
+                # MIRRORING DELETIONS: Remove canonical mappings NOT present in the final proposal.
+                # This ensures the database mirrors the verified physical layout.
+                deleted_count, _ = StoreTankMapping.objects.filter(
+                    store=self.store
+                ).exclude(tank_index__in=proposed_indices).delete()
+                
+                if deleted_count:
+                    logger.info(f"SYNC_STEP: Purged {deleted_count} stale tank mappings for Store #{self.store.store_num}")
             
-            self.save() # Persist linkage changes to StoreUpdate itself
+            self.save() # Final linkage persistence
+            logger.info(f"SYNC_COMPLETE: Successfully applied Update {self.id} to Store {self.store.store_num}")
             logger.info(f"Successfully applied StoreUpdate ID {self.id} to Store {self.store.store_num}")
 
     def save(self, *args, **kwargs):

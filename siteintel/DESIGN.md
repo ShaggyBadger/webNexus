@@ -169,22 +169,37 @@ This ensures full accountability and traceability.
 
 ---
 
-## 5. Implementation Status (Current: Version 1.0.0)
+### 3.7 Data Integrity & Security (Operational Hardening)
+
+**Change:**
+Implemented rigorous protection for the site intelligence database.
+
+*   **Non-Destructive Synchronization:** Refactored the `apply_update` logic to use an **"Upsert" (Update or Create)** pattern. This ensures that modifications to specific tanks do not accidentally delete unrelated site data.
+*   **XSS Protection:** Added automated **HTML stripping** on all proposal form fields to neutralize malicious code injection (Cross-Site Scripting).
+*   **Access Control:** All data modification views and background API endpoints (Reverse Geocoding, Tank Picker) are strictly restricted to authenticated users.
+
+---
+
+## 5. Implementation Status (Current: Version 2.6.0)
 
 ### 5.1 Phase 1: COMPLETE
 *   **Core Models:** `Location`, `LocationType`, `StoreUpdate`, and `TankUpdate` implemented.
-*   **Canonical Linkage:** `tankgauge.Store` linked to `siteintel.Location`; `tank_index` added to mappings.
+*   **Canonical Linkage:** `tankgauge.Store` linked to `siteintel.Location`.
+*   **Non-Destructive Sync:** Atomic upsert logic for preserving site configuration.
 *   **Tactical UI:** 
-    *   **Dashboard:** Centralized hub for site search and management.
-    *   **Proposal Form:** AJAX-driven identification, GPS capture, and physical tank indexing.
-    *   **Mapping:** Leaflet.js integration with CartoDB Dark Matter tiles and draggable markers.
-    *   **Tank Picker:** +/- 10% tolerance search for matching tank charts.
-*   **Approval Workflow:** Admin action "[ APPROVE & APPLY ]" for atomic data synchronization.
+    *   **Dashboard:** Centralized hub with search and target management.
+    *   **Proposal Form:** 
+        *   **Reverse Geocoding:** Auto-address population from GPS.
+        *   **Proximity Detection:** 250ft radius duplicate warning.
+        *   **Brand Selector:** Intelligent dropdown with custom entry option.
+    *   **Mapping:** Leaflet.js integration with draggable markers.
+*   **Security:** Full authentication requirements and data sanitization.
 
 ### 5.2 Phase 2: PLANNED
-*   Introduction of additional location types (Fuel Racks, Yards).
-*   Advanced mapping overlays and drawing tools.
-*   Field intelligence notes expansion.
+*   Aggregated volume logic for **Manifolded Tanks**.
+*   **Site Status Tracking** (OPEN / CLOSED / MAINTENANCE).
+*   Advanced mapping overlays and field observation drawings.
+*   Support for additional location types (Fuel Racks, Yards).
 
 ---
 

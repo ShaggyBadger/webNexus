@@ -22,14 +22,16 @@ def reverse_geocode_api(request):
     """
     TACTICAL INTEL:
     Reverse geocoding using Nominatim (OpenStreetMap).
-    Converts LAT/LON coordinates into a physical address.
+    Converts LAT/LON coordinates into a physical address to reduce manual entry errors.
     """
     lat = request.GET.get('lat')
     lon = request.GET.get('lon')
     
     if not lat or not lon:
+        logger.warning("GEOCODE_ATTEMPT_FAILED: Missing coordinates in request.")
         return JsonResponse({'error': 'LAT and LON are required'}, status=400)
     
+    logger.info(f"GEOCODE_REQUEST: Lat {lat}, Lon {lon} triggered by user {request.user}")
     url = f"https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat={lat}&lon={lon}"
     
     try:
@@ -48,13 +50,14 @@ def reverse_geocode_api(request):
                 'state': address.get('state', ''),
                 'zip_code': address.get('postcode', '')
             }
+            logger.info(f"GEOCODE_SUCCESS: Decoded to {result.get('address')}, {result.get('city')}")
             return JsonResponse(result)
             
     except URLError as e:
-        logger.error(f"Geocoding Error: {str(e)}")
+        logger.error(f"GEOCODE_SERVICE_UNAVAILABLE: {str(e)}")
         return JsonResponse({'error': 'Service unavailable'}, status=503)
     except Exception as e:
-        logger.error(f"Unexpected Geocoding Error: {str(e)}")
+        logger.error(f"GEOCODE_UNEXPECTED_FAILURE: {str(e)}")
         return JsonResponse({'error': 'Internal error'}, status=500)
 
 @login_required
@@ -62,7 +65,7 @@ def proximity_check_api(request):
     """
     TACTICAL INTEL:
     Checks for existing stores within a ~250ft (0.05 mile) radius.
-    Used to prevent duplicate site creation.
+    Used as a duplication safeguard during new site proposals.
     """
     lat = request.GET.get('lat')
     lon = request.GET.get('lon')
@@ -94,6 +97,9 @@ def proximity_check_api(request):
                 'store_name': store.store_name,
                 'distance_ft': int(dist * 5280) # Convert miles to feet
             })
+    
+    if matches:
+        logger.warning(f"PROXIMITY_ALERT: {len(matches)} sites detected near Lat {lat}, Lon {lon} by user {request.user}")
             
     return JsonResponse({'matches': matches})
 
@@ -247,8 +253,7 @@ def tank_type_search_api(request):
     """
     TACTICAL INTEL:
     AJAX endpoint for the 'Tank Picker'.
-    Queries TankType records within a +/- 10% tolerance of the reported capacity
-    and/or matching a text query.
+    Queries TankType records within a +/- 10% tolerance of the reported capacity.
     """
     capacity = request.GET.get('capacity')
     query = request.GET.get('q')
@@ -264,6 +269,7 @@ def tank_type_search_api(request):
             lower_bound = cap_val * 0.9
             upper_bound = cap_val * 1.1
             filters &= Q(capacity__gte=lower_bound, capacity__lte=upper_bound)
+            logger.info(f"TANK_SEARCH: Querying charts near {cap_val} gallons for {request.user}")
         except ValueError:
             pass # Ignore invalid capacity if query is present
             
@@ -285,12 +291,15 @@ def store_lookup_api(request):
     if not query:
         return JsonResponse({'error': 'Query is required'}, status=400)
     
+    logger.info(f"STORE_LOOKUP_REQUEST: ID '{query}' triggered by {request.user}")
     store = Store.objects.filter(
         Q(store_num=query) | Q(riso_num=query)
     ).first()
     
     if store:
+        logger.info(f"STORE_LOOKUP_HIT: Found Store #{store.store_num}")
         mappings = StoreTankMapping.objects.filter(store=store).order_by('tank_index')
+...
         tanks = []
         for m in mappings:
             tanks.append({
