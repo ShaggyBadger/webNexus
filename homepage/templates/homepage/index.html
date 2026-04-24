@@ -105,8 +105,10 @@
     <!-- TankGauge Module -->
     {% include 'homepage/components/app_tankgauge.html' %}
     
+    {% if user.is_authenticated %}
     <!-- SiteIntel Module -->
     {% include 'homepage/components/app_siteintel.html' %}
+    {% endif %}
   </div>
 </div>
 {% endblock %} {% block extra_scripts %}

@@ -1,12 +1,14 @@
 from django.shortcuts import render
 from django.views.generic import CreateView, DetailView, ListView
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.decorators import login_required
 from django.urls import reverse_lazy
 from django.http import JsonResponse
 from django.db.models import Q
 from django import forms
 from .models import StoreUpdate, TankUpdate, Location, LocationType
 from tankgauge.models import Store, TankType, StoreTankMapping
+from tankgauge.logic.utils import haversine
 from .forms import StoreUpdateForm, TankUpdateForm, TankUpdateFormSet
 import logging
 import json
@@ -53,6 +55,46 @@ def reverse_geocode_api(request):
     except Exception as e:
         logger.error(f"Unexpected Geocoding Error: {str(e)}")
         return JsonResponse({'error': 'Internal error'}, status=500)
+
+@login_required
+def proximity_check_api(request):
+    """
+    TACTICAL INTEL:
+    Checks for existing stores within a ~250ft (0.05 mile) radius.
+    Used to prevent duplicate site creation.
+    """
+    lat = request.GET.get('lat')
+    lon = request.GET.get('lon')
+    exclude_num = request.GET.get('exclude_store_num')
+    
+    if not lat or not lon:
+        return JsonResponse({'error': 'LAT and LON are required'}, status=400)
+    
+    try:
+        lat_val = float(lat)
+        lon_val = float(lon)
+    except ValueError:
+        return JsonResponse({'error': 'Invalid coordinates'}, status=400)
+        
+    # Search radius in miles (0.05 miles is approx 264 feet)
+    RADIUS = 0.05
+    
+    matches = []
+    stores = Store.objects.exclude(lat__isnull=True).exclude(lon__isnull=True)
+    
+    if exclude_num:
+        stores = stores.exclude(store_num=exclude_num)
+        
+    for store in stores:
+        dist = haversine(lat_val, lon_val, store.lat, store.lon)
+        if dist <= RADIUS:
+            matches.append({
+                'store_num': store.store_num,
+                'store_name': store.store_name,
+                'distance_ft': int(dist * 5280) # Convert miles to feet
+            })
+            
+    return JsonResponse({'matches': matches})
 
 class StoreUpdateCreateView(LoginRequiredMixin, CreateView):
     """

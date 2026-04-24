@@ -1,4 +1,5 @@
 from django import forms
+import re
 from .models import StoreUpdate, TankUpdate
 from tankgauge.models import TankType
 
@@ -6,6 +7,7 @@ class StoreUpdateForm(forms.ModelForm):
     """
     OPERATIONAL FLOW:
     Captures the primary metadata for a store intelligence proposal.
+    Includes tactical sanitization to prevent XSS and injection.
     """
     class Meta:
         model = StoreUpdate
@@ -27,6 +29,32 @@ class StoreUpdateForm(forms.ModelForm):
             'lat': forms.TextInput(attrs={'class': 'form-control mono', 'readonly': 'readonly'}),
             'lon': forms.TextInput(attrs={'class': 'form-control mono', 'readonly': 'readonly'}),
         }
+
+    def clean_store_num(self):
+        """
+        Ensure store number is strictly numeric and clean of any artifacts.
+        """
+        val = self.cleaned_data.get('store_num')
+        if val is not None:
+            # Check if it contains anything other than digits
+            if not re.match(r'^\d+$', str(val)):
+                raise forms.ValidationError("STORE_ID_ERROR: MUST BE NUMERIC DIGITS ONLY")
+        return val
+
+    def clean(self):
+        """
+        TACTICAL SANITIZATION:
+        Strips HTML tags from all text inputs to prevent XSS.
+        """
+        cleaned_data = super().clean()
+        for field in cleaned_data:
+            value = cleaned_data.get(field)
+            if isinstance(value, str):
+                # Strip HTML tags using regex for a zero-dependency tactical fix
+                # This ensures any <b> or <script> tags are removed before saving.
+                clean_value = re.sub(r'<[^>]*>', '', value)
+                cleaned_data[field] = clean_value.strip()
+        return cleaned_data
 
 class TankUpdateForm(forms.ModelForm):
     """
