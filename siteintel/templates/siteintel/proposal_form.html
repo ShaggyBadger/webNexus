@@ -215,6 +215,16 @@
                                             {{ form.lon }}
                                         </div>
                                     </div>
+
+                                    <!-- Proximity Warning Container -->
+                                    <div class="col-12 d-none" id="proximity-warning">
+                                        <div class="alert alert-warning bg-dark border-warning mono py-2 px-3 mb-2" style="font-size: 0.7rem;">
+                                            <div class="text-tactical-warning fw-bold mb-1">[ PROXIMITY_ALERT: EXISTING SITE DETECTED WITHIN 250FT ]</div>
+                                            <div id="proximity-matches"></div>
+                                            <div class="mt-1 text-muted-custom">IS THIS THE SITE YOU ARE LOOKING FOR? IF SO, ABORT THIS MISSION AND UPDATE THE EXISTING RECORD.</div>
+                                        </div>
+                                    </div>
+
                                     <div class="col-12 mb-3">
                                         <div class="mono text-primary small mb-1">[ TACTICAL_SATELLITE_OVERLAY ]</div>
                                         <div id="map"></div>
@@ -339,6 +349,35 @@
             }
         };
 
+        // 2. PROXIMITY DETECTION (DUPLICATE WARNING)
+        const checkProximity = async (lat, lon) => {
+            if (!lat || !lon) return;
+            const excludeNum = document.getElementById('id_store_num').value;
+            const container = document.getElementById('proximity-warning');
+            const matchesDiv = document.getElementById('proximity-matches');
+
+            try {
+                const response = await fetch(`/siteintel/api/proximity-check/?lat=${lat}&lon=${lon}&exclude_store_num=${excludeNum}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.matches && data.matches.length > 0) {
+                        matchesDiv.innerHTML = '';
+                        data.matches.forEach(match => {
+                            const item = document.createElement('div');
+                            item.className = 'text-white mono mb-1';
+                            item.innerHTML = `<span class="text-primary fw-bold">#${match.store_num}</span> ${match.store_name} (${match.distance_ft} FT AWAY)`;
+                            matchesDiv.appendChild(item);
+                        });
+                        container.classList.remove('d-none');
+                    } else {
+                        container.classList.add('d-none');
+                    }
+                }
+            } catch (err) {
+                console.warn("Proximity Check Failed:", err);
+            }
+        };
+
         const updateLocation = (lat, lon, zoom) => {
             if (lat === undefined || lon === undefined || lat === null || lon === null) return;
             
@@ -358,6 +397,9 @@
                 map.setView([lat, lon], targetZoom);
                 map.invalidateSize();
             }
+
+            // TACTICAL: Trigger Duplicate Detection
+            checkProximity(latVal, lonVal);
         };
 
         // Initialize map with current field values (if any)
