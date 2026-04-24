@@ -1,0 +1,45 @@
+<div class="row g-3 align-items-end">
+    <div class="col-md-2">
+        <label class="form-label">ATG Index</label>
+        {{ tank_form.tank_index }}
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">Fuel Type</label>
+        {{ tank_form.fuel_type }}
+    </div>
+    <div class="col-md-7">
+        <!-- Search State -->
+        <div class="tank-search-container {% if assigned_tank %}d-none{% endif %}">
+            <label class="form-label">Search Capacity (GAL)</label>
+            <div class="input-group input-group-sm">
+                {{ tank_form.reported_capacity }}
+                <span class="input-group-text bg-dark text-primary"><i class="fas fa-search"></i></span>
+            </div>
+            <div class="search-results-overlay d-none"></div>
+            <div class="form-check mt-1">
+                {{ tank_form.is_unverified }}
+                <label class="form-check-label mono" style="font-size: 0.6rem; color: var(--muted-text-color);">
+                    CHART NOT FOUND (UNVERIFIED)
+                </label>
+            </div>
+        </div>
+        
+        <!-- Locked State -->
+        <div class="locked-tank-display {% if not assigned_tank %}d-none{% endif %}">
+            <div class="tank-info-container">
+                <div class="tank-info-main">
+                    {% if assigned_tank %}{{ assigned_tank.name }}{% else %}SIGNAL_LOCKED: TANK_CHART{% endif %}
+                </div>
+                <div class="tank-info-sub">
+                    {% if assigned_tank %}
+                        {{ assigned_tank.capacity }} GAL // {{ assigned_tank.max_depth }}" DEPTH
+                    {% else %}
+                        NAME // MAX_GAL // MAX_INCH
+                    {% endif %}
+                </div>
+            </div>
+            <button type="button" class="btn btn-outline-warning btn-sm change-tank-btn mono">[ CHANGE ]</button>
+        </div>
+        {{ tank_form.tank_type }}
+    </div>
+</div>

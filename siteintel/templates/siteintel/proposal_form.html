@@ -192,53 +192,18 @@
                             {% for tank_form in tank_formset %}
                             <div class="tank-entry" data-index="{{ forloop.counter0 }}">
                                 {{ tank_form.id }}
-                                {% with assigned_tank=tank_form.instance.tank_type|default:tank_form.initial.tank_type %}
-                                <div class="row g-3 align-items-end">
-                                    <div class="col-md-2">
-                                        <label class="form-label">ATG Index</label>
-                                        {{ tank_form.tank_index }}
-                                    </div>
-                                    <div class="col-md-3">
-                                        <label class="form-label">Fuel Type</label>
-                                        {{ tank_form.fuel_type }}
-                                    </div>
-                                    <div class="col-md-7">
-                                        <!-- Search State -->
-                                        <div class="tank-search-container {% if assigned_tank %}d-none{% endif %}">
-                                            <label class="form-label">Search Capacity (GAL)</label>
-                                            <div class="input-group input-group-sm">
-                                                {{ tank_form.reported_capacity }}
-                                                <span class="input-group-text bg-dark text-primary"><i class="fas fa-search"></i></span>
-                                            </div>
-                                            <div class="search-results-overlay d-none"></div>
-                                            <div class="form-check mt-1">
-                                                {{ tank_form.is_unverified }}
-                                                <label class="form-check-label mono" style="font-size: 0.6rem; color: var(--muted-text-color);">
-                                                    CHART NOT FOUND (UNVERIFIED)
-                                                </label>
-                                            </div>
-                                        </div>
-                                        
-                                        <!-- Locked State -->
-                                        <div class="locked-tank-display {% if not assigned_tank %}d-none{% endif %}">
-                                            <div class="tank-info-container">
-                                                <div class="tank-info-main">
-                                                    {% if assigned_tank %}{{ assigned_tank.name }}{% else %}SIGNAL_LOCKED: TANK_CHART{% endif %}
-                                                </div>
-                                                <div class="tank-info-sub">
-                                                    {% if assigned_tank %}
-                                                        {{ assigned_tank.capacity }} GAL // {{ assigned_tank.max_depth }}" DEPTH
-                                                    {% else %}
-                                                        NAME // MAX_GAL // MAX_INCH
-                                                    {% endif %}
-                                                </div>
-                                            </div>
-                                            <button type="button" class="btn btn-outline-warning btn-sm change-tank-btn mono">[ CHANGE ]</button>
-                                        </div>
-                                        {{ tank_form.tank_type }}
-                                    </div>
-                                </div>
-                                {% endwith %}
+                                {% if tank_form.instance.tank_type %}
+                                    {% with assigned_tank=tank_form.instance.tank_type %}
+                                        {% include "siteintel/components/tank_entry_row.html" with tank_form=tank_form assigned_tank=assigned_tank %}
+                                    {% endwith %}
+                                {% elif tank_form.initial.tank_type %}
+                                    {% with assigned_tank=tank_form.initial.tank_type %}
+                                        {% include "siteintel/components/tank_entry_row.html" with tank_form=tank_form assigned_tank=assigned_tank %}
+                                    {% endwith %}
+                                {% else %}
+                                    {% include "siteintel/components/tank_entry_row.html" with tank_form=tank_form assigned_tank=None %}
+                                {% endif %}
+                                
                                 {% if tank_formset.can_delete %}
                                     <div class="form-check d-none">
                                         {{ tank_form.DELETE }}
@@ -272,43 +237,7 @@
 
 <div id="empty-tank-form" class="d-none">
     <div class="tank-entry" data-index="__prefix__">
-        <div class="row g-3 align-items-end">
-            <div class="col-md-2">
-                <label class="form-label">ATG Index</label>
-                {{ tank_formset.empty_form.tank_index }}
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">Fuel Type</label>
-                {{ tank_formset.empty_form.fuel_type }}
-            </div>
-            <div class="col-md-7">
-                <!-- Search State -->
-                <div class="tank-search-container">
-                    <label class="form-label">Search Capacity (GAL)</label>
-                    <div class="input-group input-group-sm">
-                        {{ tank_formset.empty_form.reported_capacity }}
-                        <span class="input-group-text bg-dark text-primary"><i class="fas fa-search"></i></span>
-                    </div>
-                    <div class="search-results-overlay d-none"></div>
-                    <div class="form-check mt-1">
-                        {{ tank_formset.empty_form.is_unverified }}
-                        <label class="form-check-label mono" style="font-size: 0.6rem; color: var(--muted-text-color);">
-                            CHART NOT FOUND (UNVERIFIED)
-                        </label>
-                    </div>
-                </div>
-                
-                <!-- Locked State -->
-                <div class="locked-tank-display d-none">
-                    <div class="tank-info-container">
-                        <div class="tank-info-main">SIGNAL_LOCKED: TANK_CHART</div>
-                        <div class="tank-info-sub">NAME // MAX_GAL // MAX_INCH</div>
-                    </div>
-                    <button type="button" class="btn btn-outline-warning btn-sm change-tank-btn mono">[ CHANGE ]</button>
-                </div>
-                {{ tank_formset.empty_form.tank_type }}
-            </div>
-        </div>
+        {% include "siteintel/components/tank_entry_row.html" with tank_form=tank_formset.empty_form assigned_tank=None %}
         <button type="button" class="btn btn-outline-danger btn-sm remove-tank mono py-0 px-1" style="font-size: 0.6rem;">
             [ REMOVE ]
         </button>
