@@ -5,12 +5,54 @@ from django.urls import reverse_lazy
 from django.http import JsonResponse
 from django.db.models import Q
 from django import forms
-from .models import StoreUpdate, TankUpdate, Location
+from .models import StoreUpdate, TankUpdate, Location, LocationType
 from tankgauge.models import Store, TankType, StoreTankMapping
 from .forms import StoreUpdateForm, TankUpdateForm, TankUpdateFormSet
 import logging
+import json
+import urllib.request
+from urllib.error import URLError
 
 logger = logging.getLogger('webnexus')
+
+def reverse_geocode_api(request):
+    """
+    TACTICAL INTEL:
+    Reverse geocoding using Nominatim (OpenStreetMap).
+    Converts LAT/LON coordinates into a physical address.
+    """
+    lat = request.GET.get('lat')
+    lon = request.GET.get('lon')
+    
+    if not lat or not lon:
+        return JsonResponse({'error': 'LAT and LON are required'}, status=400)
+    
+    url = f"https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat={lat}&lon={lon}"
+    
+    try:
+        req = urllib.request.Request(
+            url, 
+            headers={'User-Agent': 'webNexus-Tactical-Agent/1.0'}
+        )
+        with urllib.request.urlopen(req) as response:
+            data = json.loads(response.read().decode())
+            
+            address = data.get('address', {})
+            # Tactical normalization of address components
+            result = {
+                'address': address.get('house_number', '') + ' ' + address.get('road', '') if address.get('road') else address.get('pedestrian', ''),
+                'city': address.get('city') or address.get('town') or address.get('village') or address.get('suburb', ''),
+                'state': address.get('state', ''),
+                'zip_code': address.get('postcode', '')
+            }
+            return JsonResponse(result)
+            
+    except URLError as e:
+        logger.error(f"Geocoding Error: {str(e)}")
+        return JsonResponse({'error': 'Service unavailable'}, status=503)
+    except Exception as e:
+        logger.error(f"Unexpected Geocoding Error: {str(e)}")
+        return JsonResponse({'error': 'Internal error'}, status=500)
 
 class StoreUpdateCreateView(LoginRequiredMixin, CreateView):
     """
@@ -27,14 +69,35 @@ class StoreUpdateCreateView(LoginRequiredMixin, CreateView):
         initial = super().get_initial()
         store_num = self.request.GET.get('store_num')
         riso_num = self.request.GET.get('riso_num')
+        
+        # Default to "Gas Station" as the baseline
+        gas_station = LocationType.objects.filter(name="Gas Station").first()
+        if gas_station:
+            initial['location_type'] = gas_station.id
+
+        # If targeting an existing store, override with its current type
+        target_store = None
         if store_num:
-            initial['store_num'] = store_num
-        if riso_num:
-            initial['riso_num'] = riso_num
+            target_store = Store.objects.filter(store_num=store_num).first()
+        elif riso_num:
+            target_store = Store.objects.filter(riso_num=riso_num).first()
+
+        if target_store:
+            initial['store_num'] = target_store.store_num
+            initial['riso_num'] = target_store.riso_num
+            initial['store_type'] = target_store.store_type
+            if target_store.location and target_store.location.location_type:
+                initial['location_type'] = target_store.location.location_type.id
+
         return initial
 
     def get_context_data(self, **kwargs):
         data = super().get_context_data(**kwargs)
+        
+        # Get distinct store types for the dropdown
+        existing_types = Store.objects.exclude(store_type__isnull=True).exclude(store_type='').values_list('store_type', flat=True).distinct().order_by('store_type')
+        data['existing_store_types'] = list(existing_types)
+        
         store_num = self.request.GET.get('store_num')
         
         if self.request.POST:
@@ -198,6 +261,7 @@ def store_lookup_api(request):
             'store_num': store.store_num,
             'riso_num': store.riso_num,
             'store_name': store.store_name,
+            'store_type': store.store_type,
             'address': store.address,
             'city': store.city,
             'state': store.state,

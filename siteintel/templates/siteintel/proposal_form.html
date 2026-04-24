@@ -116,6 +116,20 @@
         <div class="col-lg-10">
             <h2 class="mono text-primary mb-4">[ PROPOSE_SITE_INTEL ]</h2>
             
+            {% if form.errors or tank_formset.errors %}
+            <div class="alert alert-danger bg-dark border-danger mono mb-4" style="font-size: 0.75rem;">
+                <div class="text-danger fw-bold mb-2">[ FORM_VALIDATION_ERROR ]</div>
+                <ul class="m-0">
+                    {% for field, errors in form.errors.items %}
+                        <li>{{ field|upper }}: {{ errors|striptags }}</li>
+                    {% endfor %}
+                    {% for error in tank_formset.non_form_errors %}
+                        <li>TANK_CONFIG: {{ error|striptags }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+            
             <form method="post" id="proposal-form">
                 {% csrf_token %}
                 
@@ -127,12 +141,16 @@
                     </div>
                     <div class="card-body">
                         <div class="row g-3">
-                            <div class="col-md-3">
+                            <div class="col-md-4">
+                                <label class="form-label">Location Type</label>
+                                {{ form.location_type }}
+                            </div>
+                            <div class="col-md-4">
                                 <label class="form-label">Store #</label>
                                 {{ form.store_num }}
                                 <small class="text-muted-custom mono mt-1 d-block" style="font-size: 0.6rem;">AUTO-LOOKUP TRIGGERED</small>
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-md-4">
                                 <label class="form-label">RISO ID</label>
                                 {{ form.riso_num }}
                             </div>
@@ -140,21 +158,51 @@
                                 <label class="form-label">Site Name</label>
                                 {{ form.store_name }}
                             </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Store Type / Brand</label>
+                                <div class="input-group">
+                                    <select class="form-select mono" id="store-type-selector" style="font-size: 0.8rem;">
+                                        <option value="">-- SELECT_BRAND --</option>
+                                        {% for stype in existing_store_types %}
+                                            <option value="{{ stype }}" {% if form.initial.store_type == stype %}selected{% endif %}>{{ stype }}</option>
+                                        {% endfor %}
+                                        <option value="CUSTOM" {% if form.initial.store_type and form.initial.store_type not in existing_store_types %}selected{% endif %}>[ CUSTOM_ENTRY ]</option>
+                                    </select>
+                                    <input type="text" id="custom-store-type" class="form-control mono {% if not form.initial.store_type or form.initial.store_type in existing_store_types %}d-none{% endif %}" 
+                                           placeholder="Enter brand..." value="{% if form.initial.store_type and form.initial.store_type not in existing_store_types %}{{ form.initial.store_type }}{% endif %}" style="font-size: 0.8rem;">
+                                </div>
+                                {{ form.store_type }}
+                            </div>
                             
                             <div class="col-12 mt-4">
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <label class="form-label m-0">Geospatial Data</label>
-                                    <button type="button" class="btn btn-outline-primary btn-sm mono" id="gps-capture-btn" style="font-size: 0.7rem;">
-                                        [ RE-CAPTURE GPS_PULSE ]
-                                    </button>
+                                    <div class="d-flex gap-2">
+                                        <button type="button" class="btn btn-outline-info btn-sm mono" id="geocode-btn" style="font-size: 0.7rem;">
+                                            [ DECODE_COORDINATES ]
+                                        </button>
+                                        <button type="button" class="btn btn-outline-primary btn-sm mono" id="gps-capture-btn" style="font-size: 0.7rem;">
+                                            [ RE-CAPTURE GPS_PULSE ]
+                                        </button>
+                                    </div>
                                 </div>
                                 <div class="row g-2">
                                     <div class="col-md-9">
-                                        {{ form.address }}
-                                        <div class="row g-2 mt-1">
-                                            <div class="col-md-5">{{ form.city }}</div>
-                                            <div class="col-md-3">{{ form.state }}</div>
-                                            <div class="col-md-4">{{ form.zip_code }}</div>
+                                        <div class="input-group input-group-sm mb-2">
+                                            <span class="input-group-text mono bg-dark text-muted-custom" style="width: 110px; font-size: 0.65rem;">ADDRESS</span>
+                                            {{ form.address }}
+                                        </div>
+                                        <div class="input-group input-group-sm mb-2">
+                                            <span class="input-group-text mono bg-dark text-muted-custom" style="width: 110px; font-size: 0.65rem;">CITY</span>
+                                            {{ form.city }}
+                                        </div>
+                                        <div class="input-group input-group-sm mb-2">
+                                            <span class="input-group-text mono bg-dark text-muted-custom" style="width: 110px; font-size: 0.65rem;">STATE</span>
+                                            {{ form.state }}
+                                        </div>
+                                        <div class="input-group input-group-sm mb-2">
+                                            <span class="input-group-text mono bg-dark text-muted-custom" style="width: 110px; font-size: 0.65rem;">ZIP_CODE</span>
+                                            {{ form.zip_code }}
                                         </div>
                                     </div>
                                     <div class="col-md-3">
@@ -374,7 +422,72 @@
 
         document.getElementById('gps-capture-btn').addEventListener('click', captureGps);
 
-        // 3. STORE LOOKUP & PRE-POPULATION
+        // 3. REVERSE GEOCODING (COORDINATE DECODING)
+        const decodeCoordinates = async () => {
+            const lat = latInput.value;
+            const lon = lonInput.value;
+            if (!lat || !lon) {
+                alert("COORDINATE_ERROR: TARGET LAT/LON REQUIRED FOR DECODING");
+                return;
+            }
+
+            const btn = document.getElementById('geocode-btn');
+            const originalText = btn.innerText;
+            btn.innerText = "[ DECODING... ]";
+            btn.disabled = true;
+
+            try {
+                const response = await fetch(`/siteintel/api/reverse-geocode/?lat=${lat}&lon=${lon}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.address) document.getElementById('id_address').value = data.address;
+                    if (data.city) document.getElementById('id_city').value = data.city;
+                    if (data.state) document.getElementById('id_state').value = data.state;
+                    if (data.zip_code) document.getElementById('id_zip_code').value = data.zip_code;
+                    
+                    btn.innerText = "[ DECODE_SUCCESS ]";
+                    btn.classList.replace('btn-outline-info', 'btn-outline-success');
+                } else {
+                    btn.innerText = "[ DECODE_FAILED ]";
+                    btn.classList.replace('btn-outline-info', 'btn-outline-danger');
+                }
+            } catch (err) {
+                console.error("Geocoding Error:", err);
+                btn.innerText = "[ DECODE_ERROR ]";
+                btn.classList.replace('btn-outline-info', 'btn-outline-danger');
+            } finally {
+                setTimeout(() => {
+                    btn.innerText = originalText;
+                    btn.disabled = false;
+                    btn.classList.remove('btn-outline-success', 'btn-outline-danger');
+                    btn.classList.add('btn-outline-info');
+                }, 3000);
+            }
+        };
+
+        document.getElementById('geocode-btn').addEventListener('click', decodeCoordinates);
+
+        // 4. STORE_TYPE LOGIC (DROPDOWN + CUSTOM)
+        const typeSelector = document.getElementById('store-type-selector');
+        const customTypeInput = document.getElementById('custom-store-type');
+        const hiddenTypeInput = document.getElementById('id_store_type');
+
+        typeSelector.addEventListener('change', (e) => {
+            if (e.target.value === 'CUSTOM') {
+                customTypeInput.classList.remove('d-none');
+                customTypeInput.focus();
+                hiddenTypeInput.value = customTypeInput.value;
+            } else {
+                customTypeInput.classList.add('d-none');
+                hiddenTypeInput.value = e.target.value;
+            }
+        });
+
+        customTypeInput.addEventListener('input', (e) => {
+            hiddenTypeInput.value = e.target.value;
+        });
+
+        // 5. STORE LOOKUP & PRE-POPULATION
         const fetchStoreData = async (storeNum, isInitialLoad = false) => {
             if (!storeNum) return;
             try {
@@ -383,6 +496,21 @@
                     const data = await response.json();
                     document.getElementById('id_riso_num').value = data.riso_num || '';
                     document.getElementById('id_store_name').value = data.store_name || '';
+
+                    // Handle Store Type Sync
+                    if (data.store_type) {
+                        const optionExists = Array.from(typeSelector.options).some(opt => opt.value === data.store_type);
+                        if (optionExists) {
+                            typeSelector.value = data.store_type;
+                            customTypeInput.classList.add('d-none');
+                        } else {
+                            typeSelector.value = 'CUSTOM';
+                            customTypeInput.classList.remove('d-none');
+                            customTypeInput.value = data.store_type;
+                        }
+                        hiddenTypeInput.value = data.store_type;
+                    }
+
                     document.getElementById('id_address').value = data.address || '';
                     document.getElementById('id_city').value = data.city || '';
                     document.getElementById('id_state').value = data.state || '';

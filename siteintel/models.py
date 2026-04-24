@@ -89,6 +89,14 @@ class StoreUpdate(models.Model):
         choices=STATUS_CHOICES, 
         default='PENDING'
     )
+
+    location_type = models.ForeignKey(
+        LocationType,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="proposed_updates"
+    )
     
     # Audit Trail (Who and When)
     submitted_by = models.ForeignKey(
@@ -110,6 +118,7 @@ class StoreUpdate(models.Model):
     store_num = models.IntegerField(null=True, blank=True, help_text="Physical Store #")
     riso_num = models.IntegerField(null=True, blank=True, help_text="RISO Identifier")
     store_name = models.CharField(max_length=255, null=True, blank=True)
+    store_type = models.CharField(max_length=255, null=True, blank=True, help_text="Brand/Type (e.g., 7-Eleven, Speedway)")
     address = models.CharField(max_length=255, null=True, blank=True)
     city = models.CharField(max_length=100, null=True, blank=True)
     state = models.CharField(max_length=50, null=True, blank=True)
@@ -129,11 +138,15 @@ class StoreUpdate(models.Model):
 
         with transaction.atomic():
             # 1. Ensure Location exists and is linked
-            loc_type_name = "Store"
-            location_type, _ = LocationType.objects.get_or_create(
-                name=loc_type_name,
-                defaults={'description': "Standard retail or delivery destination."}
-            )
+            # Use proposed location_type or fallback to "Store"
+            if self.location_type:
+                location_type = self.location_type
+            else:
+                loc_type_name = "Gas Station"
+                location_type, _ = LocationType.objects.get_or_create(
+                    name=loc_type_name,
+                    defaults={'description': "Retail fuel site or convenience store."}
+                )
 
             if not self.location:
                 self.location = Location.objects.create(
@@ -149,6 +162,7 @@ class StoreUpdate(models.Model):
             else:
                 # Update existing location
                 self.location.name = self.store_name or self.location.name
+                self.location.location_type = location_type
                 self.location.address = self.address or self.location.address
                 self.location.city = self.city or self.location.city
                 self.location.state = self.state or self.location.state
@@ -173,6 +187,7 @@ class StoreUpdate(models.Model):
                         store_num=self.store_num,
                         riso_num=self.riso_num,
                         store_name=self.store_name,
+                        store_type=self.store_type,
                         address=self.address,
                         city=self.city,
                         state=self.state,
@@ -186,6 +201,7 @@ class StoreUpdate(models.Model):
                 self.store.store_num = self.store_num or self.store.store_num
                 self.store.riso_num = self.riso_num or self.store.riso_num
                 self.store.store_name = self.store_name or self.store.store_name
+                self.store.store_type = self.store_type or self.store.store_type
                 self.store.address = self.address or self.store.address
                 self.store.city = self.city or self.store.city
                 self.store.state = self.state or self.store.state
@@ -195,21 +211,27 @@ class StoreUpdate(models.Model):
                 self.store.location = self.location
                 self.store.save()
 
-            # 3. Synchronize Tank Mappings
-            # For simplicity in Phase 1, we clear and rebuild mappings if updates are provided
+            # 3. Synchronize Tank Mappings (Non-Destructive Upsert)
             tank_updates = self.tank_updates.all()
             if tank_updates.exists():
-                # Clear existing mappings for this store
-                StoreTankMapping.objects.filter(store=self.store).delete()
+                # Keep track of which physical tanks are in this approved proposal
+                proposed_indices = []
                 
-                # Rebuild from proposed updates
                 for tu in tank_updates:
-                    StoreTankMapping.objects.create(
+                    StoreTankMapping.objects.update_or_create(
                         store=self.store,
-                        tank_type=tu.tank_type, # May be None if unverified
-                        fuel_type=tu.fuel_type.lower(),
-                        tank_index=tu.tank_index
+                        tank_index=tu.tank_index,
+                        defaults={
+                            'tank_type': tu.tank_type,
+                            'fuel_type': tu.fuel_type.lower()
+                        }
                     )
+                    proposed_indices.append(tu.tank_index)
+                
+                # MIRRORING DELETIONS: 
+                # Remove canonical mappings that were NOT included in this proposal.
+                # This ensures the database matches the field agent's final verified layout.
+                StoreTankMapping.objects.filter(store=self.store).exclude(tank_index__in=proposed_indices).delete()
             
             self.save() # Persist linkage changes to StoreUpdate itself
             logger.info(f"Successfully applied StoreUpdate ID {self.id} to Store {self.store.store_num}")

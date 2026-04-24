@@ -10,18 +10,20 @@ class StoreUpdateForm(forms.ModelForm):
     class Meta:
         model = StoreUpdate
         fields = [
-            'store_num', 'riso_num', 'store_name', 
+            'location_type', 'store_num', 'riso_num', 'store_name', 'store_type',
             'address', 'city', 'state', 'zip_code', 
             'lat', 'lon'
         ]
         widgets = {
+            'location_type': forms.Select(attrs={'class': 'form-select mono', 'style': 'font-size: 0.8rem;'}),
             'store_num': forms.TextInput(attrs={'class': 'form-control mono', 'placeholder': 'Physical Store #'}),
             'riso_num': forms.TextInput(attrs={'class': 'form-control mono', 'placeholder': 'RISO ID'}),
             'store_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Site Name'}),
-            'address': forms.TextInput(attrs={'class': 'form-control'}),
-            'city': forms.TextInput(attrs={'class': 'form-control'}),
-            'state': forms.TextInput(attrs={'class': 'form-control'}),
-            'zip_code': forms.TextInput(attrs={'class': 'form-control'}),
+            'store_type': forms.HiddenInput(), # Handled by custom UI logic
+            'address': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Street Address'}),
+            'city': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'City'}),
+            'state': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'State'}),
+            'zip_code': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Zip Code'}),
             'lat': forms.TextInput(attrs={'class': 'form-control mono', 'readonly': 'readonly'}),
             'lon': forms.TextInput(attrs={'class': 'form-control mono', 'readonly': 'readonly'}),
         }

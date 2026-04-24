@@ -23,20 +23,20 @@ class StoreUpdateAdmin(admin.ModelAdmin):
     Provides the administrative interface for reviewing and approving
     field-submitted site intelligence. 
     """
-    list_display = ('store_name', 'status', 'submitted_by', 'submitted_at', 'approved_by')
-    list_filter = ('status', 'submitted_at', 'state')
-    search_fields = ('store_name', 'store_num', 'riso_num', 'submitted_by__username')
+    list_display = ('store_name', 'store_type', 'status', 'submitted_by', 'submitted_at', 'approved_by')
+    list_filter = ('status', 'submitted_at', 'state', 'store_type')
+    search_fields = ('store_name', 'store_num', 'riso_num', 'submitted_by__username', 'store_type')
     inlines = [TankUpdateInline]
     
     fieldsets = (
         ('Proposal Status', {
-            'fields': ('status', 'submitted_by', 'submitted_at', 'approved_by', 'approved_at')
+            'fields': ('status', 'location_type', 'submitted_by', 'submitted_at', 'approved_by', 'approved_at')
         }),
         ('Canonical Links', {
             'fields': ('location', 'store')
         }),
         ('Proposed Site Details', {
-            'fields': ('store_name', 'store_num', 'riso_num', 'address', 'city', 'state', 'zip_code', 'lat', 'lon')
+            'fields': ('store_name', 'store_type', 'store_num', 'riso_num', 'address', 'city', 'state', 'zip_code', 'lat', 'lon')
         }),
     )
     
@@ -69,9 +69,34 @@ class StoreUpdateAdmin(admin.ModelAdmin):
     def save_model(self, request, obj, form, change):
         """
         Auto-capture the approving user when status is set to APPROVED.
+        Also triggers apply_update() if status is changing to APPROVED.
         """
-        if obj.status == 'APPROVED' and not obj.approved_by:
-            obj.approved_by = request.user
+        is_becoming_approved = False
+        if obj.status == 'APPROVED':
+            if not change: # New record created as APPROVED
+                is_becoming_approved = True
+            else:
+                # Use a fresh fetch to see what's currently in the DB
+                old_status = StoreUpdate.objects.get(pk=obj.pk).status
+                if old_status != 'APPROVED':
+                    is_becoming_approved = True
+
+        if is_becoming_approved:
             from django.utils import timezone
-            obj.approved_at = timezone.now()
+            if not obj.approved_by:
+                obj.approved_by = request.user
+            if not obj.approved_at:
+                obj.approved_at = timezone.now()
+            
+            # Canonical synchronization
+            try:
+                # We save before applying to ensure the status is 'APPROVED' 
+                # inside apply_update's check.
+                super().save_model(request, obj, form, change)
+                obj.apply_update()
+                return # Skip the final super().save_model below
+            except Exception as e:
+                from django.contrib import messages
+                messages.error(request, f"SYNC_ERROR: {str(e)}")
+        
         super().save_model(request, obj, form, change)
