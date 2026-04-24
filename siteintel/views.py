@@ -1,6 +1,7 @@
 from django.shortcuts import render
 from django.views.generic import CreateView, DetailView, ListView
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.decorators import login_required
 from django.urls import reverse_lazy
 from django.http import JsonResponse
 from django.db.models import Q
@@ -15,6 +16,7 @@ from urllib.error import URLError
 
 logger = logging.getLogger('webnexus')
 
+@login_required
 def reverse_geocode_api(request):
     """
     TACTICAL INTEL:
@@ -199,6 +201,7 @@ class SiteIntelDashboardView(LoginRequiredMixin, ListView):
             )
         return queryset
 
+@login_required
 def tank_type_search_api(request):
     """
     TACTICAL INTEL:
@@ -230,6 +233,7 @@ def tank_type_search_api(request):
     
     return JsonResponse({'results': list(matches)})
 
+@login_required
 def store_lookup_api(request):
     """
     TACTICAL INTEL:
