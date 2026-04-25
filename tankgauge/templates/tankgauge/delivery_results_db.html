@@ -46,11 +46,17 @@
   <!-- Mission Summary -->
   <div id="mission-summary" class="mission-summary db-mode" style="display: none;">
     <div class="text-center mb-3">
-      <h3 class="mono fw-bold" style="font-size: 1.1rem">[ MISSION_CARGO_SUMMARY ]</h3>
+      <h3 class="mono fw-bold">
+        <span class="d-none d-md-inline" style="font-size: 1.1rem;">[ MISSION_CARGO_SUMMARY ]</span>
+        <span class="d-inline d-md-none" style="font-size: 0.9rem;">[ MISSION_CARGO ]</span>
+      </h3>
     </div>
     <div class="specs-list mb-0">
       <div class="spec-line">
-        <span class="specs-label">TOTAL_DELIVERY_VOLUME:</span>
+        <span class="specs-label">
+          <span class="d-none d-md-inline">TOTAL_DELIVERY_VOLUME:</span>
+          <span class="d-inline d-md-none">TOTAL_VOLUME:</span>
+        </span>
         <span class="specs-value text-primary" id="summary-total-vol">0 G</span>
       </div>
       <div class="spec-line">

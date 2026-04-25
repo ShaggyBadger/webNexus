@@ -299,7 +299,6 @@ def store_lookup_api(request):
     if store:
         logger.info(f"STORE_LOOKUP_HIT: Found Store #{store.store_num}")
         mappings = StoreTankMapping.objects.filter(store=store).order_by('tank_index')
-...
         tanks = []
         for m in mappings:
             tanks.append({

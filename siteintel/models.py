@@ -288,6 +288,8 @@ class TankUpdate(models.Model):
     
     # Physical hardware indexing (e.g., 1, 2, 3...)
     tank_index = models.IntegerField(
+        null=True,
+        blank=True,
         help_text="The physical tank number from the ATG printout (1, 2, 3...)."
     )
     

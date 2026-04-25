@@ -126,6 +126,11 @@
                     {% for error in tank_formset.non_form_errors %}
                         <li>TANK_CONFIG: {{ error|striptags }}</li>
                     {% endfor %}
+                    {% for form_errors in tank_formset.errors %}
+                        {% for field, errors in form_errors.items %}
+                            <li>TANK #{{ forloop.parentloop.counter }}: {{ field|upper }}: {{ errors|striptags }}</li>
+                        {% endfor %}
+                    {% endfor %}
                 </ul>
             </div>
             {% endif %}
