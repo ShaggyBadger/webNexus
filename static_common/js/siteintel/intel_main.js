@@ -30,10 +30,21 @@ document.addEventListener('DOMContentLoaded', () => {
         IntelMarkdown.init(textareaId, 'intel-md-toolbar');
     }
 
+    // 3. Markdown Toolbar for Intel Reports
+    if (document.getElementById('intel-md-toolbar')) {
+        // Ensure the textarea has an ID. If not, assign one dynamically.
+        const textarea = document.querySelector('textarea');
+        if (textarea && !textarea.id) {
+            textarea.id = 'site-intel-notes-textarea';
+        }
+        IntelMarkdown.init(textarea.id, 'intel-md-toolbar');
+    }
+
     // 4. Site Selector Page Initialization
     if (document.getElementById('site-lookup-input')) {
         IntelSelector.init('site-lookup-input', 'site-lookup-results');
     }
-    
+
     console.log("INTEL_SYSTEM_INITIALIZED");
-});
+    });
+
