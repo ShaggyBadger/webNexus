@@ -106,6 +106,9 @@
     {% include 'homepage/components/app_tankgauge.html' %}
     
     {% if user.is_authenticated %}
+    <!-- FieldIntel Module -->
+    {% include 'homepage/components/app_fieldintel.html' %}
+
     <!-- SiteIntel Module -->
     {% include 'homepage/components/app_siteintel.html' %}
     {% endif %}

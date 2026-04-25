@@ -74,6 +74,11 @@
     <a href="javascript:history.back()" class="btn btn-return-tactical mono">
       <i class="fas fa-arrow-left me-2"></i>RETURN_TO_PARAMETERS
     </a>
+    {% if store.location %}
+    <a href="{% url 'siteintel:location_detail' store.location.id %}" class="btn btn-outline-secondary btn-tactical-sm mono py-2">
+      <i class="fas fa-satellite me-2"></i>VIEW_FIELD_INTEL
+    </a>
+    {% endif %}
     <a href="{% url 'siteintel:proposal_create' %}?store_num={{ store.store_num }}" class="btn btn-outline-primary btn-tactical-sm mono py-2">
       <i class="fas fa-edit me-2"></i>UPDATE_SITE_INTEL
     </a>

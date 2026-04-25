@@ -73,3 +73,21 @@ class TacticalProfileForm(forms.ModelForm):
                 'readonly': 'readonly'
             }),
         }
+
+class TacticalProfileModelForm(forms.ModelForm):
+    """
+    Profile-specific form for operational preferences.
+    """
+    class Meta:
+        model = Profile
+        fields = ("callsign", "map_preference")
+        widgets = {
+            'callsign': forms.TextInput(attrs={
+                'class': 'tactical-input', 
+                'placeholder': 'CALLSIGN'
+            }),
+            'map_preference': forms.Select(attrs={
+                'class': 'tactical-input mono',
+                'style': 'background-color: #1a1d21; color: var(--primary-color); border-color: var(--navbar-border);'
+            }),
+        }

@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}SITE_SELECTOR | {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-12 col-md-8 col-lg-6">
+            <div class="mb-5 text-center">
+                <h2 class="mono text-primary">[ TARGET_ACQUISITION ]</h2>
+                <div class="mono text-muted-custom small">
+                    IDENTIFY_SITE_FOR_INTELLIGENCE_REPORTING
+                </div>
+            </div>
+
+            <!-- Search Input -->
+            <div class="mb-4">
+                <label for="site-lookup-input" class="mono text-primary small mb-2 d-block">ENTER_STORE_NUMBER:</label>
+                <input type="text" 
+                       id="site-lookup-input" 
+                       class="form-control tactical-input mono" 
+                       placeholder="SCANNING_ID..."
+                       inputmode="numeric"
+                       pattern="[0-9]*"
+                       data-lookup-url="{% url 'siteintel:api_site_lookup' %}"
+                       autocomplete="off">
+            </div>
+
+            <!-- Results Container -->
+            <div id="site-lookup-results" class="mt-4">
+                <!-- Dynamically populated by intel_selector.js -->
+            </div>
+
+            <div class="mt-5 pt-4 border-top border-secondary text-center">
+                <a href="{% url 'siteintel:dashboard' %}" class="btn btn-outline-secondary btn-sm mono">
+                    [ ACCESS_SATELLITE_HUB ]
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script type="module" src="{% static 'js/siteintel/intel_main.js' %}"></script>
+{% endblock %}

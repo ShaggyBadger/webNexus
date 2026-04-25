@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}UPDATE_INTEL // {{ object.location.name }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-12 col-md-8 col-lg-6">
+            <div class="mb-4 text-center">
+                <h2 class="mono text-primary">[ FIELD_INTEL_REPORT ]</h2>
+                <div class="mono text-muted-custom small">
+                    LOCATION: {{ object.location.name }} // AUTHOR: {{ request.user.username }}
+                </div>
+            </div>
+
+            <form method="post" class="card bg-dark-custom border-secondary p-4 shadow-lg">
+                {% csrf_token %}
+                
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <label for="{{ form.notes.id_for_label }}" class="mono text-primary small mb-0 d-block">
+                            ENTER_FIELD_OBSERVATIONS:
+                        </label>
+                        <!-- Tactical Markdown Toolbar -->
+                        <div id="intel-md-toolbar" class="d-flex gap-2">
+                            <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2 mono" data-md-cmd="bold" title="BOLD" style="font-size: 0.7rem;">[ B ]</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2 mono" data-md-cmd="italic" title="ITALIC" style="font-size: 0.7rem;">[ I ]</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2 mono" data-md-cmd="list" title="LIST" style="font-size: 0.7rem;">[ L ]</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2 mono" data-md-cmd="link" title="LINK" style="font-size: 0.7rem;">[ K ]</button>
+                        </div>
+                    </div>
+                    {{ form.notes }}
+                    {% if form.notes.errors %}
+                        <div class="text-danger small mono mt-1">{{ form.notes.errors }}</div>
+                    {% endif %}
+                </div>
+
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-primary mono fw-bold">
+                        [ TRANSMIT_INTELLIGENCE ]
+                    </button>
+                    <a href="{% url 'siteintel:location_detail' object.location.id %}" class="btn btn-outline-secondary mono">
+                        [ ABORT_AND_RETURN ]
+                    </a>
+                </div>
+            </form>
+
+            <div class="mt-4 p-3 border border-secondary mono small text-muted-custom">
+                <div class="fw-bold text-primary mb-1">TACTICAL_GUIDANCE:</div>
+                - RECORD_SITE_ACCESS_ISSUES<br>
+                - NOTE_UNUSUAL_TANK_CONFIGURATIONS<br>
+                - DOCUMENT_ON_SITE_CONTACTS<br>
+                - IDENTIFY_POTENTIAL_HAZARDS<br>
+                - <span class="text-primary">MARKDOWN_SUPPORTED:</span> **BOLD**, *ITALIC*, [LINKS]
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script type="module" src="{% static 'js/siteintel/intel_main.js' %}"></script>
+{% endblock %}

@@ -5,7 +5,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib import messages
 from .models import Profile
-from .forms import TacticalSignupForm, TacticalLoginForm, TacticalProfileForm
+from .forms import TacticalSignupForm, TacticalLoginForm, TacticalProfileForm, TacticalProfileModelForm
 
 # Configure Tactical Logger for Accounts App
 # This logger routes through the central logging configuration defined in settings.py
@@ -129,15 +129,19 @@ def tactical_profile_edit(request):
     """
     Service Record (Profile) update view.
     
-    Handles modification of agent identity fields (First/Last name).
-    Sensitive parameters like Email/Clearance are locked or read-only in this view.
+    Handles modification of agent identity fields (First/Last name)
+    and Profile parameters (Callsign, Map Preference).
     """
     user = request.user
+    profile, created = Profile.objects.get_or_create(user=user)
     
     if request.method == 'POST':
         user_form = TacticalProfileForm(request.POST, instance=user)
-        if user_form.is_valid():
+        profile_form = TacticalProfileModelForm(request.POST, instance=profile)
+        
+        if user_form.is_valid() and profile_form.is_valid():
             user_form.save()
+            profile_form.save()
             logger.info(f"RECORD_UPDATED: Agent {user.username} updated identity parameters.")
             messages.success(request, "SERVICE RECORD UPDATED.")
             return redirect('accounts:profile')
@@ -146,8 +150,10 @@ def tactical_profile_edit(request):
             messages.error(request, "UPDATE FAILED. Check protocol errors.")
     else:
         user_form = TacticalProfileForm(instance=user)
+        profile_form = TacticalProfileModelForm(instance=profile)
     
     return render(request, 'accounts/profile_edit.html', {
         'user_form': user_form,
+        'profile_form': profile_form,
         'user': user
     })

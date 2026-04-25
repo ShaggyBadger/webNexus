@@ -180,7 +180,7 @@ Implemented rigorous protection for the site intelligence database.
 
 ---
 
-## 5. Implementation Status (Current: Version 2.6.0)
+## 5. Implementation Status (Current: Version 2.7.0)
 
 ### 5.1 Phase 1: COMPLETE
 *   **Core Models:** `Location`, `LocationType`, `StoreUpdate`, and `TankUpdate` implemented.
@@ -195,11 +195,33 @@ Implemented rigorous protection for the site intelligence database.
     *   **Mapping:** Leaflet.js integration with draggable markers.
 *   **Security:** Full authentication requirements and data sanitization.
 
-### 5.2 Phase 2: PLANNED
-*   Aggregated volume logic for **Manifolded Tanks**.
-*   **Site Status Tracking** (OPEN / CLOSED / MAINTENANCE).
-*   Advanced mapping overlays and field observation drawings.
-*   Support for additional location types (Fuel Racks, Yards).
+### 5.2 Phase 2: IN PROGRESS (Site Intelligence & Tactical Overlays)
+*   **Field Intelligence System:** Dedicated `SiteIntelligence` model for non-structural notes and observations.
+*   **Multi-Layered Notes:** Personal user notes with a fallback to "Default" approved notes.
+*   **Markdown Support:** Rich text rendering in notes with a tactical formatting toolbar.
+*   **Tactical Map Overlays:** 
+    *   Integrated `Leaflet.draw` for plotting entry/exit routes and fuel drops.
+    *   **GeoJSON Persistence:** Canonical overlays stored in `Location.tactical_overlay`.
+    *   **Approval Workflow:** `MapOverlayUpdate` model for administrative review of map changes.
+*   **Public Accessibility:** Site Intelligence Detail view is now public, while modifications remain strictly authenticated.
+*   **Modular Architecture:** Complete decoupling of JavaScript logic into feature-specific modules (`static_common/js/siteintel/`).
+
+---
+
+## 6. Site Intelligence Architecture (Phase 2)
+
+### 6.1 Everything is a Proposal (Map Edition)
+Following the core philosophy, map drawings are not applied directly. They are submitted as `MapOverlayUpdate` proposals. This ensures "Josh the Manager" can verify the accuracy of routes and markers before they become the source of truth for all field agents.
+
+### 6.2 Intelligence Fallback Logic
+The system prioritizes individual agent observations while ensuring no one is "flying blind":
+1.  **Personal Intelligence:** If a logged-in user has notes for a site, they see their own.
+2.  **Default Intelligence:** If no personal notes exist (or the user is unauthenticated), the system displays the approved "Default" record.
+
+### 6.3 Technical Standards
+*   **JavaScript:** Strictly modular (ES6 Modules). No inline scripts. Logic is isolated into `map`, `draw`, `notes`, `selector`, and `markdown` modules.
+*   **Geospatial:** All drawings are persisted as standard GeoJSON strings.
+*   **Styling:** Tactical high-contrast labels and multi-color support (Hazard Red, Operation Green, etc.) for visual clarity in field conditions.
 
 ---
 

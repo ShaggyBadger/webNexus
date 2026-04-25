@@ -47,10 +47,10 @@
             
             <div class="mono small text-muted-custom mb-4">[ IDENTITY_UPDATE_PROTOCOL ]</div>
             
-            {% for field in user_form %}
+            {% for field in profile_form %}
                 <div class="mb-4">
                     <label for="{{ field.id_for_label }}" class="form-label mono small fw-bold mb-2">
-                        <i class="fas {% if 'first' in field.name %}fa-address-card{% elif 'last' in field.name %}fa-id-badge{% else %}fa-envelope{% endif %} me-2"></i>{{ field.label|upper }}
+                        <i class="fas {% if 'callsign' in field.name %}fa-terminal{% elif 'map' in field.name %}fa-map-marked-alt{% else %}fa-info-circle{% endif %} me-2"></i>{{ field.label|upper }}
                     </label>
                     {{ field }}
                     {% if field.help_text %}
@@ -71,9 +71,6 @@
                 </a>
             </div>
         </form>
-    </div>
-    
-    <div class="text-center">
         <p class="mono x-small text-muted-custom" style="font-size: 0.65rem;">
             * SENSITIVE SECURITY PARAMETERS MUST BE MODIFIED BY COMMAND OVERRIDE.
         </p>

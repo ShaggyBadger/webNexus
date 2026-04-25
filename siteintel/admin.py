@@ -1,5 +1,38 @@
 from django.contrib import admin
-from .models import LocationType, Location, StoreUpdate, TankUpdate
+from .models import LocationType, Location, StoreUpdate, TankUpdate, SiteIntelligence, MapOverlayUpdate
+
+@admin.register(MapOverlayUpdate)
+class MapOverlayUpdateAdmin(admin.ModelAdmin):
+    list_display = ('location', 'status', 'submitted_by', 'submitted_at', 'approved_by')
+    list_filter = ('status', 'submitted_at')
+    search_fields = ('location__name', 'submitted_by__username')
+    actions = ['approve_and_apply']
+
+    def approve_and_apply(self, request, queryset):
+        success_count = 0
+        for obj in queryset:
+            if obj.status == 'PENDING':
+                obj.status = 'APPROVED'
+                obj.approved_by = request.user
+                from django.utils import timezone
+                obj.approved_at = timezone.now()
+                try:
+                    obj.apply_overlay()
+                    obj.save()
+                    success_count += 1
+                except Exception as e:
+                    self.message_user(request, f"Error applying overlay {obj.id}: {str(e)}", level='ERROR')
+        
+        if success_count:
+            self.message_user(request, f"Successfully approved and applied {success_count} tactical map overlays.")
+
+    approve_and_apply.short_description = "[ APPROVE & APPLY ] Selected Map Overlays"
+
+@admin.register(SiteIntelligence)
+class SiteIntelligenceAdmin(admin.ModelAdmin):
+    list_display = ('location', 'author', 'is_default', 'created_at')
+    list_filter = ('is_default', 'created_at', 'author')
+    search_fields = ('location__name', 'notes', 'author__username')
 
 @admin.register(LocationType)
 class LocationTypeAdmin(admin.ModelAdmin):

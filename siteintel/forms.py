@@ -1,6 +1,6 @@
 from django import forms
 import re
-from .models import StoreUpdate, TankUpdate
+from .models import StoreUpdate, TankUpdate, SiteIntelligence
 from tankgauge.models import TankType
 
 class StoreUpdateForm(forms.ModelForm):
@@ -84,3 +84,29 @@ TankUpdateFormSet = forms.inlineformset_factory(
     extra=1, 
     can_delete=True
 )
+
+class SiteIntelligenceForm(forms.ModelForm):
+    """
+    OPERATIONAL FLOW:
+    Captures field intelligence (notes and stuff) for a specific site.
+    """
+    class Meta:
+        model = SiteIntelligence
+        fields = ['notes']
+        widgets = {
+            'notes': forms.Textarea(attrs={
+                'class': 'form-control tactical-input', 
+                'placeholder': 'ENTER_FIELD_OBSERVATIONS...',
+                'rows': 10
+            }),
+        }
+
+    def clean_notes(self):
+        """
+        TACTICAL SANITIZATION:
+        Strips HTML tags from notes.
+        """
+        notes = self.cleaned_data.get('notes')
+        if notes:
+            return re.sub(r'<[^>]*>', '', notes).strip()
+        return notes

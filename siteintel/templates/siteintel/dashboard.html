@@ -83,9 +83,14 @@
                             {{ store.city }}, {{ store.state }} // RISO: {{ store.riso_num|default:"---" }} // TANKS: <span class="text-primary">{{ store.tank_mappings.count }}</span>
                         </div>
                     </div>
-                    <div>
+                    <div class="d-flex gap-2">
+                        {% if store.location %}
+                        <a href="{% url 'siteintel:location_detail' store.location.id %}" class="btn btn-outline-secondary btn-sm mono py-1 px-3" style="font-size: 0.7rem;">
+                            [ VIEW_INTEL ]
+                        </a>
+                        {% endif %}
                         <a href="{% url 'siteintel:proposal_create' %}?store_num={{ store.store_num }}" class="btn btn-outline-primary btn-sm mono py-1 px-3" style="font-size: 0.7rem;">
-                            [ UPDATE_INTEL ]
+                            [ UPDATE_SITE ]
                         </a>
                     </div>
                 </div>

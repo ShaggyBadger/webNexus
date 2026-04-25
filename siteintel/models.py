@@ -45,6 +45,9 @@ class Location(models.Model):
     lat = models.FloatField(blank=True, null=True, help_text="High-precision Latitude")
     lon = models.FloatField(blank=True, null=True, help_text="High-precision Longitude")
     
+    # Tactical Overlay Data (GeoJSON)
+    tactical_overlay = models.TextField(blank=True, null=True, help_text="Canonical tactical drawings (GeoJSON)")
+    
     # Intel & Metadata
     notes = models.TextField(blank=True, null=True, help_text="General field observations")
     created_at = models.DateTimeField(auto_now_add=True)
@@ -317,3 +320,94 @@ class TankUpdate(models.Model):
 
     def __str__(self):
         return f"Tank {self.tank_index}: {self.fuel_type} ({self.reported_capacity} gal)"
+
+class SiteIntelligence(models.Model):
+    """
+    OPERATIONAL FLOW:
+    A dedicated table for 'notes and stuff' (Field Intelligence).
+    Independent of the structural StoreUpdate/TankUpdate models.
+    Supports individual user records with a 'Default' fallback mechanism.
+    """
+    location = models.ForeignKey(
+        Location, 
+        on_delete=models.CASCADE, 
+        related_name='intelligence'
+    )
+    author = models.ForeignKey(
+        User, 
+        on_delete=models.CASCADE, 
+        related_name='field_intelligence'
+    )
+    notes = models.TextField(help_text="Tactical observations, site quirks, or field intelligence.")
+    is_default = models.BooleanField(
+        default=False, 
+        help_text="If True, this becomes the 'Default' intel for users who have no personal notes."
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Site Intelligence"
+        verbose_name_plural = "Site Intelligence Records"
+        unique_together = ('location', 'author') # One intel profile per user per site
+
+    def __str__(self):
+        status = " [DEFAULT]" if self.is_default else ""
+        return f"Intel for {self.location.name} by {self.author.username}{status}"
+
+class MapOverlayUpdate(models.Model):
+    """
+    OPERATIONAL FLOW:
+    A proposal for tactical map drawings (GeoJSON).
+    Requires administrative approval before affecting the canonical Location record.
+    """
+    STATUS_CHOICES = [
+        ('PENDING', 'Pending Approval'),
+        ('APPROVED', 'Approved & Applied'),
+        ('REJECTED', 'Rejected'),
+    ]
+
+    location = models.ForeignKey(
+        Location, 
+        on_delete=models.CASCADE, 
+        related_name='overlay_updates'
+    )
+    geojson_data = models.TextField(help_text="Proposed tactical drawings (GeoJSON)")
+    
+    status = models.CharField(
+        max_length=20, 
+        choices=STATUS_CHOICES, 
+        default='PENDING'
+    )
+    
+    submitted_by = models.ForeignKey(
+        User, 
+        on_delete=models.CASCADE, 
+        related_name='submitted_overlays'
+    )
+    submitted_at = models.DateTimeField(auto_now_add=True)
+    
+    approved_by = models.ForeignKey(
+        User, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='approved_overlays'
+    )
+    approved_at = models.DateTimeField(null=True, blank=True)
+
+    def apply_overlay(self):
+        """
+        Syncs the proposed GeoJSON to the canonical Location record.
+        """
+        if self.status != 'APPROVED':
+            raise ValueError("Only approved overlays can be applied.")
+            
+        with transaction.atomic():
+            self.location.tactical_overlay = self.geojson_data
+            self.location.save()
+            logger.info(f"OVERLAY_SYNC: Applied GeoJSON for Location {self.location.id}")
+
+    def __str__(self):
+        return f"Overlay Proposal for {self.location.name} (Status: {self.status})"

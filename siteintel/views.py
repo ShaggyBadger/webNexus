@@ -1,15 +1,15 @@
-from django.shortcuts import render
-from django.views.generic import CreateView, DetailView, ListView
+from django.shortcuts import render, get_object_or_404, redirect
+from django.views.generic import CreateView, DetailView, ListView, UpdateView, TemplateView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.decorators import login_required
-from django.urls import reverse_lazy
-from django.http import JsonResponse
+from django.urls import reverse_lazy, reverse
+from django.http import JsonResponse, HttpResponseForbidden
 from django.db.models import Q
 from django import forms
-from .models import StoreUpdate, TankUpdate, Location, LocationType
+from .models import StoreUpdate, TankUpdate, Location, LocationType, SiteIntelligence, MapOverlayUpdate
 from tankgauge.models import Store, TankType, StoreTankMapping
 from tankgauge.logic.utils import haversine
-from .forms import StoreUpdateForm, TankUpdateForm, TankUpdateFormSet
+from .forms import StoreUpdateForm, TankUpdateForm, TankUpdateFormSet, SiteIntelligenceForm
 import logging
 import json
 import urllib.request
@@ -326,3 +326,170 @@ def store_lookup_api(request):
         return JsonResponse(data)
     
     return JsonResponse({'error': 'Store not found'}, status=404)
+
+class LocationDetailView(DetailView):
+    """
+    OPERATIONAL FLOW:
+    The central intelligence hub for a specific site.
+    Displays canonical site metadata, tank configurations, and field intelligence.
+    Implements the fallback logic: Personal Notes > Default Notes.
+    
+    ACCESSIBILITY: Publicly viewable.
+    """
+    model = Location
+    template_name = 'siteintel/location_detail.html'
+    context_object_name = 'location'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        loc = self.get_object()
+        
+        # Canonical Store Link
+        context['store'] = getattr(loc, 'store_canonical', None)
+        
+        # Tank Mappings (Digital Twin)
+        if context['store']:
+            context['tanks'] = StoreTankMapping.objects.filter(store=context['store']).order_by('tank_index')
+        
+        # Intelligence Layer (The Fallback Logic)
+        if self.request.user.is_authenticated:
+            personal_intel = SiteIntelligence.objects.filter(location=loc, author=self.request.user).first()
+            if personal_intel:
+                context['intel'] = personal_intel
+                context['intel_mode'] = 'PERSONAL'
+            else:
+                default_intel = SiteIntelligence.objects.filter(location=loc, is_default=True).first()
+                context['intel'] = default_intel
+                context['intel_mode'] = 'DEFAULT'
+        else:
+            # Unauthenticated users only see approved/default intel
+            context['intel'] = SiteIntelligence.objects.filter(location=loc, is_default=True).first()
+            context['intel_mode'] = 'PUBLIC'
+            
+        return context
+
+class MapOverlayUpdateView(LoginRequiredMixin, CreateView):
+    """
+    OPERATIONAL FLOW:
+    Dedicated interface for drawing tactical map overlays.
+    Submits a proposal for administrative review.
+    """
+    model = MapOverlayUpdate
+    fields = ['geojson_data']
+    template_name = 'siteintel/map_edit.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['location'] = get_object_or_404(Location, id=self.kwargs.get('location_id'))
+        return context
+
+    def form_valid(self, form):
+        loc = get_object_or_404(Location, id=self.kwargs.get('location_id'))
+        form.instance.location = loc
+        form.instance.submitted_by = self.request.user
+        logger.info(f"OVERLAY_PROPOSAL: Submitted for Site {loc.id} by {self.request.user}")
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        return reverse('siteintel:location_detail', kwargs={'pk': self.kwargs.get('location_id')})
+
+class SiteIntelligenceUpdateView(LoginRequiredMixin, UpdateView):
+    """
+    OPERATIONAL FLOW:
+    Allows agents to record or update their own field intelligence for a site.
+    """
+    model = SiteIntelligence
+    form_class = SiteIntelligenceForm
+    template_name = 'siteintel/intel_form.html'
+
+    def get_object(self, queryset=None):
+        location_id = self.kwargs.get('location_id')
+        location = get_object_or_404(Location, id=location_id)
+        intel, created = SiteIntelligence.objects.get_or_create(
+            location=location, 
+            author=self.request.user,
+            defaults={'notes': ''}
+        )
+        return intel
+
+    def get_success_url(self):
+        return reverse('siteintel:location_detail', kwargs={'pk': self.object.location.id})
+
+class SiteSelectorView(LoginRequiredMixin, TemplateView):
+    """
+    OPERATIONAL FLOW:
+    A dedicated 'Target Acquisition' page for finding site intelligence.
+    """
+    template_name = 'siteintel/site_selector.html'
+
+@login_required
+def site_lookup_api(request):
+    """
+    TACTICAL INTEL:
+    Numeric-focused lookup for site selection.
+    Targets Store Numbers and RISO identifiers. 
+    Optimized for high-speed target acquisition in field conditions.
+    """
+    q = request.GET.get('q', '').strip()
+    if not q or not q.isdigit():
+        return JsonResponse({'results': []})
+    
+    logger.info(f"TARGET_SCAN: Searching for site ID '{q}' by user {request.user}")
+    
+    # SEARCH_STORES: Target canonical retail sites by ID
+    stores = Store.objects.filter(
+        Q(store_num__icontains=q) | Q(riso_num__icontains=q)
+    ).select_related('location')[:10]
+    
+    results = []
+    for s in stores:
+        loc_id = s.location.id if s.location else None
+        results.append({
+            'type': 'STORE',
+            'id': loc_id,
+            'store_pk': s.id,
+            'store_num': s.store_num,
+            'name': s.store_name or f"Store #{s.store_num}",
+            'city': s.city or "UNKNOWN_LOC",
+            'has_location': loc_id is not None
+        })
+    
+    logger.info(f"TARGET_SCAN_COMPLETE: Identified {len(results)} potential targets for ID '{q}'")
+    return JsonResponse({'results': results})
+
+@login_required
+def initialize_location_for_store(request, store_id):
+    """
+    OPERATIONAL_INIT:
+    Ensures a Store has a corresponding Location record so intel can be recorded.
+    This enables organic growth of the site intelligence database as agents visit sites.
+    """
+    store = get_object_or_404(Store, id=store_id)
+    
+    if not store.location:
+        logger.info(f"INTEL_BOOTSTRAP: Initializing Location record for Store #{store.store_num}")
+        
+        # Create a basic location from store data
+        gas_station, created = LocationType.objects.get_or_create(
+            name="Gas Station",
+            defaults={'description': "Retail fuel site or convenience store."}
+        )
+        if created:
+            logger.info("INTEL_BOOTSTRAP: Created new 'Gas Station' LocationType")
+        
+        loc = Location.objects.create(
+            name=store.store_name or f"Store #{store.store_num}",
+            location_type=gas_station,
+            address=store.address,
+            city=store.city,
+            state=store.state,
+            zip_code=store.zip_code,
+            lat=store.lat,
+            lon=store.lon
+        )
+        
+        store.location = loc
+        store.save()
+        logger.info(f"INTEL_INIT_SUCCESS: Store #{store.store_num} linked to Location ID {loc.id} by {request.user}")
+    
+    return redirect('siteintel:location_detail', pk=store.location.id)
