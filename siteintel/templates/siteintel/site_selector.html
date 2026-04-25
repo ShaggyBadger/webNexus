@@ -17,14 +17,17 @@
             <!-- Search Input -->
             <div class="mb-4">
                 <label for="site-lookup-input" class="mono text-primary small mb-2 d-block">ENTER_STORE_NUMBER:</label>
-                <input type="text" 
-                       id="site-lookup-input" 
-                       class="form-control tactical-input mono" 
-                       placeholder="SCANNING_ID..."
-                       inputmode="numeric"
-                       pattern="[0-9]*"
-                       data-lookup-url="{% url 'siteintel:api_site_lookup' %}"
-                       autocomplete="off">
+                <div class="input-group">
+                    <input type="text" 
+                           id="site-lookup-input" 
+                           class="form-control tactical-input mono" 
+                           placeholder="SCANNING_ID..."
+                           inputmode="numeric"
+                           pattern="[0-9]*"
+                           data-lookup-url="{% url 'siteintel:api_site_lookup' %}"
+                           autocomplete="off">
+                    <button type="button" id="search-button" class="btn btn-primary mono">[ SEARCH ]</button>
+                </div>
             </div>
 
             <!-- Results Container -->

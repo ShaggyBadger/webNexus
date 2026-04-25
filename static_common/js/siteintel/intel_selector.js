@@ -6,14 +6,16 @@ export const IntelSelector = {
     init: function(inputId, resultsId) {
         const input = document.getElementById(inputId);
         const results = document.getElementById(resultsId);
-        if (!input || !results) return;
+        const searchButton = document.getElementById('search-button'); // Get the new button
+        if (!input || !results || !searchButton) return;
 
         const lookupUrl = input.dataset.lookupUrl;
         let timeout = null;
 
-        input.addEventListener('input', (e) => {
+        // Function to perform search, debounced
+        const performSearch = () => {
             clearTimeout(timeout);
-            const query = e.target.value.trim();
+            const query = input.value.trim();
             
             if (query.length < 2) {
                 results.innerHTML = '';
@@ -23,7 +25,11 @@ export const IntelSelector = {
             timeout = setTimeout(() => {
                 this.performLookup(query, lookupUrl, results);
             }, 300);
-        });
+        };
+
+        // Trigger search on input or button click
+        input.addEventListener('input', performSearch);
+        searchButton.addEventListener('click', performSearch);
         
         console.log("INTEL_SELECTOR_READY");
     },
@@ -58,6 +64,7 @@ export const IntelSelector = {
             })
             .catch(err => {
                 console.error("SELECTOR_ERROR:", err);
+                resultsContainer.innerHTML = '<div class="text-center text-danger mono py-3">[ SEARCH_FAILED ]</div>';
             });
     }
 };
