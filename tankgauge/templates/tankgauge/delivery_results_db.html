@@ -67,7 +67,7 @@
   <!-- Tank Cards -->
   <div id="tank-cards">
     {% for tank in tanks %}
-        {% include 'tankgauge/templates/tankgauge/components/tank_card.html' with tank=tank mode='db' %}
+        {% include 'tankgauge/components/tank_card.html' with tank=tank mode='db' %}
     {% endfor %}
   </div>
 
