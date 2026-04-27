@@ -6,16 +6,14 @@ export const IntelSelector = {
     init: function(inputId, resultsId) {
         const input = document.getElementById(inputId);
         const results = document.getElementById(resultsId);
+        const form = document.getElementById('site-selector-form');
         const searchButton = document.getElementById('search-button');
-        if (!input || !results || !searchButton) return;
+
+        if (!input || !results) return;
 
         const lookupUrl = input.dataset.lookupUrl;
         let timeout = null;
 
-        /**
-         * Orchestrates the search request.
-         * @param {boolean} immediate - If true, bypasses the debounce timeout.
-         */
         const executeSearch = (immediate = false) => {
             clearTimeout(timeout);
             const query = input.value.trim();
@@ -26,10 +24,10 @@ export const IntelSelector = {
             }
 
             if (immediate) {
-                IntelSelector.performLookup(query, lookupUrl, results);
+                this.performLookup(query, lookupUrl, results);
             } else {
                 timeout = setTimeout(() => {
-                    IntelSelector.performLookup(query, lookupUrl, results);
+                    this.performLookup(query, lookupUrl, results);
                 }, 300);
             }
         };
@@ -37,8 +35,15 @@ export const IntelSelector = {
         // 1. Live Search (Debounced)
         input.addEventListener('input', () => executeSearch(false));
 
-        // 2. Form Submission (Immediate)
-        const form = document.getElementById('site-selector-form');
+        // 2. Button Click (Immediate)
+        if (searchButton) {
+            searchButton.addEventListener('click', (e) => {
+                e.preventDefault();
+                executeSearch(true);
+            });
+        }
+
+        // 3. Form Submission (Enter Key fallback)
         if (form) {
             form.addEventListener('submit', (e) => {
                 e.preventDefault();
@@ -46,7 +51,7 @@ export const IntelSelector = {
             });
         }
 
-        // 3. Enter Key Support (Redundant but safe)
+        // 4. Enter Key (Force Immediate)
         input.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
                 e.preventDefault();
@@ -58,7 +63,6 @@ export const IntelSelector = {
     },
 
     performLookup: function(query, url, resultsContainer) {
-        // Show scanning state
         resultsContainer.innerHTML = '<div class="text-center text-primary mono py-3">[ SCANNING_STREAMS... ]</div>';
 
         fetch(`${url}?q=${encodeURIComponent(query)}`)

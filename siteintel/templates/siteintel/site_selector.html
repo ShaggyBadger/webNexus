@@ -7,10 +7,10 @@
 <div class="container py-4">
     <div class="row justify-content-center">
         <div class="col-12 col-md-8 col-lg-6">
-            <div class="mb-5 text-center">
+            <div class="mb-5 text-center px-2">
                 <h2 class="mono text-primary d-none d-md-block">[ TARGET_ACQUISITION ]</h2>
-                <h2 class="mono text-primary d-md-none">TARGET_ACQUISITION</h2>
-                <div class="mono text-muted-custom small px-2">
+                <h2 class="mono text-primary d-md-none text-nowrap" style="font-size: 1.2rem;">TARGET_ACQUISITION</h2>
+                <div class="mono text-muted-custom small">
                     IDENTIFY_SITE_FOR_INTELLIGENCE_REPORTING
                 </div>
             </div>
@@ -27,7 +27,7 @@
                            pattern="[0-9]*"
                            data-lookup-url="{% url 'siteintel:api_site_lookup' %}"
                            autocomplete="off">
-                    <button type="submit" id="search-button" class="btn btn-primary mono">[ SEARCH ]</button>
+                    <button type="button" id="search-button" class="btn btn-primary mono">[ SEARCH ]</button>
                 </div>
                 <div class="mono text-muted-custom smaller mt-1" style="font-size: 0.6rem;">
                     MIN_2_CHARACTERS_REQUIRED
