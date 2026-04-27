@@ -45,52 +45,57 @@
 
 {% block content %}
 <div class="container py-4">
-    <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
-        <h2 class="mono text-primary m-0">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-2 px-2">
+        <h2 class="mono text-primary m-0 text-nowrap">
             <span class="d-none d-md-inline">[ SITE_INTEL_HUB ]</span>
-            <span class="d-inline d-md-none" style="font-size: 1.2rem;">[ INTEL_HUB ]</span>
+            <span class="d-md-none" style="font-size: 1.05rem;">INTEL_HUB</span>
         </h2>
         <div class="d-flex gap-2 w-100 w-md-auto">
-            <a href="{% url 'siteintel:proposal_list' %}" class="btn btn-outline-secondary btn-sm mono flex-grow-1 flex-md-grow-0">
-                [ MY_PROPOSALS ]
+            <a href="{% url 'siteintel:proposal_list' %}" class="btn btn-outline-secondary btn-sm mono flex-grow-1 flex-md-grow-0 py-1" style="font-size: 0.7rem;">
+                <span class="d-none d-md-inline">[ MY_PROPOSALS ]</span>
+                <span class="d-md-none">PROPOSALS</span>
             </a>
-            <a href="{% url 'siteintel:proposal_create' %}" class="btn btn-primary btn-sm mono flex-grow-1 flex-md-grow-0">
-                [ + NEW_SITE ]
+            <a href="{% url 'siteintel:proposal_create' %}" class="btn btn-primary btn-sm mono flex-grow-1 flex-md-grow-0 py-1" style="font-size: 0.7rem;">
+                <span class="d-none d-md-inline">[ + NEW_SITE ]</span>
+                <span class="d-md-none">+ NEW_SITE</span>
             </a>
         </div>
     </div>
 
     <!-- Search / Filter -->
-    <div class="mb-4">
+    <div class="mb-4 px-2">
         <form method="get" class="input-group">
-            <input type="text" name="q" class="form-control search-bar-tactical" placeholder="SEARCH_BY_ID_OR_NAME..." value="{{ request.GET.q }}">
-            <button class="btn btn-outline-primary mono" type="submit">[ EXECUTE_QUERY ]</button>
+            <input type="text" name="q" class="form-control search-bar-tactical" placeholder="SEARCH..." value="{{ request.GET.q }}">
+            <button class="btn btn-outline-primary mono" type="submit">
+                <span class="d-none d-md-inline">[ EXECUTE_QUERY ]</span>
+                <span class="d-md-none">GO</span>
+            </button>
         </form>
     </div>
 
     <!-- Store Grid -->
-    <div class="row">
+    <div class="row px-2">
         {% for store in stores %}
         <div class="col-12">
             <div class="store-card p-3">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
+                <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-3">
+                    <div style="min-width: 0;">
                         <div class="d-flex align-items-center gap-2">
                             <span class="store-num">#{{ store.store_num }}</span>
-                            <h5 class="m-0 text-white" style="font-size: 1rem;">{{ store.store_name|default:"UNIDENTIFIED_LOC" }}</h5>
+                            <h5 class="m-0 text-white text-truncate" style="font-size: 1rem;">{{ store.store_name|default:"UNIDENTIFIED_LOC" }}</h5>
                         </div>
-                        <div class="store-meta mt-1">
-                            {{ store.city }}, {{ store.state }} // RISO: {{ store.riso_num|default:"---" }} // TANKS: <span class="text-primary">{{ store.tank_mappings.count }}</span>
+                        <div class="store-meta mt-1 text-truncate">
+                            {{ store.city }} // RISO: {{ store.riso_num|default:"---" }}
                         </div>
                     </div>
-                    <div class="d-flex gap-2">
+                    <div class="d-flex gap-2 w-100 w-sm-auto">
                         {% if store.location %}
-                        <a href="{% url 'siteintel:location_detail' store.location.id %}" class="btn btn-outline-secondary btn-sm mono py-1 px-3" style="font-size: 0.7rem;">
-                            [ VIEW_INTEL ]
+                        <a href="{% url 'siteintel:location_detail' store.location.id %}" class="btn btn-outline-secondary btn-sm mono py-1 px-3 flex-grow-1 flex-sm-grow-0" style="font-size: 0.7rem;">
+                            VIEW
                         </a>
                         {% endif %}
-                        <a href="{% url 'siteintel:proposal_create' %}?store_num={{ store.store_num }}" class="btn btn-outline-primary btn-sm mono py-1 px-3" style="font-size: 0.7rem;">
-                            [ UPDATE_SITE ]
+                        <a href="{% url 'siteintel:proposal_create' %}?store_num={{ store.store_num }}" class="btn btn-outline-primary btn-sm mono py-1 px-3 flex-grow-1 flex-sm-grow-0" style="font-size: 0.7rem;">
+                            UPDATE
                         </a>
                     </div>
                 </div>
@@ -98,23 +103,23 @@
         </div>
         {% empty %}
         <div class="col-12 text-center py-5">
-            <div class="mono text-muted-custom">NO SITES MATCHING QUERY PARAMETERS</div>
+            <div class="mono text-muted-custom">NO SITES MATCHING QUERY</div>
         </div>
         {% endfor %}
     </div>
 
     <!-- Pagination -->
     {% if is_paginated %}
-    <nav class="mt-4">
+    <nav class="mt-4 px-2">
         <ul class="pagination justify-content-center mono" style="font-size: 0.75rem;">
             {% if page_obj.has_previous %}
-                <li class="page-item"><a class="page-link bg-dark text-primary border-secondary" href="?page={{ page_obj.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">[ PREV ]</a></li>
+                <li class="page-item"><a class="page-link bg-dark text-primary border-secondary" href="?page={{ page_obj.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">PREV</a></li>
             {% endif %}
             
-            <li class="page-item disabled"><span class="page-link bg-dark text-muted-custom border-secondary">PAGE {{ page_obj.number }} OF {{ page_obj.paginator.num_pages }}</span></li>
+            <li class="page-item disabled"><span class="page-link bg-dark text-muted-custom border-secondary">{{ page_obj.number }}/{{ page_obj.paginator.num_pages }}</span></li>
             
             {% if page_obj.has_next %}
-                <li class="page-item"><a class="page-link bg-dark text-primary border-secondary" href="?page={{ page_obj.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">[ NEXT ]</a></li>
+                <li class="page-item"><a class="page-link bg-dark text-primary border-secondary" href="?page={{ page_obj.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">NEXT</a></li>
             {% endif %}
         </ul>
     </nav>

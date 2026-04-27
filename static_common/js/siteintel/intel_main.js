@@ -10,41 +10,46 @@ import { IntelMapDraw } from './intel_map_draw.js';
 import { IntelMarkdown } from './intel_markdown.js';
 
 document.addEventListener('DOMContentLoaded', () => {
-    // 1. Intelligence Detail Page Initialization
-    if (document.getElementById('intel-map')) {
+    console.log("INTEL_SYSTEM_BOOTING...");
+
+    // Helper to safely initialize modules without blocking others
+    const safelyInit = (selector, initFn) => {
+        if (document.getElementById(selector)) {
+            try {
+                initFn();
+            } catch (err) {
+                console.error(`INIT_ERROR [${selector}]:`, err);
+            }
+        }
+    };
+
+    // 1. Intelligence Detail Page
+    safelyInit('intel-map', () => {
         IntelMap.init('intel-map');
         IntelNotes.init();
-    }
+    });
 
-    // 2. Map Drawing Interface (Phase 2b)
-    if (document.getElementById('map-edit-canvas')) {
+    // 2. Map Drawing Interface
+    safelyInit('map-edit-canvas', () => {
         const map = IntelMap.init('map-edit-canvas');
         const hiddenField = 'id_geojson_data';
         const initialData = document.getElementById('map-edit-canvas').dataset.overlay;
         IntelMapDraw.init(map, hiddenField, initialData);
-    }
-
-    // 3. Markdown Toolbar for Intel Reports
-    if (document.getElementById('intel-md-toolbar')) {
-        const textareaId = document.querySelector('textarea').id;
-        IntelMarkdown.init(textareaId, 'intel-md-toolbar');
-    }
-
-    // 3. Markdown Toolbar for Intel Reports
-    if (document.getElementById('intel-md-toolbar')) {
-        // Ensure the textarea has an ID. If not, assign one dynamically.
-        const textarea = document.querySelector('textarea');
-        if (textarea && !textarea.id) {
-            textarea.id = 'site-intel-notes-textarea';
-        }
-        IntelMarkdown.init(textarea.id, 'intel-md-toolbar');
-    }
-
-    // 4. Site Selector Page Initialization
-    if (document.getElementById('site-lookup-input')) {
-        IntelSelector.init('site-lookup-input', 'site-lookup-results');
-    }
-
-    console.log("INTEL_SYSTEM_INITIALIZED");
     });
 
+    // 3. Markdown Toolbar
+    safelyInit('intel-md-toolbar', () => {
+        const textarea = document.querySelector('textarea');
+        if (textarea) {
+            if (!textarea.id) textarea.id = 'site-intel-notes-textarea';
+            IntelMarkdown.init(textarea.id, 'intel-md-toolbar');
+        }
+    });
+
+    // 4. Site Selector Page
+    safelyInit('site-lookup-input', () => {
+        IntelSelector.init('site-lookup-input', 'site-lookup-results');
+    });
+
+    console.log("INTEL_SYSTEM_ONLINE");
+});

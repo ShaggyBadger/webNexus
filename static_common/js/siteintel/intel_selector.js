@@ -6,14 +6,15 @@ export const IntelSelector = {
     init: function(inputId, resultsId) {
         const input = document.getElementById(inputId);
         const results = document.getElementById(resultsId);
-        const searchButton = document.getElementById('search-button'); // Get the new button
-        if (!input || !results || !searchButton) return;
+        const form = document.getElementById('site-selector-form');
+        const searchButton = document.getElementById('search-button');
+
+        if (!input || !results) return;
 
         const lookupUrl = input.dataset.lookupUrl;
         let timeout = null;
 
-        // Function to perform search, debounced
-        const performSearch = () => {
+        const executeSearch = (immediate = false) => {
             clearTimeout(timeout);
             const query = input.value.trim();
             
@@ -22,21 +23,53 @@ export const IntelSelector = {
                 return;
             }
 
-            timeout = setTimeout(() => {
+            if (immediate) {
                 this.performLookup(query, lookupUrl, results);
-            }, 300);
+            } else {
+                timeout = setTimeout(() => {
+                    this.performLookup(query, lookupUrl, results);
+                }, 300);
+            }
         };
 
-        // Trigger search on input or button click
-        input.addEventListener('input', performSearch);
-        searchButton.addEventListener('click', performSearch);
-        
-        console.log("INTEL_SELECTOR_READY");
+        // 1. Live Search (Debounced)
+        input.addEventListener('input', () => executeSearch(false));
+
+        // 2. Button Click (Immediate)
+        if (searchButton) {
+            searchButton.addEventListener('click', (e) => {
+                e.preventDefault();
+                executeSearch(true);
+            });
+        }
+
+        // 3. Form Submission (Enter Key fallback)
+        if (form) {
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                executeSearch(true);
+            });
+        }
+
+        // 4. Enter Key (Force Immediate)
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                executeSearch(true);
+            }
+        });
+
+        console.log("INTEL_SELECTOR_INITIALIZED");
     },
 
     performLookup: function(query, url, resultsContainer) {
+        resultsContainer.innerHTML = '<div class="text-center text-primary mono py-3">[ SCANNING_STREAMS... ]</div>';
+
         fetch(`${url}?q=${encodeURIComponent(query)}`)
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) throw new Error('NETWORK_RESPONSE_NOT_OK');
+                return response.json();
+            })
             .then(data => {
                 resultsContainer.innerHTML = '';
                 if (data.results && data.results.length > 0) {
@@ -52,7 +85,6 @@ export const IntelSelector = {
                             if (site.has_location) {
                                 window.location.href = `/siteintel/site/${site.id}/`;
                             } else {
-                                // Redirect to a view that ensures location exists before showing intel
                                 window.location.href = `/siteintel/init-location/${site.store_pk}/`;
                             }
                         });
