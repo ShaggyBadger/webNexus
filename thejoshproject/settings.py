@@ -190,6 +190,16 @@ LOGGING = {
             "level": "INFO",
             "propagate": True,
         },
+        "django.request": {
+            "handlers": ["file_minimal", "file_full", "console"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+        "django.server": {
+            "handlers": ["file_minimal", "file_full", "console"],
+            "level": "INFO",
+            "propagate": False,
+        },
         "tankgauge": {
             "handlers": ["file_minimal", "file_full", "console"],
             "level": "INFO",

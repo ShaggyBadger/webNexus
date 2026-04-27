@@ -49,6 +49,19 @@ class LoggingMiddleware:
         response = self.get_response(request)
         return response
 
+    def process_exception(self, request, exception):
+        """
+        Captured when a view or template rendering raises an uncaught exception.
+        """
+        logger = logging.getLogger('django.request')
+        meta = get_current_request_meta()
+        logger.error(
+            f"SERVER_CRITICAL: {type(exception).__name__} - {str(exception)}",
+            exc_info=True,
+            extra=meta
+        )
+        return None
+
 class TacticalFilter(logging.Filter):
     """
     Logging filter that injects all captured request metadata into the log record.

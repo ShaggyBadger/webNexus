@@ -141,9 +141,4 @@ const TacticalGPS = {
 
 document.addEventListener("DOMContentLoaded", () => {
   TacticalGPS.init();
-  setInterval(() => {
-    if (localStorage.getItem(TacticalGPS.storageKey) === "granted") {
-      TacticalGPS.pulse().catch(() => {});
-    }
-  }, 10000);
 });
