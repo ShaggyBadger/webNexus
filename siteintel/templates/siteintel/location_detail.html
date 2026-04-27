@@ -81,21 +81,25 @@
 {% block content %}
 <div class="container py-4">
     <!-- Header Section -->
-    <div class="mb-4">
+    <div class="mb-4 px-2">
         <div class="d-flex justify-content-between align-items-start">
-            <div>
-                <h2 class="mono text-primary mb-1">[ SITE_INTELLIGENCE ]</h2>
-                <div class="mono text-muted-custom small">
-                    TARGET_ACQUIRED: {{ location.name }} // TYPE: {{ location.location_type.name }}
+            <div style="min-width: 0;">
+                <h2 class="mono text-primary mb-1 text-truncate">
+                    <span class="d-none d-md-inline">[ SITE_INTELLIGENCE ]</span>
+                    <span class="d-md-none">SITE_INTELLIGENCE</span>
+                </h2>
+                <div class="mono text-muted-custom small text-truncate">
+                    TARGET: {{ location.name }}
                 </div>
             </div>
-            <a href="{% url 'siteintel:dashboard' %}" class="btn btn-outline-secondary btn-sm mono">
-                [ RETURN_TO_HUB ]
+            <a href="{% url 'siteintel:dashboard' %}" class="btn btn-outline-secondary btn-sm mono ms-2 flex-shrink-0">
+                <span class="d-none d-md-inline">[ RETURN_TO_HUB ]</span>
+                <span class="d-md-none">HUB</span>
             </a>
         </div>
     </div>
 
-    <div class="row g-4">
+    <div class="row g-4 px-2">
         <!-- Left Column: Map & Metadata -->
         <div class="col-12 col-lg-5">
             <div id="intel-map" 
@@ -109,14 +113,16 @@
             {% if user.is_authenticated %}
             <div class="d-grid mb-3">
                 <a href="{% url 'siteintel:map_edit' location.id %}" class="btn btn-outline-primary mono btn-sm">
-                    [ EDIT_TACTICAL_MAP ]
+                    <span class="d-none d-md-inline">[ EDIT_TACTICAL_MAP ]</span>
+                    <span class="d-md-none">EDIT_TACTICAL_MAP</span>
                 </a>
             </div>
             {% endif %}
             
             <div class="card bg-dark-custom border-secondary p-3">
                 <div class="intel-section-header" style="font-size: 0.9rem;">
-                    [ CANONICAL_DATA ]
+                    <span class="d-none d-md-inline">[ CANONICAL_DATA ]</span>
+                    <span class="d-md-none">CANONICAL_DATA</span>
                 </div>
                 <div class="row g-3">
                     <div class="col-6">
@@ -149,7 +155,8 @@
             <!-- Tank Section -->
             <div class="mb-4">
                 <div class="intel-section-header">
-                    <span>[ TANK_CONFIGURATION ]</span>
+                    <span class="d-none d-md-inline">[ TANK_CONFIGURATION ]</span>
+                    <span class="d-md-none">TANK_CONFIGURATION</span>
                 </div>
                 <div class="row g-2">
                     {% for tank in tanks %}
@@ -163,7 +170,7 @@
                         </div>
                     </div>
                     {% empty %}
-                    <div class="col-12 text-muted-custom mono small">[ NO_CANONICAL_TANK_DATA ]</div>
+                    <div class="col-12 text-muted-custom mono small">NO_CANONICAL_TANK_DATA</div>
                     {% endfor %}
                 </div>
             </div>
@@ -171,16 +178,18 @@
             <!-- Intelligence Section -->
             <div class="mb-4">
                 <div class="intel-section-header">
-                    <span>
-                        [ FIELD_INTELLIGENCE ]
+                    <span class="text-truncate">
+                        <span class="d-none d-md-inline">[ FIELD_INTELLIGENCE ]</span>
+                        <span class="d-md-none">FIELD_INTEL</span>
                         {% if intel_mode == 'PERSONAL' %}
-                        <span class="intel-status-badge status-personal ms-2">USER_RECORD</span>
+                        <span class="intel-status-badge status-personal ms-1">USER</span>
                         {% else %}
-                        <span class="intel-status-badge status-default ms-2">DEFAULT_RECORD</span>
+                        <span class="intel-status-badge status-default ms-1">SHARED</span>
                         {% endif %}
                     </span>
-                    <a href="{% url 'siteintel:intel_update' location.id %}" class="btn btn-primary btn-sm mono py-0" style="font-size: 0.65rem;">
-                        [ UPDATE_INTEL ]
+                    <a href="{% url 'siteintel:intel_update' location.id %}" class="btn btn-primary btn-sm mono py-0 flex-shrink-0 ms-2" style="font-size: 0.65rem;">
+                        <span class="d-none d-md-inline">[ UPDATE_INTEL ]</span>
+                        <span class="d-md-none">UPDATE</span>
                     </a>
                 </div>
                 
@@ -188,13 +197,13 @@
                     {% if intel %}
                         {{ intel.notes|markdown }}
                     {% else %}
-                        <div class="text-muted-custom">[ NO_INTELLIGENCE_RECORDED_FOR_THIS_SITE ]</div>
+                        <div class="text-muted-custom">NO_INTELLIGENCE_RECORDED</div>
                     {% endif %}
                 </div>
                 
                 {% if intel_mode == 'DEFAULT' and intel %}
                 <div class="mt-2 mono text-muted-custom" style="font-size: 0.6rem;">
-                    * YOU ARE VIEWING THE SHARED INTELLIGENCE LAYER. CREATE YOUR OWN TO OVERRIDE.
+                    * VIEWING SHARED LAYER. CREATE YOUR OWN TO OVERRIDE.
                 </div>
                 {% endif %}
             </div>

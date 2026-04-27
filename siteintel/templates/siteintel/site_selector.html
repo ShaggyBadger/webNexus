@@ -8,14 +8,15 @@
     <div class="row justify-content-center">
         <div class="col-12 col-md-8 col-lg-6">
             <div class="mb-5 text-center">
-                <h2 class="mono text-primary">[ TARGET_ACQUISITION ]</h2>
-                <div class="mono text-muted-custom small">
+                <h2 class="mono text-primary d-none d-md-block">[ TARGET_ACQUISITION ]</h2>
+                <h2 class="mono text-primary d-md-none">TARGET_ACQUISITION</h2>
+                <div class="mono text-muted-custom small px-2">
                     IDENTIFY_SITE_FOR_INTELLIGENCE_REPORTING
                 </div>
             </div>
 
-            <!-- Search Input -->
-            <div class="mb-4">
+            <!-- Search Form -->
+            <form id="site-selector-form" class="mb-4 px-2" autocomplete="off">
                 <label for="site-lookup-input" class="mono text-primary small mb-2 d-block">ENTER_STORE_NUMBER:</label>
                 <div class="input-group">
                     <input type="text" 
@@ -26,18 +27,22 @@
                            pattern="[0-9]*"
                            data-lookup-url="{% url 'siteintel:api_site_lookup' %}"
                            autocomplete="off">
-                    <button type="button" id="search-button" class="btn btn-primary mono">[ SEARCH ]</button>
+                    <button type="submit" id="search-button" class="btn btn-primary mono">[ SEARCH ]</button>
                 </div>
-            </div>
+                <div class="mono text-muted-custom smaller mt-1" style="font-size: 0.6rem;">
+                    MIN_2_CHARACTERS_REQUIRED
+                </div>
+            </form>
 
             <!-- Results Container -->
-            <div id="site-lookup-results" class="mt-4">
+            <div id="site-lookup-results" class="mt-4 px-2">
                 <!-- Dynamically populated by intel_selector.js -->
             </div>
 
-            <div class="mt-5 pt-4 border-top border-secondary text-center">
+            <div class="mt-5 pt-4 border-top border-secondary text-center px-2">
                 <a href="{% url 'siteintel:dashboard' %}" class="btn btn-outline-secondary btn-sm mono">
-                    [ ACCESS_SATELLITE_HUB ]
+                    <span class="d-none d-md-inline">[ ACCESS_SATELLITE_HUB ]</span>
+                    <span class="d-md-none">ACCESS_SATELLITE_HUB</span>
                 </a>
             </div>
         </div>
