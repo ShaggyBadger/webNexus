@@ -1,16 +1,44 @@
 {% extends 'base.html' %} {% load static %} {% block title %}TankGauge // Intel #{{ store.store_num }}{% endblock %}
 {% block extra_head %}
 <link rel="stylesheet" href="{% static 'tankgauge/css/tankgauge.css' %}" />
+<style>
+  .btn-intel-focus {
+    background-color: var(--primary-color) !important;
+    border-color: var(--primary-color) !important;
+    color: #121417 !important;
+    font-weight: 900 !important;
+    letter-spacing: 2px !important;
+    padding: 1rem !important;
+    box-shadow: 0 0 20px rgba(141, 163, 93, 0.3) !important;
+  }
+  .btn-intel-focus:hover {
+    background-color: #a3b97a !important;
+    box-shadow: 0 0 30px rgba(141, 163, 93, 0.5) !important;
+  }
+  .btn-return-subtle {
+    background: rgba(18, 20, 23, 0.8) !important;
+    color: var(--muted-text-color) !important;
+    border: 1px solid var(--navbar-border) !important;
+    font-size: 0.7rem !important;
+    padding: 0.5rem 1rem !important;
+    opacity: 0.7;
+  }
+  .btn-return-subtle:hover {
+    opacity: 1;
+    color: var(--text-color) !important;
+    border-color: var(--muted-text-color) !important;
+  }
+</style>
 {% endblock %} 
 
 {% block content %}
 <div class="container-fluid px-4 mt-5 tankgauge-container">
   <div class="text-center mb-5">
     <h1 class="mono tankgauge-title">
-      TANK_DELIVERY_<span class="text-accent">INTEL</span>
+      TANK DELIVERY <span class="text-accent">INTEL</span>
     </h1>
     <div class="mono text-muted-custom small">
-      [ STORE_TARGET: #{{ store.store_num }} ]
+      [ STORE TARGET: #{{ store.store_num }} ]
     </div>
   </div>
 
@@ -18,8 +46,8 @@
   <div class="store-intel-bar mono db-mode">
     <div class="row g-3">
       <div class="col-12 col-md-3">
-        <span class="label-tactical">STORE_NAME</span>
-        <span class="small">{{ store.store_name|default:"UNKNOWN_LOC" }}</span>
+        <span class="label-tactical">STORE NAME</span>
+        <span class="small">{{ store.store_name|default:"UNKNOWN LOC" }}</span>
       </div>
       <div class="col-12 col-md-3">
         <span class="label-tactical">LOCATION</span>
@@ -30,8 +58,8 @@
         <span class="small">{{ store.address }}</span>
       </div>
       <div class="col-12 col-md-3">
-        <span class="label-tactical">OPERATIONAL_STATUS</span>
-        <span class="text-success small">ACTIVE_LINK</span>
+        <span class="label-tactical">OPERATIONAL STATUS</span>
+        <span class="text-success small">ACTIVE LINK</span>
       </div>
     </div>
   </div>
@@ -39,7 +67,7 @@
   <!-- Tank Cards -->
   <div id="tank-cards">
     {% for tank in tanks %}
-        {% include 'tankgauge/components/tank_card.html' with tank=tank mode='db' %}
+        {% include 'tankgauge/templates/tankgauge/components/tank_card.html' with tank=tank mode='db' %}
     {% endfor %}
   </div>
 
@@ -47,20 +75,20 @@
   <div id="mission-summary" class="mission-summary db-mode" style="display: none;">
     <div class="text-center mb-3">
       <h3 class="mono fw-bold">
-        <span class="d-none d-md-inline" style="font-size: 1.1rem;">[ MISSION_CARGO_SUMMARY ]</span>
-        <span class="d-inline d-md-none" style="font-size: 0.9rem;">[ MISSION_CARGO ]</span>
+        <span class="d-none d-md-inline" style="font-size: 1.1rem;">[ MISSION CARGO SUMMARY ]</span>
+        <span class="d-inline d-md-none" style="font-size: 0.9rem;">[ MISSION CARGO ]</span>
       </h3>
     </div>
     <div class="specs-list mb-0">
       <div class="spec-line">
         <span class="specs-label">
-          <span class="d-none d-md-inline">TOTAL_DELIVERY_VOLUME:</span>
-          <span class="d-inline d-md-none">TOTAL_VOLUME:</span>
+          <span class="d-none d-md-inline">TOTAL DELIVERY VOLUME:</span>
+          <span class="d-inline d-md-none">TOTAL VOLUME:</span>
         </span>
         <span class="specs-value text-primary" id="summary-total-vol">0 G</span>
       </div>
       <div class="spec-line">
-        <span class="specs-label">MISSION_INTEGRITY:</span>
+        <span class="specs-label">MISSION INTEGRITY:</span>
         <span class="specs-value" id="summary-status">NOMINAL</span>
       </div>
     </div>
@@ -69,18 +97,22 @@
     </div>
   </div>
 
-  <!-- Final Submission / Reset -->
-  <div class="d-flex justify-content-center flex-column flex-md-row gap-3 mb-5">
-    <a href="javascript:history.back()" class="btn btn-return-tactical mono">
-      <i class="fas fa-arrow-left me-2"></i>RETURN_TO_PARAMETERS
+  <!-- Site Intel Focus (Large Button) -->
+  {% if store.location %}
+  <div class="d-grid mb-4">
+    <a href="{% url 'siteintel:location_detail' store.location.id %}" class="btn btn-intel-focus mono">
+      <i class="fas fa-satellite me-3"></i>VIEW SITE INTELLIGENCE
     </a>
-    {% if store.location %}
-    <a href="{% url 'siteintel:location_detail' store.location.id %}" class="btn btn-outline-secondary btn-tactical-sm mono py-2">
-      <i class="fas fa-satellite me-2"></i>VIEW_FIELD_INTEL
+  </div>
+  {% endif %}
+
+  <!-- secondary Controls -->
+  <div class="d-flex justify-content-center flex-column flex-md-row gap-3 mb-5 align-items-center">
+    <a href="javascript:history.back()" class="btn btn-return-subtle mono">
+      <i class="fas fa-arrow-left me-2"></i>RETURN TO PARAMETERS
     </a>
-    {% endif %}
-    <a href="{% url 'siteintel:proposal_create' %}?store_num={{ store.store_num }}" class="btn btn-outline-primary btn-tactical-sm mono py-2">
-      <i class="fas fa-edit me-2"></i>UPDATE_SITE_INTEL
+    <a href="{% url 'siteintel:proposal_create' %}?store_num={{ store.store_num }}" class="btn btn-outline-primary btn-tactical-sm mono py-2 px-4">
+      <i class="fas fa-edit me-2"></i>UPDATE SITE INTEL
     </a>
   </div>
 </div>

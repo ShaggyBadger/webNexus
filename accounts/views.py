@@ -7,32 +7,26 @@ from django.contrib import messages
 from .models import Profile
 from .forms import TacticalSignupForm, TacticalLoginForm, TacticalProfileForm, TacticalProfileModelForm
 
-# Configure Tactical Logger for Accounts App
-# This logger routes through the central logging configuration defined in settings.py
-logger = logging.getLogger('django')
+# Configure Tactical Logger for Accounts
+logger = logging.getLogger('webnexus')
 
 @login_required
 def tactical_password_change(request):
     """
-    Tactical Password Change view.
-    
-    OPERATIONAL FLOW:
-    1. Authenticated agent requests password change.
-    2. On POST, validates the new password against Django's security policy.
-    3. Saves new password and updates session hash to prevent logout (security protocol).
-    4. Logs success/failure for security audit.
+    TACTICAL_CREDENTIAL_OVERRIDE:
+    Updates the agent's authentication credentials while maintaining session integrity.
     """
     if request.method == 'POST':
         form = PasswordChangeForm(request.user, request.POST)
         if form.is_valid():
             user = form.save()
-            # Important: update_session_auth_hash keeps the user logged in after password change
+            # TACTICAL: Maintain active session after password swap
             update_session_auth_hash(request, user)
-            logger.info(f"PASSWORD_CHANGED: Agent {user.username} successfully updated credentials.")
+            logger.info(f"AUTH_SECURITY: Agent {user.username} updated credentials successfully.")
             messages.success(request, 'PASSWORD CHANGED SUCCESSFULLY.')
             return redirect('accounts:profile')
         else:
-            logger.warning(f"PASSWORD_CHANGE_FAILED: Validation error for Agent {request.user.username}.")
+            logger.warning(f"AUTH_SECURITY_FAIL: Credential update rejected for Agent {request.user.username}.")
             messages.error(request, 'PASSWORD CHANGE FAILED. Check protocol errors.')
     else:
         form = PasswordChangeForm(request.user)
@@ -41,24 +35,20 @@ def tactical_password_change(request):
 
 def tactical_login(request):
     """
-    Standard login logic with tactical UI wrapper.
-    
-    OPERATIONAL FLOW:
-    1. Agent provides credentials (Email/Username + Password).
-    2. Backend authenticates via EmailOrUsernameBackend (allows dual-id login).
-    3. If valid, establishes session and redirects to homepage.
-    4. Logs all access attempts (granted/denied) for system monitoring.
+    TACTICAL_ACCESS_CONTROL:
+    Authenticates agents using multi-identifier logic (Email or Username).
+    Establishes secure session links.
     """
     if request.method == 'POST':
         form = TacticalLoginForm(data=request.POST)
         if form.is_valid():
             user = form.get_user()
             login(request, user)
-            logger.info(f"ACCESS_GRANTED: Agent {user.username} logged into system.")
+            logger.info(f"ACCESS_GRANTED: Agent {user.username} established secure link.")
             messages.success(request, f"ACCESS GRANTED. Welcome, {user.username}.")
             return redirect('homepage:homepage')
         else:
-            logger.warning(f"ACCESS_DENIED: Failed login attempt for credentials provided.")
+            logger.warning("ACCESS_DENIED: Unauthorized link attempt detected.")
             messages.error(request, "ACCESS DENIED. Invalid credentials.")
     else:
         form = TacticalLoginForm()
@@ -67,13 +57,12 @@ def tactical_login(request):
 
 def tactical_logout(request):
     """
-    Standard logout.
-    
-    Terminates the current session and clears client-side cookies.
+    TACTICAL_DISCONNECT:
+    Terminates active session and synchronizes system state.
     """
     user = request.user
     if user.is_authenticated:
-        logger.info(f"SESSION_TERMINATED: Agent {user.username} logged out.")
+        logger.info(f"ACCESS_TERMINATED: Agent {user.username} disconnected.")
     
     logout(request)
     messages.info(request, "SESSION TERMINATED.")
@@ -81,25 +70,21 @@ def tactical_logout(request):
 
 def tactical_signup(request):
     """
-    Enlistment view for new agents.
-    
-    OPERATIONAL FLOW:
-    1. Collects email/identity from new agent.
-    2. UserCreationForm handles password hashing and security requirements.
-    3. Auto-sync signals (accounts/logic/signals.py) generate the internal username.
-    4. Logs in the new agent immediately upon successful record creation.
+    AGENT_ENLISTMENT:
+    Registers new operators and initializes tactical profiles via signals.
+    Automatically establishes session link upon successful registration.
     """
     if request.method == 'POST':
         form = TacticalSignupForm(request.POST)
         if form.is_valid():
             user = form.save()
-            # Note: Explicit backend required for immediate login after signup
+            # TACTICAL: Auto-login requires explicit backend reference for signals-driven systems
             login(request, user, backend='accounts.logic.auth_backends.EmailOrUsernameBackend')
-            logger.info(f"ENLISTMENT_SUCCESS: New agent {user.email} joined the network.")
+            logger.info(f"ENLISTMENT_SUCCESS: New agent {user.email} initialized.")
             messages.success(request, "ENLISTMENT SUCCESSFUL. Welcome to webNexus.")
             return redirect('homepage:homepage')
         else:
-            logger.warning("ENLISTMENT_FAILED: Protocol validation errors during signup.")
+            logger.warning("ENLISTMENT_FAILED: Registration protocol validation error.")
             messages.error(request, "ENLISTMENT FAILED. Check protocol errors.")
     else:
         form = TacticalSignupForm()
@@ -109,15 +94,14 @@ def tactical_signup(request):
 @login_required
 def tactical_profile(request):
     """
-    Service Record (Profile) dashboard. Read-only view.
-    
-    Displays agent identity parameters and clearance status.
+    SERVICE_RECORD_DASHBOARD:
+    Read-only view of the agent's identity, callsign, and clearance level.
     """
     user = request.user
-    # Profile recovery: ensures the agent has a profile record even if signals failed
+    # Profile recovery: Ensures data integrity even if signals were bypassed
     profile, created = Profile.objects.get_or_create(user=user)
     if created:
-        logger.info(f"PROFILE_RECOVERY: Generated missing profile record for Agent {user.username}.")
+        logger.info(f"PROFILE_RECOVERY: Generated missing identity record for Agent {user.username}.")
     
     return render(request, 'accounts/profile.html', {
         'user': user,
@@ -127,10 +111,8 @@ def tactical_profile(request):
 @login_required
 def tactical_profile_edit(request):
     """
-    Service Record (Profile) update view.
-    
-    Handles modification of agent identity fields (First/Last name)
-    and Profile parameters (Callsign, Map Preference).
+    SERVICE_RECORD_UPDATE:
+    Handles modification of agent parameters (Name, Callsign, Map Preferences).
     """
     user = request.user
     profile, created = Profile.objects.get_or_create(user=user)
@@ -142,11 +124,11 @@ def tactical_profile_edit(request):
         if user_form.is_valid() and profile_form.is_valid():
             user_form.save()
             profile_form.save()
-            logger.info(f"RECORD_UPDATED: Agent {user.username} updated identity parameters.")
+            logger.info(f"RECORD_SYNC: Agent {user.username} synchronized identity parameters.")
             messages.success(request, "SERVICE RECORD UPDATED.")
             return redirect('accounts:profile')
         else:
-            logger.warning(f"RECORD_UPDATE_FAILED: Identity validation errors for Agent {user.username}.")
+            logger.warning(f"RECORD_SYNC_FAIL: Validation errors for Agent {user.username}.")
             messages.error(request, "UPDATE FAILED. Check protocol errors.")
     else:
         user_form = TacticalProfileForm(instance=user)

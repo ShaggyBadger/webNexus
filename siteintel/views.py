@@ -15,6 +15,7 @@ import json
 import urllib.request
 from urllib.error import URLError
 
+# Configure Tactical Logger for Site Intelligence
 logger = logging.getLogger('webnexus')
 
 @login_required
@@ -72,12 +73,14 @@ def proximity_check_api(request):
     exclude_num = request.GET.get('exclude_store_num')
     
     if not lat or not lon:
+        logger.warning("PROXIMITY_CHECK_ABORTED: Missing coordinates.")
         return JsonResponse({'error': 'LAT and LON are required'}, status=400)
     
     try:
         lat_val = float(lat)
         lon_val = float(lon)
     except ValueError:
+        logger.warning(f"PROXIMITY_CHECK_FAILED: Invalid coordinates provided: {lat}, {lon}")
         return JsonResponse({'error': 'Invalid coordinates'}, status=400)
         
     # Search radius in miles (0.05 miles is approx 264 feet)
@@ -100,6 +103,8 @@ def proximity_check_api(request):
     
     if matches:
         logger.warning(f"PROXIMITY_ALERT: {len(matches)} sites detected near Lat {lat}, Lon {lon} by user {request.user}")
+    else:
+        logger.info(f"PROXIMITY_CLEARED: No conflicting sites detected for Lat {lat}, Lon {lon}")
             
     return JsonResponse({'matches': matches})
 
@@ -115,6 +120,7 @@ class StoreUpdateCreateView(LoginRequiredMixin, CreateView):
     success_url = reverse_lazy('siteintel:proposal_list')
 
     def get_initial(self):
+        """Pre-populates the proposal form with known site data."""
         initial = super().get_initial()
         store_num = self.request.GET.get('store_num')
         riso_num = self.request.GET.get('riso_num')
@@ -132,8 +138,10 @@ class StoreUpdateCreateView(LoginRequiredMixin, CreateView):
             target_store = Store.objects.filter(riso_num=riso_num).first()
 
         if target_store:
+            logger.info(f"PROPOSAL_INIT: Pre-populating form for Store #{target_store.store_num}")
             initial['store_num'] = target_store.store_num
             initial['riso_num'] = target_store.riso_num
+            initial['store_name'] = target_store.store_name
             initial['store_type'] = target_store.store_type
             if target_store.location and target_store.location.location_type:
                 initial['location_type'] = target_store.location.location_type.id
@@ -141,6 +149,7 @@ class StoreUpdateCreateView(LoginRequiredMixin, CreateView):
         return initial
 
     def get_context_data(self, **kwargs):
+        """Injects distinct store types and tank formsets into the context."""
         data = super().get_context_data(**kwargs)
         
         # Get distinct store types for the dropdown
@@ -167,9 +176,8 @@ class StoreUpdateCreateView(LoginRequiredMixin, CreateView):
                             'tank_type': mapping.tank_type, # Pass the object itself
                         })
             
-            logger.info(f"Initial Tanks for Store {store_num}: {initial_tanks}")
-            
             if initial_tanks:
+                logger.info(f"TANK_SYNC: Initializing {len(initial_tanks)} tank forms for Store {store_num}")
                 # TACTICAL: Create a one-off factory. 
                 # InlineFormSet needs extra to be set to the length of initial if instance is None
                 CustomFormSet = forms.inlineformset_factory(
@@ -183,6 +191,7 @@ class StoreUpdateCreateView(LoginRequiredMixin, CreateView):
         return data
 
     def form_valid(self, form):
+        """Finalizes the submission, linking to existing store/location if found."""
         context = self.get_context_data()
         tank_formset = context['tank_formset']
         
@@ -203,14 +212,16 @@ class StoreUpdateCreateView(LoginRequiredMixin, CreateView):
             if existing_store:
                 form.instance.store = existing_store
                 form.instance.location = existing_store.location
+                logger.info(f"PROPOSAL_LINK: Linking submission to existing Store #{existing_store.store_num}")
 
             self.object = form.save()
             tank_formset.instance = self.object
             tank_formset.save()
             
-            logger.info(f"Field Proposal Submitted: Store {store_num} by {self.request.user}")
+            logger.info(f"PROPOSAL_SUBMITTED: Store {store_num} by Agent {self.request.user}")
             return super().form_valid(form)
         else:
+            logger.warning(f"PROPOSAL_REJECTED: Tank formset validation failed for Agent {self.request.user}")
             return self.render_to_response(self.get_context_data(form=form))
 
 class StoreUpdateListView(LoginRequiredMixin, ListView):
@@ -223,6 +234,7 @@ class StoreUpdateListView(LoginRequiredMixin, ListView):
     context_object_name = 'proposals'
 
     def get_queryset(self):
+        """Filters proposals to only show those belonging to the current agent."""
         return StoreUpdate.objects.filter(submitted_by=self.request.user).order_by('-submitted_at')
 
 class SiteIntelDashboardView(LoginRequiredMixin, ListView):
@@ -237,9 +249,11 @@ class SiteIntelDashboardView(LoginRequiredMixin, ListView):
     paginate_by = 25
 
     def get_queryset(self):
+        """Handles numeric search and target acquisition logic."""
         queryset = Store.objects.all().order_by('store_num')
         q = self.request.GET.get('q')
         if q:
+            logger.info(f"DASHBOARD_QUERY: Filtering by '{q}' triggered by {request.user}")
             queryset = queryset.filter(
                 Q(store_num__icontains=q) | 
                 Q(riso_num__icontains=q) | 
@@ -269,15 +283,14 @@ def tank_type_search_api(request):
             lower_bound = cap_val * 0.9
             upper_bound = cap_val * 1.1
             filters &= Q(capacity__gte=lower_bound, capacity__lte=upper_bound)
-            logger.info(f"TANK_SEARCH: Querying charts near {cap_val} gallons for {request.user}")
+            logger.info(f"TANK_SEARCH: Capacity near {cap_val}G for {request.user}")
         except ValueError:
-            pass # Ignore invalid capacity if query is present
+            logger.warning(f"TANK_SEARCH_FAILED: Invalid capacity '{capacity}'")
             
     if query:
         filters &= (Q(name__icontains=query) | Q(manufacturer__icontains=query) | Q(model__icontains=query))
     
     matches = TankType.objects.filter(filters).values('id', 'name', 'manufacturer', 'capacity', 'max_depth')[:20]
-    
     return JsonResponse({'results': list(matches)})
 
 @login_required
@@ -325,6 +338,7 @@ def store_lookup_api(request):
         }
         return JsonResponse(data)
     
+    logger.info(f"STORE_LOOKUP_MISS: No record found for ID '{query}'")
     return JsonResponse({'error': 'Store not found'}, status=404)
 
 class LocationDetailView(DetailView):
@@ -341,6 +355,7 @@ class LocationDetailView(DetailView):
     context_object_name = 'location'
 
     def get_context_data(self, **kwargs):
+        """Resolves the intelligence layer and canonical tank configurations."""
         context = super().get_context_data(**kwargs)
         loc = self.get_object()
         
@@ -351,21 +366,27 @@ class LocationDetailView(DetailView):
         if context['store']:
             context['tanks'] = StoreTankMapping.objects.filter(store=context['store']).order_by('tank_index')
         
-        # Intelligence Layer (The Fallback Logic)
+        # Intelligence Layer (Dual-Layer Sync)
+        personal_intel = None
+        default_intel = SiteIntelligence.objects.filter(location=loc, is_default=True).first()
+        
         if self.request.user.is_authenticated:
             personal_intel = SiteIntelligence.objects.filter(location=loc, author=self.request.user).first()
-            if personal_intel:
-                context['intel'] = personal_intel
-                context['intel_mode'] = 'PERSONAL'
-            else:
-                default_intel = SiteIntelligence.objects.filter(location=loc, is_default=True).first()
-                context['intel'] = default_intel
-                context['intel_mode'] = 'DEFAULT'
+            
+            # TACTICAL: Determine initial display mode
+            # If agent has personal notes, prioritize them; otherwise show shared layer.
+            context['intel_mode'] = 'PERSONAL' if personal_intel else 'DEFAULT'
         else:
-            # Unauthenticated users only see approved/default intel
-            context['intel'] = SiteIntelligence.objects.filter(location=loc, is_default=True).first()
+            # Anonymous users only see shared layer
             context['intel_mode'] = 'PUBLIC'
             
+        context['personal_intel'] = personal_intel
+        context['default_intel'] = default_intel
+        
+        # Legacy support for existing logic
+        context['intel'] = personal_intel if personal_intel else default_intel
+        
+        logger.info(f"SITE_ACCESS: Site ID {loc.id} accessed by {self.request.user.username if self.request.user.is_authenticated else 'ANONYMOUS'}")
         return context
 
 class MapOverlayUpdateView(LoginRequiredMixin, CreateView):
@@ -379,18 +400,21 @@ class MapOverlayUpdateView(LoginRequiredMixin, CreateView):
     template_name = 'siteintel/map_edit.html'
 
     def get_context_data(self, **kwargs):
+        """Attaches the target location to the drawing context."""
         context = super().get_context_data(**kwargs)
         context['location'] = get_object_or_404(Location, id=self.kwargs.get('location_id'))
         return context
 
     def form_valid(self, form):
+        """Assigns the drawing metadata and logs the submission."""
         loc = get_object_or_404(Location, id=self.kwargs.get('location_id'))
         form.instance.location = loc
         form.instance.submitted_by = self.request.user
-        logger.info(f"OVERLAY_PROPOSAL: Submitted for Site {loc.id} by {self.request.user}")
+        logger.info(f"OVERLAY_PROPOSAL: Map update submitted for Site {loc.id} by Agent {self.request.user}")
         return super().form_valid(form)
 
     def get_success_url(self):
+        """Returns to the site detail view upon successful submission."""
         return reverse('siteintel:location_detail', kwargs={'pk': self.kwargs.get('location_id')})
 
 class SiteIntelligenceUpdateView(LoginRequiredMixin, UpdateView):
@@ -403,6 +427,7 @@ class SiteIntelligenceUpdateView(LoginRequiredMixin, UpdateView):
     template_name = 'siteintel/intel_form.html'
 
     def get_object(self, queryset=None):
+        """Retrieves or initializes the agent's personal intel record."""
         location_id = self.kwargs.get('location_id')
         location = get_object_or_404(Location, id=location_id)
         intel, created = SiteIntelligence.objects.get_or_create(
@@ -410,19 +435,21 @@ class SiteIntelligenceUpdateView(LoginRequiredMixin, UpdateView):
             author=self.request.user,
             defaults={'notes': ''}
         )
+        if created:
+            logger.info(f"INTEL_INIT: Initialized new field report for Site {location_id} by Agent {self.request.user}")
         return intel
 
     def get_success_url(self):
+        """Returns to the site detail view upon successful update."""
         return reverse('siteintel:location_detail', kwargs={'pk': self.object.location.id})
 
-class SiteSelectorView(LoginRequiredMixin, TemplateView):
+class SiteSelectorView(TemplateView):
     """
     OPERATIONAL FLOW:
     A dedicated 'Target Acquisition' page for finding site intelligence.
     """
     template_name = 'siteintel/site_selector.html'
 
-@login_required
 def site_lookup_api(request):
     """
     TACTICAL INTEL:
@@ -434,7 +461,8 @@ def site_lookup_api(request):
     if not q or not q.isdigit():
         return JsonResponse({'results': []})
     
-    logger.info(f"TARGET_SCAN: Searching for site ID '{q}' by user {request.user}")
+    user_str = request.user.username if request.user.is_authenticated else "ANONYMOUS"
+    logger.info(f"TARGET_SCAN: Searching for site ID '{q}' by user {user_str}")
     
     # SEARCH_STORES: Target canonical retail sites by ID
     stores = Store.objects.filter(
@@ -450,7 +478,7 @@ def site_lookup_api(request):
             'store_pk': s.id,
             'store_num': s.store_num,
             'name': s.store_name or f"Store #{s.store_num}",
-            'city': s.city or "UNKNOWN_LOC",
+            'city': s.city or "UNKNOWN LOC",
             'has_location': loc_id is not None
         })
     

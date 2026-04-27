@@ -331,10 +331,16 @@
 
             if (!map) {
                 map = L.map('map').setView([defaultLat, defaultLon], zoom);
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-                    maxZoom: 19
-                }).addTo(map);
+                
+                // Use Global Tactical Tile Layer Provider
+                if (window.getTacticalTileLayer) {
+                    window.getTacticalTileLayer(L).addTo(map);
+                } else {
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                        maxZoom: 19
+                    }).addTo(map);
+                }
 
                 marker = L.marker([defaultLat, defaultLon], { draggable: true }).addTo(map);
 

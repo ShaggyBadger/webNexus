@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="referrer" content="no-referrer-when-downgrade">
     <meta name="csrf-token" content="{{ csrf_token }}">
+    <meta name="user-map-preference" content="{{ USER_MAP_PREFERENCE }}">
     <title>{% block title %}{{ SITE_NAME }}{% endblock %}</title>
 
     <!-- Mobile-Specific Meta Tags (iOS / Android) -->
@@ -154,6 +155,28 @@
     <script src="{% static 'js/tactical_gps.js' %}"></script>
     <!-- Field Intel Module -->
     <script src="{% static 'js/field_intel.js' %}"></script>
+    <script>
+        /**
+         * TACTICAL TILE LAYER PROVIDER
+         * Respects user map preference globally.
+         */
+        window.getTacticalTileLayer = function(L) {
+            const preference = document.querySelector('meta[name="user-map-preference"]')?.content || 'STANDARD';
+            
+            if (preference === 'DARK') {
+                return L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                    attribution: '© OpenStreetMap contributors © CARTO',
+                    subdomains: 'abcd',
+                    maxZoom: 20
+                });
+            }
+            
+            return L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors',
+                maxZoom: 19
+            });
+        };
+    </script>
     {% block extra_scripts %}{% endblock %}
 </body>
 </html>
