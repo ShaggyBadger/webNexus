@@ -7,12 +7,17 @@ export const IntelSelector = {
         const input = document.getElementById(inputId);
         const results = document.getElementById(resultsId);
         const form = document.getElementById('site-selector-form');
+        const searchButton = document.getElementById('search-button');
 
         if (!input || !results) return;
 
         const lookupUrl = input.dataset.lookupUrl;
         let timeout = null;
 
+        /**
+         * Orchestrates the search request.
+         * @param {boolean} immediate - If true, bypasses the debounce timeout.
+         */
         const executeSearch = (immediate = false) => {
             clearTimeout(timeout);
             const query = input.value.trim();
@@ -31,10 +36,12 @@ export const IntelSelector = {
             }
         };
 
-        // 1. Live Search (Debounced)
-        input.addEventListener('input', () => executeSearch(false));
+        // 1. Live Search (Debounced) - Fires on every keystroke
+        input.addEventListener('input', () => {
+            executeSearch(false);
+        });
 
-        // 2. Form Submission (Enter Key fallback)
+        // 2. Form Submission (Enter Key or Button Click) - Fires immediately
         if (form) {
             form.addEventListener('submit', (e) => {
                 e.preventDefault();
@@ -42,7 +49,15 @@ export const IntelSelector = {
             });
         }
 
-        // 3. Enter Key (Force Immediate)
+        // 3. Fallback for search button if it's outside form or has specific behavior
+        if (searchButton) {
+            searchButton.addEventListener('click', (e) => {
+                e.preventDefault();
+                executeSearch(true);
+            });
+        }
+
+        // 4. Force immediate search on 'Enter' key inside input
         input.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
                 e.preventDefault();
@@ -50,10 +65,11 @@ export const IntelSelector = {
             }
         });
 
-        console.log("INTEL_SELECTOR_INITIALIZED");
+        console.log("INTEL_SELECTOR_READY");
     },
 
     performLookup: function(query, url, resultsContainer) {
+        // Show scanning state
         resultsContainer.innerHTML = '<div class="text-center text-primary mono py-3">[ SCANNING_STREAMS... ]</div>';
 
         fetch(`${url}?q=${encodeURIComponent(query)}`)
