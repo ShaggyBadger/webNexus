@@ -7,7 +7,6 @@ export const IntelSelector = {
         const input = document.getElementById(inputId);
         const results = document.getElementById(resultsId);
         const form = document.getElementById('site-selector-form');
-        const searchButton = document.getElementById('search-button');
 
         if (!input || !results) return;
 
@@ -35,15 +34,7 @@ export const IntelSelector = {
         // 1. Live Search (Debounced)
         input.addEventListener('input', () => executeSearch(false));
 
-        // 2. Button Click (Immediate)
-        if (searchButton) {
-            searchButton.addEventListener('click', (e) => {
-                e.preventDefault();
-                executeSearch(true);
-            });
-        }
-
-        // 3. Form Submission (Enter Key fallback)
+        // 2. Form Submission (Enter Key fallback)
         if (form) {
             form.addEventListener('submit', (e) => {
                 e.preventDefault();
@@ -51,7 +42,7 @@ export const IntelSelector = {
             });
         }
 
-        // 4. Enter Key (Force Immediate)
+        // 3. Enter Key (Force Immediate)
         input.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
                 e.preventDefault();
