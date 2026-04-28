@@ -253,7 +253,7 @@ class SiteIntelDashboardView(LoginRequiredMixin, ListView):
         queryset = Store.objects.all().order_by('store_num')
         q = self.request.GET.get('q')
         if q:
-            logger.info(f"DASHBOARD_QUERY: Filtering by '{q}' triggered by {request.user}")
+            logger.info(f"DASHBOARD_QUERY: Filtering by '{q}' triggered by {self.request.user}")
             queryset = queryset.filter(
                 Q(store_num__icontains=q) | 
                 Q(riso_num__icontains=q) | 

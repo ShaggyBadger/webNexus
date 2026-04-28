@@ -2,6 +2,11 @@ from django.db import models
 
 
 class Store(models.Model):
+    """
+    OPERATIONAL FLOW:
+    Canonical record of a physical retail site.
+    Serves as the primary anchor for tank configurations and site-specific data.
+    """
     store_num = models.IntegerField(unique=True, null=True, blank=True)
     riso_num = models.IntegerField(unique=True, null=True, blank=True)
     store_name = models.CharField(max_length=255, null=True, blank=True)
@@ -35,6 +40,11 @@ class Store(models.Model):
 
 
 class TankType(models.Model):
+    """
+    OPERATIONAL FLOW:
+    Defines a specific hardware model of fuel tank (e.g., Highland 10k, Xerxes 12k).
+    Contains structural dimensions and link to calibration charts.
+    """
     name = models.CharField(max_length=255, null=True, blank=True)
     manufacturer = models.CharField(max_length=255, null=True, blank=True)
     model = models.CharField(max_length=255, null=True, blank=True)
@@ -49,6 +59,11 @@ class TankType(models.Model):
 
 
 class StoreTankMapping(models.Model):
+    """
+    OPERATIONAL FLOW:
+    The critical linkage between a physical Store and its installed hardware.
+    Defines which fuel product is stored in which tank index.
+    """
     store = models.ForeignKey(
         Store, on_delete=models.CASCADE, related_name="tank_mappings"
     )
@@ -67,6 +82,11 @@ class StoreTankMapping(models.Model):
 
 
 class TankChart(models.Model):
+    """
+    OPERATIONAL FLOW:
+    High-precision calibration data (The 'Stick Chart').
+    Maps physical depth (inches) to volume (gallons) for a specific TankType.
+    """
     tank_type = models.ForeignKey(
         TankType, on_delete=models.CASCADE, related_name="charts"
     )

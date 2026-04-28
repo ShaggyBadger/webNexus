@@ -14,21 +14,25 @@ from .logic.calculations import (
 from .logic.utils import haversine
 
 # Initialize logger for this module
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('tankgauge')
 
 
 def delivery_form(request):
     """
-    Renders the Fuel Delivery Estimation form.
+    OPERATIONAL FLOW:
+    Renders the primary Fuel Delivery Estimation interface.
+    Serves as the mission-entry point for field agents.
     """
+    logger.debug(f"UI_ACCESS: Delivery form accessed by {request.user}")
     form = DeliveryEstimationForm()
     return render(request, "tankgauge/delivery_form.html", {"form": form})
 
 
 def delivery_submit(request):
     """
-    Handles form submission for Fuel Delivery Estimation.
-    Queries the database for specific store tanks or returns standard 7-11 defaults.
+    OPERATIONAL FLOW:
+    Orchestrates the transition from 'Site Identification' to 'Tank Data Entry'.
+    Resolves physical store numbers into canonical tank configurations.
     """
     if request.method == "POST":
         form = DeliveryEstimationForm(request.POST)
@@ -37,9 +41,10 @@ def delivery_submit(request):
             selected_fuels = form.cleaned_data["fuel_types"]
 
             try:
+                # SITE_ACQUISITION: Attempt to resolve the store identifier
                 store, is_preset = get_store_and_preset_status(store_number_input)
             except Exception as e:
-                logger.error("DATABASE_CONNECTION_ERROR", extra={"store_id": store_number_input, "error": str(e)}, exc_info=True)
+                logger.error(f"DATABASE_CONNECTION_ERROR: Failed to resolve store {store_number_input}", exc_info=True)
                 return render(
                     request,
                     "tankgauge/delivery_form.html",
@@ -50,7 +55,7 @@ def delivery_submit(request):
                 )
 
             if not store:
-                logger.warning("STORE_NOT_FOUND", extra={"store_id": store_number_input})
+                logger.warning(f"STORE_NOT_FOUND: Store ID #{store_number_input} not in database.")
                 return render(
                     request,
                     "tankgauge/delivery_form.html",
@@ -60,7 +65,7 @@ def delivery_submit(request):
                     },
                 )
 
-            logger.info("FETCHING_DATA", extra={"store_id": store_number_input, "is_preset": is_preset, "fuels": selected_fuels})
+            logger.info(f"FETCHING_DATA: Store #{store.store_num} accessed. Preset={is_preset}, Fuels={selected_fuels}")
             tanks_found = []
             for fuel in selected_fuels:
                 try:
@@ -141,25 +146,29 @@ def delivery_submit(request):
 
 def closest_store_api(request):
     """
-    Tactical Intel: Returns the closest store based on GPS coordinates.
+    TACTICAL INTEL:
+    Determines the nearest operational site based on user-reported GPS coordinates.
+    Used for the 'Near Me' feature to reduce manual store number entry.
     """
     lat = request.GET.get("lat")
     lon = request.GET.get("lon")
 
     if not lat or not lon:
+        logger.warning("GEO_LOOKUP_ABORTED: Missing coordinates in request.")
         return JsonResponse({"error": "Missing coordinates"}, status=400)
 
     try:
         user_lat = float(lat)
         user_lon = float(lon)
     except (ValueError, TypeError):
+        logger.warning(f"GEO_LOOKUP_FAILED: Invalid coordinates provided: {lat}, {lon}")
         return JsonResponse({"error": "Invalid coordinates"}, status=400)
 
-    # Fetch all stores with coordinates
+    # SITE_SCAN: Search all stores with valid geospatial data
     try:
         stores = Store.objects.exclude(lat__isnull=True).exclude(lon__isnull=True)
     except Exception as e:
-        logger.error("DATABASE_ERROR_CLOSEST_STORE", extra={"lat": user_lat, "lon": user_lon, "error": str(e)}, exc_info=True)
+        logger.error(f"DATABASE_ERROR_CLOSEST_STORE: Lat {user_lat}, Lon {user_lon}", exc_info=True)
         return JsonResponse({"error": "Database error"}, status=500)
 
     closest_store = None
@@ -174,18 +183,13 @@ def closest_store_api(request):
     if closest_store:
         distance_feet = round(min_distance_miles * 5280)
         
-        # Tactical Distance Formatting
+        # Tactical Distance Formatting (Miles for long range, Feet for proximity)
         if min_distance_miles >= 1:
             distance_display = f"{min_distance_miles:.1f} MI"
         else:
             distance_display = f"{distance_feet:,} FT"
 
-        logger.info("GEOLOCATION_SUCCESS", extra={
-            "lat": user_lat,
-            "lon": user_lon,
-            "store_num": closest_store.store_num,
-            "distance": distance_display
-        })
+        logger.info(f"GEOLOCATION_SUCCESS: Store #{closest_store.store_num} identified at {distance_display} range.")
 
         return JsonResponse(
             {
@@ -199,12 +203,15 @@ def closest_store_api(request):
             }
         )
 
+    logger.warning("GEOLOCATION_EMPTY: No stores found in database.")
     return JsonResponse({"error": "No stores found"}, status=404)
 
 
 def calculate_tank_api(request):
     """
-    AJAX API endpoint for calculating a single tank's estimation.
+    TACTICAL INTEL:
+    Asynchronous computation engine for real-time tank estimations.
+    Takes physical stick readings and delivery amounts to project final volumes.
     """
     if request.method != "POST":
         return JsonResponse({"error": "Method not allowed"}, status=405)
@@ -221,7 +228,7 @@ def calculate_tank_api(request):
     except (ValueError, TypeError):
         return JsonResponse({"error": "Invalid numerical input"}, status=400)
 
-    # Tank lookup logic using helpers
+    # TANK_RESOLUTION: Determine which physical tank chart to use.
     try:
         if tank_id and tank_id.isdigit():
             mapping = StoreTankMapping.objects.filter(id=int(tank_id)).select_related("tank_type").first()
@@ -229,26 +236,20 @@ def calculate_tank_api(request):
             store, _ = get_store_and_preset_status(store_id)
             mapping = get_tank_mapping(store, fuel_type)
     except Exception as e:
-        logger.error("DATABASE_ERROR_AJAX_CALC", extra={"store_id": store_id, "fuel": fuel_type, "tank_id": tank_id, "error": str(e)}, exc_info=True)
+        logger.error(f"DATABASE_ERROR_AJAX_CALC: Store {store_id}, Fuel {fuel_type}", exc_info=True)
         return JsonResponse({"error": "Database connection error"}, status=500)
 
     if not mapping or not mapping.tank_type:
-        logger.warning("CALC_MISSING_MAPPING", extra={"store_id": store_id, "fuel": fuel_type})
+        logger.warning(f"CALC_MISSING_MAPPING: No hardware definition for Store {store_id} {fuel_type}")
         return JsonResponse({"error": "Tank mapping or type not found"}, status=404)
 
     tank_type = mapping.tank_type
 
-    # Perform calculation
+    # COMPUTATION_PHASE: Execute the core math
     try:
         result = perform_tank_calc(tank_type, fuel_type, current_inches, delivery_gallons)
-        logger.info("CALC_SUCCESS", extra={
-            "store_id": store_id,
-            "fuel": fuel_type,
-            "inches": current_inches,
-            "gallons": delivery_gallons,
-            "result": result
-        })
+        logger.info(f"CALC_SUCCESS: Store {store_id} {fuel_type} -> Final Volume {result['final_gallons']}G")
         return JsonResponse(result)
     except Exception as e:
-        logger.error("CALCULATION_LOGIC_FAILURE", extra={"store_id": store_id, "fuel": fuel_type, "error": str(e)}, exc_info=True)
+        logger.error(f"CALCULATION_LOGIC_FAILURE: Store {store_id} {fuel_type}", exc_info=True)
         return JsonResponse({"error": f"Calculation failed: {str(e)}"}, status=500)

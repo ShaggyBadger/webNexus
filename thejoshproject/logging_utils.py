@@ -3,12 +3,15 @@ import threading
 import json
 import datetime
 
-# Thread-local storage to hold request-specific metadata
+# Thread-local storage to hold request-specific metadata for tactical logging
 _thread_locals = threading.local()
+logger = logging.getLogger('django.server')
 
 def get_current_request_meta():
     """
+    TACTICAL_INTEL:
     Retrieves request metadata from the current thread's storage.
+    Used by filters and formatters to inject context into logs.
     """
     return {
         'ip': getattr(_thread_locals, 'ip', '0.0.0.0'),
@@ -21,10 +24,13 @@ def get_current_request_meta():
 
 class LoggingMiddleware:
     """
-    Middleware to capture comprehensive request metadata for tactical logging.
+    TACTICAL_TELEMETRY_MIDDLEWARE:
+    Captures comprehensive request metadata (IP, UA, Method, Path, User) 
+    and stores it in thread-local storage for use by the logging system.
     """
     def __init__(self, get_response):
         self.get_response = get_response
+        logger.info("SYSTEM_TELEMETRY: LoggingMiddleware initialized.")
 
     def __call__(self, request):
         # 1. Capture IP (Handling Nginx/Proxy with X-Forwarded-For)
