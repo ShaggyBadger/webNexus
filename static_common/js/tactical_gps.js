@@ -105,6 +105,15 @@ const TacticalGPS = {
       refDisplay.innerHTML = `LOC_REF: <span class="text-primary">${lat}°N, ${lon}°W</span>`;
     }
 
+    // Dispatch global event for other modules (like RackManager)
+    document.dispatchEvent(new CustomEvent('webnexus:gps_pulse', { 
+        detail: { 
+            lat: coords.latitude, 
+            lon: coords.longitude,
+            accuracy: coords.accuracy
+        } 
+    }));
+
     try {
       const response = await fetch(
         `/tankgauge/api/closest-store/?lat=${coords.latitude}&lon=${coords.longitude}`,

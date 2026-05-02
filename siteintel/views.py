@@ -6,10 +6,11 @@ from django.urls import reverse_lazy, reverse
 from django.http import JsonResponse, HttpResponseForbidden
 from django.db.models import Q
 from django import forms
-from .models import StoreUpdate, TankUpdate, Location, LocationType, SiteIntelligence, MapOverlayUpdate
+from .models import StoreUpdate, TankUpdate, Location, LocationType, SiteIntelligence, MapOverlayUpdate, FuelRack, RackCheckIn
 from tankgauge.models import Store, TankType, StoreTankMapping
 from tankgauge.logic.utils import haversine
 from .forms import StoreUpdateForm, TankUpdateForm, TankUpdateFormSet, SiteIntelligenceForm
+from .logic import rack_ops
 import logging
 import json
 import urllib.request
@@ -107,6 +108,84 @@ def proximity_check_api(request):
         logger.info(f"PROXIMITY_CLEARED: No conflicting sites detected for Lat {lat}, Lon {lon}")
             
     return JsonResponse({'matches': matches})
+
+@login_required
+def rack_status_api(request):
+    """
+    TACTICAL INTEL:
+    Returns the lockout status for fuel racks relative to the current user.
+    Can be filtered by a specific rack_id.
+    """
+    rack_id = request.GET.get('rack_id')
+    
+    if rack_id:
+        rack = get_object_or_404(FuelRack, id=rack_id)
+        status = rack_ops.get_rack_status(request.user, rack)
+        return JsonResponse({
+            'rack_id': rack.id,
+            'name': rack.location.name,
+            'status': status
+        })
+    
+    # Return all racks with user status
+    racks = FuelRack.objects.all().select_related('location')
+    results = []
+    for rack in racks:
+        status = rack_ops.get_rack_status(request.user, rack)
+        results.append({
+            'id': rack.id,
+            'name': rack.location.name,
+            'lat': rack.location.lat,
+            'lon': rack.location.lon,
+            'status': status
+        })
+        
+    return JsonResponse({'racks': results})
+
+@login_required
+def rack_checkin_api(request):
+    """
+    TACTICAL INTEL:
+    POST endpoint to record a fuel rack check-in.
+    Resets the lockout timer for the user.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+        
+    try:
+        data = json.loads(request.body)
+        rack_id = data.get('rack_id')
+        lat = data.get('lat')
+        lon = data.get('lon')
+        accuracy = data.get('accuracy')
+        
+        if not rack_id:
+            return JsonResponse({'error': 'rack_id is required'}, status=400)
+            
+        rack = get_object_or_404(FuelRack, id=rack_id)
+        checkin = rack_ops.record_checkin(
+            user=request.user,
+            rack=rack,
+            lat=float(lat) if lat is not None else None,
+            lon=float(lon) if lon is not None else None,
+            accuracy=float(accuracy) if accuracy is not None else None
+        )
+        
+        status = rack_ops.get_rack_status(request.user, rack)
+        
+        return JsonResponse({
+            'success': True,
+            'message': f"Check-in recorded at {rack.location.name}",
+            'is_verified': checkin.is_verified,
+            'status': status
+        })
+        
+    except (ValueError, json.JSONDecodeError) as e:
+        logger.error(f"RACK_CHECKIN_ERROR: Invalid data - {str(e)}")
+        return JsonResponse({'error': 'Invalid request data'}, status=400)
+    except Exception as e:
+        logger.error(f"RACK_CHECKIN_CRITICAL: {str(e)}")
+        return JsonResponse({'error': 'Server error'}, status=500)
 
 class StoreUpdateCreateView(LoginRequiredMixin, CreateView):
     """

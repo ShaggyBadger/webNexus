@@ -105,6 +105,9 @@
     <!-- TankGauge Module -->
     {% include 'homepage/components/app_tankgauge.html' %}
     
+    <!-- Fuel Rack Module (Authenticated Only) -->
+    {% include 'homepage/components/app_fuelracks.html' %}
+
     <!-- FieldIntel Module (Publicly Accessible) -->
     {% include 'homepage/components/app_fieldintel.html' %}
 
@@ -115,6 +118,7 @@
   </div>
 </div>
 {% endblock %} {% block extra_scripts %}
+<script src="{% static 'js/siteintel/rack_manager.js' %}"></script>
 <script>
   function updateClock() {
     const now = new Date();

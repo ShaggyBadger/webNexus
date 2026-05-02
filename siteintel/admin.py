@@ -1,5 +1,17 @@
 from django.contrib import admin
-from .models import LocationType, Location, StoreUpdate, TankUpdate, SiteIntelligence, MapOverlayUpdate
+from .models import LocationType, Location, StoreUpdate, TankUpdate, SiteIntelligence, MapOverlayUpdate, FuelRack, RackCheckIn
+
+@admin.register(FuelRack)
+class FuelRackAdmin(admin.ModelAdmin):
+    list_display = ('location', 'lockout_days')
+    search_fields = ('location__name',)
+
+@admin.register(RackCheckIn)
+class RackCheckInAdmin(admin.ModelAdmin):
+    list_display = ('user', 'rack', 'timestamp', 'is_verified')
+    list_filter = ('is_verified', 'timestamp', 'user')
+    search_fields = ('user__username', 'rack__location__name')
+    readonly_fields = ('timestamp',)
 
 @admin.register(MapOverlayUpdate)
 class MapOverlayUpdateAdmin(admin.ModelAdmin):
