@@ -427,6 +427,10 @@ class LocationDetailView(DetailView):
     Displays canonical site metadata, tank configurations, and field intelligence.
     Implements the fallback logic: Personal Notes > Default Notes.
     
+    HYBRID METADATA: 
+    Processes and orders site-specific attributes by merging global 
+    definitions (SiteAttributeDefinition) with custom site quirks (JSON).
+    
     ACCESSIBILITY: Publicly viewable.
     """
     model = Location
@@ -462,6 +466,34 @@ class LocationDetailView(DetailView):
         context['personal_intel'] = personal_intel
         context['default_intel'] = default_intel
         
+        # Hybrid Metadata Layer: Order by Global Definitions, then Custom
+        # This ensures that standard fields (e.g., Manifolds) appear in a fixed, 
+        # prioritized order while still allowing site-specific quirks to follow.
+        from .models import SiteAttributeDefinition
+        definitions = SiteAttributeDefinition.objects.all().order_by('sort_weight')
+        metadata = loc.metadata or {}
+        ordered_attrs = []
+        seen_keys = set()
+        
+        # 1. Process Global Attributes
+        for df in definitions:
+            if df.field_key in metadata:
+                val = metadata[df.field_key]
+                # Filter out empty/null values to keep the UI de-cluttered
+                if val is not None and val != '':
+                    ordered_attrs.append({'label': df.label, 'value': val})
+                seen_keys.add(df.field_key)
+        
+        # 2. Append remaining Custom Attributes (Site Quirks)
+        for key, val in metadata.items():
+            if key not in seen_keys:
+                if val is not None and val != '':
+                    # Normalize key label (replace underscores, title case)
+                    ordered_attrs.append({'label': key.replace('_', ' ').title(), 'value': val})
+        
+        context['site_attributes'] = ordered_attrs
+        logger.info(f"METADATA_LOAD: Processed {len(ordered_attrs)} attributes for Location {loc.id}")
+
         # Legacy support for existing logic
         context['intel'] = personal_intel if personal_intel else default_intel
         

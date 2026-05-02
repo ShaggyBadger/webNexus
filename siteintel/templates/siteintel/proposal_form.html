@@ -243,6 +243,44 @@
                     </div>
                 </div>
 
+                <!-- STAGE 1.5: SITE QUIRKS (HYBRID METADATA) -->
+                <div class="tactical-card">
+                    <div class="tactical-header">
+                        <span>01B_SITE_QUIRKS</span>
+                        <span class="status-badge text-primary">HYBRID_METADATA</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3" id="global-attributes-container">
+                            {% for field in form %}
+                                {% if field.name|slice:":5" == "attr_" %}
+                                <div class="col-md-6">
+                                    <label class="form-label">{{ field.label }}</label>
+                                    {{ field }}
+                                </div>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                        
+                        <hr class="border-secondary my-4">
+                        
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <label class="form-label m-0">Custom Attributes</label>
+                            <button type="button" class="btn btn-outline-secondary btn-sm mono" id="add-custom-attr-btn" style="font-size: 0.7rem;">
+                                [ + ADD CUSTOM QUIRK ]
+                            </button>
+                        </div>
+                        
+                        <div id="custom-attributes-container" class="row g-2 mb-3">
+                            <!-- JS will inject custom fields here -->
+                        </div>
+                        
+                        {{ form.custom_metadata_json }}
+                        <small class="text-muted-custom mono d-block" style="font-size: 0.6rem;">
+                            USE CUSTOM ATTRIBUTES FOR SITE-SPECIFIC QUIRKS (E.G. "GATE_CODE", "DOG_ON_SITE")
+                        </small>
+                    </div>
+                </div>
+
                 <!-- STAGE 2: TANK CONFIGURATION -->
                 <div class="tactical-card">
                     <div class="tactical-header">
@@ -757,6 +795,58 @@
             initTankPicker(entry);
             initRemoveBtn(entry);
         });
+
+        // 6. CUSTOM ATTRIBUTES MANAGEMENT
+        const customAttrBtn = document.getElementById('add-custom-attr-btn');
+        const customAttrContainer = document.getElementById('custom-attributes-container');
+        const customMetadataInput = document.getElementById('id_custom_metadata_json');
+
+        const updateCustomMetadataJson = () => {
+            const data = {};
+            customAttrContainer.querySelectorAll('.custom-attr-row').forEach(row => {
+                const key = row.querySelector('.attr-key').value.trim();
+                const val = row.querySelector('.attr-val').value.trim();
+                if (key) data[key] = val;
+            });
+            customMetadataInput.value = JSON.stringify(data);
+        };
+
+        const createCustomAttrRow = (key = '', val = '') => {
+            const row = document.createElement('div');
+            row.className = 'col-12 custom-attr-row';
+            row.innerHTML = `
+                <div class="input-group input-group-sm">
+                    <input type="text" class="form-control mono attr-key" placeholder="KEY (e.g. GATE_CODE)" value="${key}" style="width: 30%;">
+                    <input type="text" class="form-control mono attr-val" placeholder="VALUE" value="${val}">
+                    <button type="button" class="btn btn-outline-danger remove-attr-btn">[ X ]</button>
+                </div>
+            `;
+            
+            row.querySelector('.remove-attr-btn').addEventListener('click', () => {
+                row.remove();
+                updateCustomMetadataJson();
+            });
+
+            row.querySelectorAll('input').forEach(input => {
+                input.addEventListener('input', updateCustomMetadataJson);
+            });
+
+            customAttrContainer.appendChild(row);
+        };
+
+        // Initialize from existing JSON if present
+        if (customMetadataInput.value) {
+            try {
+                const existingData = JSON.parse(customMetadataInput.value);
+                Object.entries(existingData).forEach(([key, val]) => {
+                    createCustomAttrRow(key, val);
+                });
+            } catch (e) {
+                console.warn("Malformed custom metadata JSON");
+            }
+        }
+
+        customAttrBtn.addEventListener('click', () => createCustomAttrRow());
     });
 </script>
 {% endblock %}

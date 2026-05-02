@@ -22,3 +22,12 @@ def markdown_filter(value):
     # Render markdown with common extensions
     html = markdown.markdown(value, extensions=['extra', 'sane_lists', 'nl2br'])
     return mark_safe(html)
+
+@register.filter(name="replace_underscore")
+def replace_underscore(value):
+    """
+    Replaces underscores with spaces.
+    """
+    if not isinstance(value, str):
+        return value
+    return value.replace('_', ' ')

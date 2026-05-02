@@ -1,5 +1,14 @@
 from django.contrib import admin
-from .models import LocationType, Location, StoreUpdate, TankUpdate, SiteIntelligence, MapOverlayUpdate, FuelRack, RackCheckIn
+from .models import (
+    LocationType, Location, StoreUpdate, TankUpdate, SiteIntelligence, 
+    MapOverlayUpdate, FuelRack, RackCheckIn, SiteAttributeDefinition
+)
+
+@admin.register(SiteAttributeDefinition)
+class SiteAttributeDefinitionAdmin(admin.ModelAdmin):
+    list_display = ('label', 'field_key', 'field_type', 'sort_weight', 'is_required')
+    list_editable = ('sort_weight', 'is_required')
+    search_fields = ('label', 'field_key')
 
 @admin.register(FuelRack)
 class FuelRackAdmin(admin.ModelAdmin):
@@ -55,6 +64,18 @@ class LocationAdmin(admin.ModelAdmin):
     list_display = ('name', 'location_type', 'city', 'state', 'lat', 'lon')
     list_filter = ('location_type', 'state')
     search_fields = ('name', 'address', 'city')
+    fieldsets = (
+        ('Site Info', {
+            'fields': ('name', 'location_type', 'notes')
+        }),
+        ('Geospatial', {
+            'fields': ('address', 'city', 'state', 'zip_code', 'lat', 'lon', 'tactical_overlay')
+        }),
+        ('Hybrid Metadata', {
+            'fields': ('metadata',),
+            'description': 'Structured site quirks and manifold data (JSON)'
+        }),
+    )
 
 class TankUpdateInline(admin.TabularInline):
     model = TankUpdate
@@ -82,6 +103,10 @@ class StoreUpdateAdmin(admin.ModelAdmin):
         }),
         ('Proposed Site Details', {
             'fields': ('store_name', 'store_type', 'store_num', 'riso_num', 'address', 'city', 'state', 'zip_code', 'lat', 'lon')
+        }),
+        ('Proposed Metadata', {
+            'fields': ('proposed_metadata',),
+            'description': 'Site quirks and manifold data (JSON)'
         }),
     )
     

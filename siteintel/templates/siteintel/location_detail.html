@@ -133,6 +133,23 @@
             </div>
             {% endif %}
             
+            <div class="card bg-dark-custom border-secondary p-3 mb-3">
+                <div class="intel-section-header" style="font-size: 0.9rem;">
+                    <span class="d-none d-md-inline">[ SITE ATTRIBUTES ]</span>
+                    <span class="d-md-none">SITE ATTRIBUTES</span>
+                </div>
+                <div class="row g-3">
+                    {% for attr in site_attributes %}
+                    <div class="col-6">
+                        <div class="intel-label">{{ attr.label }}</div>
+                        <div class="intel-value">{{ attr.value }}</div>
+                    </div>
+                    {% empty %}
+                    <div class="col-12 text-muted-custom mono small">NO ATTRIBUTES DEFINED</div>
+                    {% endfor %}
+                </div>
+            </div>
+
             <div class="card bg-dark-custom border-secondary p-3">
                 <div class="intel-section-header" style="font-size: 0.9rem;">
                     <span class="d-none d-md-inline">[ CANONICAL DATA ]</span>
