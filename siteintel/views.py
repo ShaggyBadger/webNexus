@@ -1,6 +1,6 @@
 from django.shortcuts import render, get_object_or_404, redirect
-from django.views.generic import CreateView, DetailView, ListView, UpdateView, TemplateView
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.views.generic import CreateView, DetailView, ListView, UpdateView, TemplateView, DeleteView
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.decorators import login_required
 from django.urls import reverse_lazy, reverse
 from django.http import JsonResponse, HttpResponseForbidden
@@ -187,98 +187,63 @@ def rack_checkin_api(request):
         logger.error(f"RACK_CHECKIN_CRITICAL: {str(e)}")
         return JsonResponse({'error': 'Server error'}, status=500)
 
-class StoreUpdateCreateView(LoginRequiredMixin, CreateView):
+class StoreUpdateFormsetMixin:
     """
-    OPERATIONAL FLOW:
-    Provides the field interface for submitting site intelligence proposals.
-    Handles both Store metadata and Tank configurations in a single submission.
+    TACTICAL_MIXIN:
+    Common logic for handling TankUpdate inline formsets across Create and Update views.
     """
-    model = StoreUpdate
-    form_class = StoreUpdateForm
-    template_name = 'siteintel/proposal_form.html'
-    success_url = reverse_lazy('siteintel:proposal_list')
-
-    def get_initial(self):
-        """Pre-populates the proposal form with known site data."""
-        initial = super().get_initial()
-        store_num = self.request.GET.get('store_num')
-        riso_num = self.request.GET.get('riso_num')
-        
-        # Default to "Gas Station" as the baseline
-        gas_station = LocationType.objects.filter(name="Gas Station").first()
-        if gas_station:
-            initial['location_type'] = gas_station.id
-
-        # If targeting an existing store, override with its current type
-        target_store = None
-        if store_num:
-            target_store = Store.objects.filter(store_num=store_num).first()
-        elif riso_num:
-            target_store = Store.objects.filter(riso_num=riso_num).first()
-
-        if target_store:
-            logger.info(f"PROPOSAL_INIT: Pre-populating form for Store #{target_store.store_num}")
-            initial['store_num'] = target_store.store_num
-            initial['riso_num'] = target_store.riso_num
-            initial['store_name'] = target_store.store_name
-            initial['store_type'] = target_store.store_type
-            if target_store.location and target_store.location.location_type:
-                initial['location_type'] = target_store.location.location_type.id
-
-        return initial
-
     def get_context_data(self, **kwargs):
-        """Injects distinct store types and tank formsets into the context."""
         data = super().get_context_data(**kwargs)
         
         # Get distinct store types for the dropdown
         existing_types = Store.objects.exclude(store_type__isnull=True).exclude(store_type='').values_list('store_type', flat=True).distinct().order_by('store_type')
         data['existing_store_types'] = list(existing_types)
         
-        store_num = self.request.GET.get('store_num')
-        
         if self.request.POST:
-            data['tank_formset'] = TankUpdateFormSet(self.request.POST)
+            data['tank_formset'] = TankUpdateFormSet(self.request.POST, instance=self.object)
         else:
-            # TACTICAL INTEL: Pre-populate formset with current canonical tank mapping
-            # if we are targeting an existing store.
-            initial_tanks = []
-            if store_num:
-                store = Store.objects.filter(store_num=store_num).first()
-                if store:
-                    mappings = StoreTankMapping.objects.filter(store=store).order_by('tank_index')
-                    for mapping in mappings:
-                        initial_tanks.append({
-                            'tank_index': mapping.tank_index,
-                            'fuel_type': mapping.fuel_type.lower() if mapping.fuel_type else '',
-                            'reported_capacity': mapping.tank_type.capacity if mapping.tank_type else 0,
-                            'tank_type': mapping.tank_type, # Pass the object itself
-                        })
-            
-            if initial_tanks:
-                logger.info(f"TANK_SYNC: Initializing {len(initial_tanks)} tank forms for Store {store_num}")
-                # TACTICAL: Create a one-off factory. 
-                # InlineFormSet needs extra to be set to the length of initial if instance is None
-                CustomFormSet = forms.inlineformset_factory(
-                    StoreUpdate, TankUpdate, form=TankUpdateForm, 
-                    extra=len(initial_tanks), can_delete=True
-                )
-                data['tank_formset'] = CustomFormSet(initial=initial_tanks)
+            if self.object:
+                # UPDATE: Load existing tank proposals
+                data['tank_formset'] = TankUpdateFormSet(instance=self.object)
             else:
-                data['tank_formset'] = TankUpdateFormSet()
+                # CREATE: Pre-populate with current canonical mappings if store_num is provided
+                store_num = self.request.GET.get('store_num')
+                initial_tanks = []
+                if store_num:
+                    store = Store.objects.filter(store_num=store_num).first()
+                    if store:
+                        mappings = StoreTankMapping.objects.filter(store=store).order_by('tank_index')
+                        for mapping in mappings:
+                            initial_tanks.append({
+                                'tank_index': mapping.tank_index,
+                                'fuel_type': mapping.fuel_type.lower() if mapping.fuel_type else '',
+                                'reported_capacity': mapping.tank_type.capacity if mapping.tank_type else 0,
+                                'tank_type': mapping.tank_type,
+                            })
                 
+                if initial_tanks:
+                    logger.info(f"TANK_SYNC: Initializing {len(initial_tanks)} tank forms for Store {store_num}")
+                    CustomFormSet = forms.inlineformset_factory(
+                        StoreUpdate, TankUpdate, form=TankUpdateForm, 
+                        extra=len(initial_tanks), can_delete=True
+                    )
+                    data['tank_formset'] = CustomFormSet(initial=initial_tanks)
+                else:
+                    data['tank_formset'] = TankUpdateFormSet()
+                    
         return data
 
     def form_valid(self, form):
-        """Finalizes the submission, linking to existing store/location if found."""
         context = self.get_context_data()
         tank_formset = context['tank_formset']
         
         if tank_formset.is_valid():
-            # Auto-assign the submitting agent
-            form.instance.submitted_by = self.request.user
+            # Ensure submitting_by is set on Create, but preserved on Update if needed
+            # For simplicity, we assume author doesn't change on Edit
+            if not form.instance.pk:
+                form.instance.submitted_by = self.request.user
             
-            # Check if this update targets an existing store/location
+            # Linkage logic (same for Create and Update)
             store_num = form.cleaned_data.get('store_num')
             riso_num = form.cleaned_data.get('riso_num')
             
@@ -291,17 +256,104 @@ class StoreUpdateCreateView(LoginRequiredMixin, CreateView):
             if existing_store:
                 form.instance.store = existing_store
                 form.instance.location = existing_store.location
-                logger.info(f"PROPOSAL_LINK: Linking submission to existing Store #{existing_store.store_num}")
 
             self.object = form.save()
             tank_formset.instance = self.object
-            tank_formset.save()
+
+            # TACTICAL: Apply auto-defaults
+            tanks = tank_formset.save(commit=False)
+            next_auto_index = 1
             
-            logger.info(f"PROPOSAL_SUBMITTED: Store {store_num} by Agent {self.request.user}")
-            return super().form_valid(form)
+            for tank in tanks:
+                if tank.tank_index is None:
+                    while any(t.tank_index == next_auto_index for t in tanks if t.tank_index is not None):
+                        next_auto_index += 1
+                    tank.tank_index = next_auto_index
+                    next_auto_index += 1
+                
+                if tank.reported_capacity is None:
+                    if tank.tank_type and tank.tank_type.capacity is not None:
+                        tank.reported_capacity = tank.tank_type.capacity
+                    else:
+                        tank.reported_capacity = 0
+                
+                tank.save()
+
+            for obj in tank_formset.deleted_objects:
+                obj.delete()
+            
+            logger.info(f"PROPOSAL_ACTION: Success for Store {store_num} by {self.request.user}")
+            return redirect(self.get_success_url())
         else:
-            logger.warning(f"PROPOSAL_REJECTED: Tank formset validation failed for Agent {self.request.user}")
             return self.render_to_response(self.get_context_data(form=form))
+
+class StoreUpdateCreateView(LoginRequiredMixin, StoreUpdateFormsetMixin, CreateView):
+    """
+    OPERATIONAL FLOW:
+    Provides the field interface for submitting site intelligence proposals.
+    """
+    model = StoreUpdate
+    form_class = StoreUpdateForm
+    template_name = 'siteintel/proposal_form.html'
+    success_url = reverse_lazy('siteintel:proposal_list')
+
+    def get_initial(self):
+        """Pre-populates the proposal form with known site data."""
+        initial = super().get_initial()
+        store_num = self.request.GET.get('store_num')
+        riso_num = self.request.GET.get('riso_num')
+        
+        if store_num:
+            initial['store_num'] = store_num
+        if riso_num:
+            initial['riso_num'] = riso_num
+
+        gas_station = LocationType.objects.filter(name="Gas Station").first()
+        if gas_station:
+            initial['location_type'] = gas_station.id
+
+        target_store = None
+        if store_num:
+            target_store = Store.objects.filter(store_num=store_num).first()
+        elif riso_num:
+            target_store = Store.objects.filter(riso_num=riso_num).first()
+
+        if target_store:
+            initial['store_name'] = target_store.store_name
+            initial['store_type'] = target_store.store_type
+            if target_store.location and target_store.location.location_type:
+                initial['location_type'] = target_store.location.location_type.id
+
+        return initial
+
+class StoreUpdateUpdateView(LoginRequiredMixin, UserPassesTestMixin, StoreUpdateFormsetMixin, UpdateView):
+    """
+    OPERATIONAL FLOW:
+    Allows agents to correct or refine their PENDING proposals.
+    """
+    model = StoreUpdate
+    form_class = StoreUpdateForm
+    template_name = 'siteintel/proposal_form.html'
+    success_url = reverse_lazy('siteintel:proposal_list')
+
+    def test_func(self):
+        """Security: Only author can edit, and only if PENDING."""
+        obj = self.get_object()
+        return obj.submitted_by == self.request.user and obj.status == 'PENDING'
+
+class StoreUpdateDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
+    """
+    OPERATIONAL FLOW:
+    Allows agents to retract PENDING proposals.
+    """
+    model = StoreUpdate
+    template_name = 'siteintel/proposal_confirm_delete.html'
+    success_url = reverse_lazy('siteintel:proposal_list')
+
+    def test_func(self):
+        """Security: Only author can delete, and only if PENDING."""
+        obj = self.get_object()
+        return obj.submitted_by == self.request.user and obj.status == 'PENDING'
 
 class StoreUpdateListView(LoginRequiredMixin, ListView):
     """

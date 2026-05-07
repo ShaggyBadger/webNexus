@@ -110,11 +110,6 @@
 
     <!-- FieldIntel Module (Publicly Accessible) -->
     {% include 'homepage/components/app_fieldintel.html' %}
-
-    {% if user.is_authenticated %}
-    <!-- SiteIntel Module (Authenticated Only) -->
-    {% include 'homepage/components/app_siteintel.html' %}
-    {% endif %}
   </div>
 </div>
 {% endblock %} {% block extra_scripts %}

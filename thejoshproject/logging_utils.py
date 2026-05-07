@@ -78,6 +78,18 @@ class TacticalFilter(logging.Filter):
             setattr(record, key, value)
         return True
 
+class TacticalJSONEncoder(json.JSONEncoder):
+    """
+    TACTICAL_ENCODER:
+    Handles non-serializable objects (like sockets, datetimes, or complex objects)
+    by converting them to their string representation.
+    """
+    def default(self, obj):
+        try:
+            return super().default(obj)
+        except TypeError:
+            return str(obj)
+
 class TacticalJSONMinimalFormatter(logging.Formatter):
     """
     Clean, high-level JSON log formatter (Timestamp, Level, IP, Message).
@@ -90,7 +102,7 @@ class TacticalJSONMinimalFormatter(logging.Formatter):
             "ip": getattr(record, 'ip', '0.0.0.0'),
             "message": record.getMessage()
         }
-        return json.dumps(log_record)
+        return json.dumps(log_record, cls=TacticalJSONEncoder)
 
 class TacticalJSONFullFormatter(logging.Formatter):
     """
@@ -127,4 +139,4 @@ class TacticalJSONFullFormatter(logging.Formatter):
             if key not in standard_fields and key not in log_record:
                 log_record[key] = value
 
-        return json.dumps(log_record)
+        return json.dumps(log_record, cls=TacticalJSONEncoder)

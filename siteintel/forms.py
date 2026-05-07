@@ -149,6 +149,11 @@ class TankUpdateForm(forms.ModelForm):
     Captures a single tank configuration proposal.
     Integrates with the AJAX 'Tank Picker' on the frontend.
     """
+    tank_index = forms.IntegerField(
+        required=False,
+        widget=forms.NumberInput(attrs={'class': 'form-control mono', 'min': 1, 'placeholder': 'ATG Index'})
+    )
+
     class Meta:
         model = TankUpdate
         fields = [
@@ -156,12 +161,15 @@ class TankUpdateForm(forms.ModelForm):
             'tank_type', 'is_unverified'
         ]
         widgets = {
-            'tank_index': forms.NumberInput(attrs={'class': 'form-control mono', 'min': 1, 'placeholder': 'ATG Index'}),
             'fuel_type': forms.Select(attrs={'class': 'form-select'}),
             'reported_capacity': forms.NumberInput(attrs={'class': 'form-control mono', 'placeholder': 'Gallons'}),
             'tank_type': forms.HiddenInput(),
             'is_unverified': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['reported_capacity'].required = False
 
 # Formset for handling multiple tanks per store update
 TankUpdateFormSet = forms.inlineformset_factory(

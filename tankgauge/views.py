@@ -166,42 +166,49 @@ def closest_store_api(request):
 
     # SITE_SCAN: Search all stores with valid geospatial data
     try:
-        stores = Store.objects.exclude(lat__isnull=True).exclude(lon__isnull=True)
+        stores = Store.objects.exclude(lat__isnull=True).exclude(lon__isnull=True).select_related('location')
     except Exception as e:
         logger.error(f"DATABASE_ERROR_CLOSEST_STORE: Lat {user_lat}, Lon {user_lon}", exc_info=True)
         return JsonResponse({"error": "Database error"}, status=500)
 
-    closest_store = None
-    min_distance_miles = float("inf")
-
+    # TACTICAL: Calculate distances and sort to find top 5 targets
+    store_distances = []
     for store in stores:
         dist = haversine(user_lat, user_lon, store.lat, store.lon)
-        if dist < min_distance_miles:
-            min_distance_miles = dist
-            closest_store = store
+        store_distances.append((dist, store))
 
-    if closest_store:
-        distance_feet = round(min_distance_miles * 5280)
-        
-        # Tactical Distance Formatting (Miles for long range, Feet for proximity)
-        if min_distance_miles >= 1:
-            distance_display = f"{min_distance_miles:.1f} MI"
-        else:
-            distance_display = f"{distance_feet:,} FT"
+    # Sort by distance (first element of tuple)
+    store_distances.sort(key=lambda x: x[0])
+    
+    # Take top 5
+    top_targets = store_distances[:5]
 
-        logger.info(f"GEOLOCATION_SUCCESS: Store #{closest_store.store_num} identified at {distance_display} range.")
+    if top_targets:
+        results = []
+        for dist_miles, store in top_targets:
+            distance_feet = round(dist_miles * 5280)
+            
+            # Tactical Distance Formatting
+            if dist_miles >= 1:
+                distance_display = f"{dist_miles:.1f} MI"
+            else:
+                distance_display = f"{distance_feet:,} FT"
 
-        return JsonResponse(
-            {
-                "store_num": closest_store.store_num,
-                "store_name": closest_store.store_name,
-                "city": closest_store.city,
-                "state": closest_store.state,
+            results.append({
+                "store_num": store.store_num,
+                "store_name": store.store_name or f"Store #{store.store_num}",
+                "store_pk": store.id,
+                "city": store.city or "UNKNOWN",
+                "state": store.state or "--",
                 "distance_feet": distance_feet,
                 "distance_display": distance_display,
-                "user_location_proxy": f"{closest_store.city}, {closest_store.state}",
-            }
-        )
+                "has_location": store.location is not None,
+                "location_id": store.location.id if store.location else None,
+                "user_location_proxy": f"{store.city}, {store.state}",
+            })
+
+        logger.info(f"GEOLOCATION_SUCCESS: Identified {len(results)} proximal targets for Agent GPS.")
+        return JsonResponse({"results": results})
 
     logger.warning("GEOLOCATION_EMPTY: No stores found in database.")
     return JsonResponse({"error": "No stores found"}, status=404)

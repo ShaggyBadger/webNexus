@@ -271,32 +271,26 @@ class StoreUpdate(models.Model):
                 self.store.save()
                 logger.info(f"SYNC_STEP: Updated Store specialized metadata for #{self.store.store_num}")
 
-            # 4. TANK_SYNCHRONIZATION: Surgical 'Upsert' of physical tank hardware.
+            # 4. TANK_SYNCHRONIZATION: Full Mirroring of physical tank hardware.
+            # Instead of a surgical 'update_or_create' (which fails if existing data is dirty/duplicated),
+            # we perform a clean sync. The approved proposal is the new source of truth.
             tank_updates = self.tank_updates.all()
             if tank_updates.exists():
-                proposed_indices = []
+                logger.info(f"SYNC_STEP: Mirroring {tank_updates.count()} tank configurations for Store #{self.store.store_num}")
                 
+                # Clear existing mappings to prevent duplication conflicts (e.g., multiple None indices)
+                deleted_count, _ = StoreTankMapping.objects.filter(store=self.store).delete()
+                if deleted_count:
+                    logger.info(f"SYNC_STEP: Purged {deleted_count} stale/conflicting mappings.")
+
                 for tu in tank_updates:
-                    mapping, created = StoreTankMapping.objects.update_or_create(
+                    StoreTankMapping.objects.create(
                         store=self.store,
                         tank_index=tu.tank_index,
-                        defaults={
-                            'tank_type': tu.tank_type,
-                            'fuel_type': tu.fuel_type.lower()
-                        }
+                        tank_type=tu.tank_type,
+                        fuel_type=tu.fuel_type.lower()
                     )
-                    proposed_indices.append(tu.tank_index)
-                    status_str = "CREATED" if created else "UPDATED"
-                    logger.info(f"SYNC_STEP: {status_str} mapping for Store #{self.store.store_num} Tank {tu.tank_index}")
-                
-                # MIRRORING DELETIONS: Remove canonical mappings NOT present in the final proposal.
-                # This ensures the database mirrors the verified physical layout.
-                deleted_count, _ = StoreTankMapping.objects.filter(
-                    store=self.store
-                ).exclude(tank_index__in=proposed_indices).delete()
-                
-                if deleted_count:
-                    logger.info(f"SYNC_STEP: Purged {deleted_count} stale tank mappings for Store #{self.store.store_num}")
+                    logger.info(f"SYNC_STEP: Synchronized Store #{self.store.store_num} Tank {tu.tank_index}")
             
             self.save() # Final linkage persistence
             logger.info(f"SYNC_COMPLETE: Successfully applied Update {self.id} to Store {self.store.store_num}")

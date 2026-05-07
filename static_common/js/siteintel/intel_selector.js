@@ -16,6 +16,8 @@ export const IntelSelector = {
         const results = document.getElementById(resultsId);
         const form = document.getElementById('site-selector-form');
         const searchButton = document.getElementById('search-button');
+        const proximityBtn = document.getElementById('proximity-scan-button');
+        const proximityStatus = document.getElementById('proximity-status');
 
         if (!input || !results) {
             console.error("INTEL_SELECTOR_ERROR: Critical UI components missing (input/results).");
@@ -23,6 +25,7 @@ export const IntelSelector = {
         }
 
         const lookupUrl = input.dataset.lookupUrl;
+        const proximityUrl = form ? form.dataset.proximityUrl : null;
         let timeout = null;
 
         /**
@@ -80,6 +83,13 @@ export const IntelSelector = {
             }
         });
 
+        // 5. PROXIMITY_SCAN: GPS-based site acquisition
+        if (proximityBtn && proximityUrl) {
+            proximityBtn.addEventListener('click', () => {
+                this.scanNearbyStores(proximityUrl, results, proximityStatus);
+            });
+        }
+
         console.log("INTEL_SELECTOR: System ready. Awaiting target ID.");
     },
 
@@ -101,37 +111,106 @@ export const IntelSelector = {
             .then(data => {
                 resultsContainer.innerHTML = '';
                 if (data.results && data.results.length > 0) {
-                    console.log(`INTEL_SELECTOR: Identified ${data.results.length} potential targets.`);
-                    data.results.forEach(site => {
-                        const item = document.createElement('div');
-                        item.className = 'selector-item p-3 mb-2 border border-secondary bg-dark-custom mono';
-                        item.style.cursor = 'pointer';
-                        
-                        // TACTICAL: High-contrast result card
-                        item.innerHTML = `
-                            <div class="text-primary fw-bold">#${site.store_num || ''} ${site.name}</div>
-                            <div class="small text-muted-custom">${site.city} [CLICK_TO_ACQUIRE]</div>
-                        `;
-                        
-                        item.addEventListener('click', () => {
-                            console.log(`INTEL_SELECTOR: Target Acquired - Store #${site.store_num}`);
-                            if (site.has_location) {
-                                window.location.href = `/siteintel/site/${site.id}/`;
-                            } else {
-                                // TACTICAL: Auto-initialize location if it doesn't exist yet
-                                window.location.href = `/siteintel/init-location/${site.store_pk}/`;
-                            }
-                        });
-                        resultsContainer.appendChild(item);
-                    });
+                    this.renderResults(data.results, resultsContainer);
                 } else {
                     console.warn(`INTEL_SELECTOR: No matches found for ID [${query}]`);
-                    resultsContainer.innerHTML = '<div class="text-center text-muted-custom mono py-3">[ NO_MATCHES_FOUND ]</div>';
+                    resultsContainer.innerHTML = `
+                        <div class="text-center py-3">
+                            <div class="text-muted-custom mono mb-3">[ NO_MATCHES_FOUND ]</div>
+                            <div class="d-grid">
+                                <a href="/siteintel/propose/?store_num=${encodeURIComponent(query)}" class="btn btn-outline-primary btn-sm mono">
+                                    [ INITIATE PROPOSAL FOR #${query} ]
+                                </a>
+                            </div>
+                        </div>
+                    `;
                 }
             })
             .catch(err => {
                 console.error("INTEL_SELECTOR_CRITICAL_FAILURE:", err);
                 resultsContainer.innerHTML = '<div class="text-center text-danger mono py-3">[ SCAN_FAILED: LINK_ERROR ]</div>';
             });
+    },
+
+    /**
+     * Acquires user GPS coordinates and searches for nearby stores.
+     */
+    scanNearbyStores: function(url, resultsContainer, statusElement) {
+        if (!navigator.geolocation) {
+            console.error("INTEL_SELECTOR: Geolocation not supported.");
+            alert("GEOLOCATION_NOT_SUPPORTED");
+            return;
+        }
+
+        statusElement.classList.remove('d-none');
+        statusElement.innerText = "ACQUIRING GPS LOCK...";
+        resultsContainer.innerHTML = '<div class="text-center text-primary mono py-3">[ INITIALIZING_GPS_SCAN... ]</div>';
+
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const lat = position.coords.latitude;
+                const lon = position.coords.longitude;
+                statusElement.innerText = `LOCK_ACQUIRED: ${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+
+                fetch(`${url}?lat=${lat}&lon=${lon}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        resultsContainer.innerHTML = '';
+                        if (data.results && data.results.length > 0) {
+                            this.renderResults(data.results, resultsContainer, true);
+                        } else {
+                            resultsContainer.innerHTML = '<div class="text-center text-muted-custom mono py-3">[ NO_STORES_IN_RANGE ]</div>';
+                        }
+                    })
+                    .catch(err => {
+                        console.error("INTEL_SELECTOR: Proximity scan failed.", err);
+                        resultsContainer.innerHTML = '<div class="text-center text-danger mono py-3">[ SCAN_FAILED: LINK_ERROR ]</div>';
+                    })
+                    .finally(() => {
+                        setTimeout(() => statusElement.classList.add('d-none'), 3000);
+                    });
+            },
+            (error) => {
+                console.error("INTEL_SELECTOR: GPS acquisition failed.", error);
+                statusElement.innerText = "GPS_ERROR: PERMISSION_DENIED";
+                resultsContainer.innerHTML = '<div class="text-center text-danger mono py-3">[ GPS_LOCK_FAILED ]</div>';
+                setTimeout(() => statusElement.classList.add('d-none'), 3000);
+            },
+            { enableHighAccuracy: true, timeout: 10000 }
+        );
+    },
+
+    /**
+     * Renders result cards into the container.
+     */
+    renderResults: function(results, container, showDistance = false) {
+        console.log(`INTEL_SELECTOR: Rendering ${results.length} targets.`);
+        results.forEach(site => {
+            const item = document.createElement('div');
+            item.className = 'selector-item p-3 mb-2 border border-secondary bg-dark-custom mono';
+            item.style.cursor = 'pointer';
+            
+            const distanceMarkup = showDistance ? `<div class="badge bg-primary text-dark float-end">${site.distance_display}</div>` : '';
+
+            // TACTICAL: High-contrast result card
+            item.innerHTML = `
+                ${distanceMarkup}
+                <div class="text-primary fw-bold">#${site.store_num || ''} ${site.store_name || site.name}</div>
+                <div class="small text-muted-custom">${site.city} [CLICK_TO_ACQUIRE]</div>
+            `;
+            
+            item.addEventListener('click', () => {
+                console.log(`INTEL_SELECTOR: Target Acquired - Store #${site.store_num}`);
+                if (site.has_location) {
+                    const id = site.location_id || site.id;
+                    window.location.href = `/siteintel/site/${id}/`;
+                } else {
+                    // TACTICAL: Auto-initialize location if it doesn't exist yet
+                    const pk = site.store_pk || site.id;
+                    window.location.href = `/siteintel/init-location/${pk}/`;
+                }
+            });
+            container.appendChild(item);
+        });
     }
 };

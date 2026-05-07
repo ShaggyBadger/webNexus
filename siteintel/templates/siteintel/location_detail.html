@@ -107,7 +107,7 @@
     </div>
 
     <div class="row g-4 px-2">
-        <!-- Left Column: Map & Metadata -->
+        <!-- Left Column: Map -->
         <div class="col-12 col-lg-5">
             <div id="intel-map" 
                  class="mb-3"
@@ -132,77 +132,82 @@
                 </a>
             </div>
             {% endif %}
-            
-            <div class="card bg-dark-custom border-secondary p-3 mb-3">
-                <div class="intel-section-header" style="font-size: 0.9rem;">
-                    <span class="d-none d-md-inline">[ SITE ATTRIBUTES ]</span>
-                    <span class="d-md-none">SITE ATTRIBUTES</span>
-                </div>
-                <div class="row g-3">
-                    {% for attr in site_attributes %}
-                    <div class="col-6">
-                        <div class="intel-label">{{ attr.label }}</div>
-                        <div class="intel-value">{{ attr.value }}</div>
-                    </div>
-                    {% empty %}
-                    <div class="col-12 text-muted-custom mono small">NO ATTRIBUTES DEFINED</div>
-                    {% endfor %}
-                </div>
-            </div>
-
-            <div class="card bg-dark-custom border-secondary p-3">
-                <div class="intel-section-header" style="font-size: 0.9rem;">
-                    <span class="d-none d-md-inline">[ CANONICAL DATA ]</span>
-                    <span class="d-md-none">CANONICAL DATA</span>
-                </div>
-                <div class="row g-3">
-                    <div class="col-6">
-                        <div class="intel-label">Store #</div>
-                        <div class="intel-value">{{ store.store_num|default:"N/A" }}</div>
-                    </div>
-                    <div class="col-6">
-                        <div class="intel-label">RISO</div>
-                        <div class="intel-value">{{ store.riso_num|default:"N/A" }}</div>
-                    </div>
-                    <div class="col-12">
-                        <div class="intel-label">Address</div>
-                        <div class="intel-value" style="font-size: 0.8rem;">
-                            {{ location.address }}<br>
-                            {{ location.city }}, {{ location.state }} {{ location.zip_code }}
-                        </div>
-                    </div>
-                    <div class="col-12">
-                        <div class="intel-label">Coordinates</div>
-                        <div class="intel-value small text-primary">
-                            {{ location.lat }}, {{ location.lon }}
-                        </div>
-                    </div>
-                </div>
-            </div>
         </div>
 
-        <!-- Right Column: Tanks & Notes -->
+        <!-- Right Column: Configuration & Notes -->
         <div class="col-12 col-lg-7">
-            <!-- Tank Section -->
-            <div class="mb-4">
+            <!-- Combined Site Configuration -->
+            <div class="card bg-dark-custom border-secondary p-3 mb-4">
                 <div class="intel-section-header">
-                    <span class="d-none d-md-inline">[ TANK CONFIGURATION ]</span>
-                    <span class="d-md-none">TANK CONFIGURATION</span>
+                    <div>
+                        <span class="d-none d-md-inline">[ SITE_CONFIGURATION ]</span>
+                        <span class="d-md-none">SITE_CONFIG</span>
+                    </div>
+                    {% if user.is_authenticated and store %}
+                    <a href="{% url 'siteintel:proposal_create' %}?store_num={{ store.store_num }}" class="btn btn-outline-warning btn-sm mono py-0" style="font-size: 0.65rem;">
+                        <span class="d-none d-md-inline">[ UPDATE SITE ]</span>
+                        <span class="d-md-none">UPDATE</span>
+                    </a>
+                    {% endif %}
                 </div>
-                <div class="row g-2">
-                    {% for tank in tanks %}
+
+                <div class="row g-4">
+                    <!-- Subsection: Canonical Data -->
                     <div class="col-12 col-md-6">
-                        <div class="border border-secondary p-2 d-flex justify-content-between align-items-center">
-                            <div class="mono small">
-                                <span class="text-primary fw-bold">T{{ tank.tank_index }}</span> 
-                                <span class="ms-2">{{ tank.fuel_type|upper }}</span>
+                        <div class="mono text-muted-custom smaller mb-2" style="font-size: 0.6rem; letter-spacing: 1px;">// CANONICAL_DATA</div>
+                        <div class="row g-3">
+                            <div class="col-6">
+                                <div class="intel-label">Store #</div>
+                                <div class="intel-value">{{ store.store_num|default:"N/A" }}</div>
                             </div>
-                            <span class="tank-badge mono">{{ tank.tank_type.capacity }}G</span>
+                            <div class="col-6">
+                                <div class="intel-label">RISO</div>
+                                <div class="intel-value">{{ store.riso_num|default:"N/A" }}</div>
+                            </div>
+                            <div class="col-12">
+                                <div class="intel-label">Address</div>
+                                <div class="intel-value" style="font-size: 0.8rem;">
+                                    {{ location.address }}<br>
+                                    {{ location.city }}, {{ location.state }} {{ location.zip_code }}
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    {% empty %}
-                    <div class="col-12 text-muted-custom mono small">NO CANONICAL TANK DATA</div>
-                    {% endfor %}
+
+                    <!-- Subsection: Site Attributes -->
+                    <div class="col-12 col-md-6">
+                        <div class="mono text-muted-custom smaller mb-2" style="font-size: 0.6rem; letter-spacing: 1px;">// SITE_ATTRIBUTES</div>
+                        <div class="row g-3">
+                            {% for attr in site_attributes %}
+                            <div class="col-6">
+                                <div class="intel-label">{{ attr.label }}</div>
+                                <div class="intel-value">{{ attr.value }}</div>
+                            </div>
+                            {% empty %}
+                            <div class="col-12 text-muted-custom mono small">NO ATTRIBUTES DEFINED</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Subsection: Tank Configuration -->
+                <div class="mt-4 pt-3 border-top border-secondary">
+                    <div class="mono text-muted-custom smaller mb-3" style="font-size: 0.6rem; letter-spacing: 1px;">// TANK_CONFIGURATION</div>
+                    <div class="row g-2">
+                        {% for tank in tanks %}
+                        <div class="col-12 col-md-6">
+                            <div class="border border-secondary p-2 d-flex justify-content-between align-items-center">
+                                <div class="mono small">
+                                    <span class="text-primary fw-bold">T{{ tank.tank_index }}</span> 
+                                    <span class="ms-2">{{ tank.fuel_type|upper }}</span>
+                                </div>
+                                <span class="tank-badge mono">{{ tank.tank_type.capacity }}G</span>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div class="col-12 text-muted-custom mono small">NO CANONICAL TANK DATA</div>
+                        {% endfor %}
+                    </div>
                 </div>
             </div>
 

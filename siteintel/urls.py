@@ -7,6 +7,8 @@ urlpatterns = [
     path('', views.SiteIntelDashboardView.as_view(), name='dashboard'),
     path('propose/', views.StoreUpdateCreateView.as_view(), name='proposal_create'),
     path('proposals/', views.StoreUpdateListView.as_view(), name='proposal_list'),
+    path('proposals/<int:pk>/edit/', views.StoreUpdateUpdateView.as_view(), name='proposal_edit'),
+    path('proposals/<int:pk>/delete/', views.StoreUpdateDeleteView.as_view(), name='proposal_delete'),
     
     # Site Intelligence Views
     path('site/<int:pk>/', views.LocationDetailView.as_view(), name='location_detail'),
