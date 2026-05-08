@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}FUEL RACK SECTOR | {{ SITE_NAME }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    .rack-card {
+        background-color: rgba(18, 20, 23, 0.9);
+        border: 1px solid var(--navbar-border);
+        border-left: 4px solid #6272a4;
+        transition: transform 0.1s ease, border-color 0.2s ease;
+    }
+    .rack-card.status-GREEN { border-left-color: #50fa7b; }
+    .rack-card.status-YELLOW { border-left-color: #f1fa8c; }
+    .rack-card.status-RED { border-left-color: #ff5555; }
+    
+    .rack-card:hover {
+        border-color: var(--primary-color);
+        background-color: rgba(28, 32, 36, 0.95);
+    }
+    .status-dot {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-right: 5px;
+    }
+    .dot-GREEN { background-color: #50fa7b; box-shadow: 0 0 5px #50fa7b; }
+    .dot-YELLOW { background-color: #f1fa8c; box-shadow: 0 0 5px #f1fa8c; }
+    .dot-RED { background-color: #ff5555; box-shadow: 0 0 5px #ff5555; }
+    .dot-GREY { background-color: #6272a4; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 px-2">
+        <h2 class="mono text-primary m-0">
+            [ FUEL RACK SECTOR ]
+        </h2>
+        <a href="{% url 'homepage' %}" class="btn btn-outline-secondary btn-sm mono">
+            [ EXIT ]
+        </a>
+    </div>
+
+    <div class="row g-3 px-2" id="rack-list-container">
+        {% for item in rack_data %}
+        <div class="col-12 col-md-6 col-lg-4">
+            <div class="rack-card p-3 h-100 d-flex flex-column status-{{ item.status.status_code }}">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <h5 class="m-0 text-white mono fw-bold">{{ item.rack.location.name|upper }}</h5>
+                    <div class="mono smaller">
+                        <span class="status-dot dot-{{ item.status.status_code }}"></span>
+                        <span style="color: {% if item.status.status_code == 'GREY' %}#6272a4{% elif item.status.status_code == 'GREEN' %}#50fa7b{% elif item.status.status_code == 'YELLOW' %}#f1fa8c{% else %}#ff5555{% endif %};">
+                            {{ item.status.label|upper }}
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="mono text-muted-custom small mb-3 flex-grow-1">
+                    {{ item.rack.location.city }}, {{ item.rack.location.state }}
+                    {% if item.status.last_checkin %}
+                    <br>LAST CHECK-IN: {{ item.status.last_checkin|date:"Y-m-d" }}
+                    {% endif %}
+                </div>
+
+                <div class="d-grid">
+                    <button class="btn btn-outline-warning btn-sm mono fw-bold manual-checkin-btn" 
+                            data-rack-id="{{ item.rack.id }}"
+                            data-rack-name="{{ item.rack.location.name }}">
+                        RECORD CHECK-IN
+                    </button>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12 text-center py-5">
+            <div class="mono text-muted-custom">NO RACKS REGISTERED IN SECTOR</div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Scripts for Manual Check-in -->
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.querySelectorAll('.manual-checkin-btn').forEach(btn => {
+    btn.addEventListener('click', async function() {
+        const rackId = this.getAttribute('data-rack-id');
+        const rackName = this.getAttribute('data-rack-name');
+        const originalText = this.innerText;
+        
+        this.disabled = true;
+        this.innerText = "RECORDING...";
+
+        try {
+            // Get current position if possible
+            let lat = null, lon = null, accuracy = null;
+            if (navigator.geolocation) {
+                const pos = await new Promise((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 });
+                }).catch(() => null);
+                if (pos) {
+                    lat = pos.coords.latitude;
+                    lon = pos.coords.longitude;
+                    accuracy = pos.coords.accuracy;
+                }
+            }
+
+            const response = await fetch('/siteintel/api/rack-checkin/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({
+                    rack_id: rackId,
+                    lat: lat,
+                    lon: lon,
+                    accuracy: accuracy
+                })
+            });
+
+            if (response.ok) {
+                this.innerText = "CHECK-IN SUCCESS";
+                this.classList.replace('btn-outline-warning', 'btn-success');
+                setTimeout(() => location.reload(), 2000);
+            } else {
+                throw new Error("Check-in failed");
+            }
+        } catch (error) {
+            console.error("Manual Check-in Error:", error);
+            this.innerText = "ERROR - RETRY";
+            this.disabled = false;
+        }
+    });
+});
+</script>
+{% endblock %}

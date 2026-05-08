@@ -107,34 +107,7 @@
     </div>
 
     <div class="row g-4 px-2">
-        <!-- Left Column: Map -->
-        <div class="col-12 col-lg-5">
-            <div id="intel-map" 
-                 class="mb-3"
-                 data-lat="{{ location.lat }}" 
-                 data-lon="{{ location.lon }}"
-                 data-site-name="{{ location.name }}"
-                 data-overlay="{{ location.tactical_overlay|default:'' }}">
-                <!-- Tactical Mode Toggle -->
-                <div class="map-mode-toggle mono">
-                    <div class="btn-group btn-group-sm p-1" style="background: rgba(18, 20, 23, 0.8); border: 1px solid var(--navbar-border);">
-                        <button type="button" class="btn btn-outline-primary active" id="btn-map-standard" style="font-size: 0.6rem;">STD</button>
-                        <button type="button" class="btn btn-outline-primary" id="btn-map-dark" style="font-size: 0.6rem;">DARK</button>
-                    </div>
-                </div>
-            </div>
-            
-            {% if user.is_authenticated %}
-            <div class="d-grid mb-3">
-                <a href="{% url 'siteintel:map_edit' location.id %}" class="btn btn-outline-primary mono btn-sm">
-                    <span class="d-none d-md-inline">[ EDIT TACTICAL MAP ]</span>
-                    <span class="d-md-none">EDIT TACTICAL MAP</span>
-                </a>
-            </div>
-            {% endif %}
-        </div>
-
-        <!-- Right Column: Configuration & Notes -->
+        <!-- Left Column: Configuration & Notes -->
         <div class="col-12 col-lg-7">
             <!-- Combined Site Configuration -->
             <div class="card bg-dark-custom border-secondary p-3 mb-4">
@@ -265,6 +238,33 @@
                     {% endif %}
                 </div>
             </div>
+        </div>
+
+        <!-- Right Column: Map -->
+        <div class="col-12 col-lg-5">
+            <div id="intel-map" 
+                 class="mb-3"
+                 data-lat="{{ location.lat }}" 
+                 data-lon="{{ location.lon }}"
+                 data-site-name="{{ location.name }}"
+                 data-overlay="{{ location.tactical_overlay|default:'' }}">
+                <!-- Tactical Mode Toggle -->
+                <div class="map-mode-toggle mono">
+                    <div class="btn-group btn-group-sm p-1" style="background: rgba(18, 20, 23, 0.8); border: 1px solid var(--navbar-border);">
+                        <button type="button" class="btn btn-outline-primary active" id="btn-map-standard" style="font-size: 0.6rem;">STD</button>
+                        <button type="button" class="btn btn-outline-primary" id="btn-map-dark" style="font-size: 0.6rem;">DARK</button>
+                    </div>
+                </div>
+            </div>
+            
+            {% if user.is_authenticated %}
+            <div class="d-grid mb-3">
+                <a href="{% url 'siteintel:map_edit' location.id %}" class="btn btn-outline-primary mono btn-sm">
+                    <span class="d-none d-md-inline">[ EDIT TACTICAL MAP ]</span>
+                    <span class="d-md-none">EDIT TACTICAL MAP</span>
+                </a>
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>

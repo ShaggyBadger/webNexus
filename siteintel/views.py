@@ -368,6 +368,40 @@ class StoreUpdateListView(LoginRequiredMixin, ListView):
         """Filters proposals to only show those belonging to the current agent."""
         return StoreUpdate.objects.filter(submitted_by=self.request.user).order_by('-submitted_at')
 
+class FuelRackListView(LoginRequiredMixin, ListView):
+    """
+    OPERATIONAL FLOW:
+    Provides a centralized 'Sector Hub' for all fuel racks.
+    
+    This view fulfills the requirement for manual target selection when 
+    automatic GPS detection is unavailable or undesirable. It calculates 
+    real-time lockout status for the authenticated agent across all racks.
+    """
+    model = FuelRack
+    template_name = 'siteintel/rack_list.html'
+    context_object_name = 'racks'
+
+    def get_context_data(self, **kwargs):
+        """
+        Enriches the rack list with tactical status metadata.
+        """
+        logger.info(f"RACK_SECTOR_ACCESS: Fuel Rack list accessed by Agent {self.request.user}")
+        context = super().get_context_data(**kwargs)
+        
+        # TACTICAL_STATUS_SYNC:
+        # We pre-calculate status for the entire sector to ensure the UI
+        # reflects current lockout windows immediately upon load.
+        rack_data = []
+        for rack in context['racks']:
+            status = rack_ops.get_rack_status(self.request.user, rack)
+            rack_data.append({
+                'rack': rack,
+                'status': status
+            })
+        
+        context['rack_data'] = rack_data
+        return context
+
 class SiteIntelDashboardView(LoginRequiredMixin, ListView):
     """
     OPERATIONAL FLOW:

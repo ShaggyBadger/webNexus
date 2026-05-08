@@ -14,6 +14,7 @@ urlpatterns = [
     path('site/<int:pk>/', views.LocationDetailView.as_view(), name='location_detail'),
     path('site/<int:location_id>/update-intel/', views.SiteIntelligenceUpdateView.as_view(), name='intel_update'),
     path('site/<int:location_id>/edit-map/', views.MapOverlayUpdateView.as_view(), name='map_edit'),
+    path('racks/', views.FuelRackListView.as_view(), name='rack_list'),
     path('selector/', views.SiteSelectorView.as_view(), name='selector'),
     path('init-location/<int:store_id>/', views.initialize_location_for_store, name='init_location'),
 
