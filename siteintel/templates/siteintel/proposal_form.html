@@ -150,33 +150,66 @@
                                 <label class="form-label">Location Type</label>
                                 {{ form.location_type }}
                             </div>
-                            <div class="col-md-4">
-                                <label class="form-label">Store #</label>
-                                {{ form.store_num }}
-                                <small class="text-muted-custom mono mt-1 d-block" style="font-size: 0.6rem;">AUTO-LOOKUP TRIGGERED</small>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">RISO ID</label>
-                                {{ form.riso_num }}
-                            </div>
-                            <div class="col-md-6">
+                            <div class="col-md-8">
                                 <label class="form-label">Site Name</label>
                                 {{ form.store_name }}
                             </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Store Type / Brand</label>
-                                <div class="input-group">
-                                    <select class="form-select mono" id="store-type-selector" style="font-size: 0.8rem;">
-                                        <option value="">-- SELECT_BRAND --</option>
-                                        {% for stype in existing_store_types %}
-                                            <option value="{{ stype }}" {% if form.initial.store_type == stype %}selected{% endif %}>{{ stype }}</option>
-                                        {% endfor %}
-                                        <option value="CUSTOM" {% if form.initial.store_type and form.initial.store_type not in existing_store_types %}selected{% endif %}>[ CUSTOM_ENTRY ]</option>
-                                    </select>
-                                    <input type="text" id="custom-store-type" class="form-control mono {% if not form.initial.store_type or form.initial.store_type in existing_store_types %}d-none{% endif %}" 
-                                           placeholder="Enter brand..." value="{% if form.initial.store_type and form.initial.store_type not in existing_store_types %}{{ form.initial.store_type }}{% endif %}" style="font-size: 0.8rem;">
+                            
+                            <!-- STORE-SPECIFIC IDENTIFICATION -->
+                            <div class="col-12 m-0">
+                                <div id="store-fields-container" class="row g-3">
+                                    <div class="col-md-4">
+                                        <label class="form-label">Store #</label>
+                                        {{ form.store_num }}
+                                        <small class="text-muted-custom mono mt-1 d-block" style="font-size: 0.6rem;">AUTO-LOOKUP TRIGGERED</small>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">RISO ID</label>
+                                        {{ form.riso_num }}
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">Store Type / Brand</label>
+                                        <div class="input-group">
+                                            <select class="form-select mono" id="store-type-selector" style="font-size: 0.8rem;">
+                                                <option value="">-- SELECT_BRAND --</option>
+                                                {% for stype in existing_store_types %}
+                                                    <option value="{{ stype }}" {% if form.initial.store_type == stype %}selected{% endif %}>{{ stype }}</option>
+                                                {% endfor %}
+                                                <option value="CUSTOM" {% if form.initial.store_type and form.initial.store_type not in existing_store_types %}selected{% endif %}>[ CUSTOM_ENTRY ]</option>
+                                            </select>
+                                            <input type="text" id="custom-store-type" class="form-control mono {% if not form.initial.store_type or form.initial.store_type in existing_store_types %}d-none{% endif %}" 
+                                                   placeholder="Enter brand..." value="{% if form.initial.store_type and form.initial.store_type not in existing_store_types %}{{ form.initial.store_type }}{% endif %}" style="font-size: 0.8rem;">
+                                        </div>
+                                        {{ form.store_type }}
+                                    </div>
                                 </div>
-                                {{ form.store_type }}
+                            </div>
+                            
+                            <!-- RACK-SPECIFIC IDENTIFICATION -->
+                            <div id="rack-fields-container" class="col-12 d-none">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Days until Lockout</label>
+                                        {{ form.rack_lockout_days }}
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label">Lane & Arm Configuration</label>
+                                        <div id="lane-configurator-container" class="p-3 border border-secondary" style="background: rgba(255,255,255,0.02);">
+                                            <!-- JS will inject LaneConfigurator here -->
+                                        </div>
+                                        {{ form.rack_config_json }}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- YARD-SPECIFIC IDENTIFICATION -->
+                            <div id="yard-fields-container" class="col-12 d-none">
+                                <div class="row g-3">
+                                    <div class="col-12">
+                                        <label class="form-label">Yard Intelligence / Notes</label>
+                                        {{ form.yard_notes }}
+                                    </div>
+                                </div>
                             </div>
                             
                             <div class="col-12 mt-4">
@@ -244,7 +277,7 @@
                 </div>
 
                 <!-- STAGE 1.5: SITE QUIRKS (HYBRID METADATA) -->
-                <div class="tactical-card">
+                <div id="quirks-section-container" class="tactical-card">
                     <div class="tactical-header">
                         <span>01B_SITE_QUIRKS</span>
                         <span class="status-badge text-primary">HYBRID_METADATA</span>
@@ -282,7 +315,7 @@
                 </div>
 
                 <!-- STAGE 2: TANK CONFIGURATION -->
-                <div class="tactical-card">
+                <div id="tank-mapping-container" class="tactical-card">
                     <div class="tactical-header">
                         <span>02_TANK_MAPPING</span>
                         <span class="status-badge text-tactical-warning">PHYSICAL_INDEXING_REQUIRED</span>
@@ -348,6 +381,12 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<script type="module">
+    import { ProposalManager } from "{% static 'js/siteintel/proposal_manager.js' %}";
+    document.addEventListener('DOMContentLoaded', () => {
+        ProposalManager.init();
+    });
+</script>
 <script>
     document.addEventListener('DOMContentLoaded', () => {
         const formsetContainer = document.getElementById('tank-formset-container');

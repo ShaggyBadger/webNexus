@@ -1,7 +1,8 @@
 from django.contrib import admin
 from .models import (
     LocationType, Location, StoreUpdate, TankUpdate, SiteIntelligence, 
-    MapOverlayUpdate, FuelRack, RackCheckIn, SiteAttributeDefinition
+    MapOverlayUpdate, FuelRack, RackCheckIn, SiteAttributeDefinition,
+    Yard
 )
 
 @admin.register(SiteAttributeDefinition)
@@ -13,6 +14,11 @@ class SiteAttributeDefinitionAdmin(admin.ModelAdmin):
 @admin.register(FuelRack)
 class FuelRackAdmin(admin.ModelAdmin):
     list_display = ('location', 'lockout_days')
+    search_fields = ('location__name',)
+
+@admin.register(Yard)
+class YardAdmin(admin.ModelAdmin):
+    list_display = ('location',)
     search_fields = ('location__name',)
 
 @admin.register(RackCheckIn)
@@ -103,6 +109,10 @@ class StoreUpdateAdmin(admin.ModelAdmin):
         }),
         ('Proposed Site Details', {
             'fields': ('store_name', 'store_type', 'store_num', 'riso_num', 'address', 'city', 'state', 'zip_code', 'lat', 'lon')
+        }),
+        ('Specialized Proposals', {
+            'fields': ('rack_lockout_days', 'rack_config_json', 'yard_notes'),
+            'description': 'Type-specific data for Fuel Racks and Yards'
         }),
         ('Proposed Metadata', {
             'fields': ('proposed_metadata',),

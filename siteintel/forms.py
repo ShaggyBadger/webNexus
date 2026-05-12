@@ -18,7 +18,8 @@ class StoreUpdateForm(forms.ModelForm):
         fields = [
             'location_type', 'store_num', 'riso_num', 'store_name', 'store_type',
             'address', 'city', 'state', 'zip_code', 
-            'lat', 'lon'
+            'lat', 'lon',
+            'rack_lockout_days', 'rack_config_json', 'yard_notes'
         ]
         widgets = {
             'location_type': forms.Select(attrs={'class': 'form-select mono', 'style': 'font-size: 0.8rem;'}),
@@ -32,6 +33,11 @@ class StoreUpdateForm(forms.ModelForm):
             'zip_code': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Zip Code'}),
             'lat': forms.TextInput(attrs={'class': 'form-control mono', 'readonly': 'readonly'}),
             'lon': forms.TextInput(attrs={'class': 'form-control mono', 'readonly': 'readonly'}),
+            
+            # Specialized Widgets
+            'rack_lockout_days': forms.NumberInput(attrs={'class': 'form-control mono', 'placeholder': 'Days to Lockout (e.g. 180)'}),
+            'rack_config_json': forms.HiddenInput(),
+            'yard_notes': forms.Textarea(attrs={'class': 'form-control tactical-input', 'placeholder': 'YARD_SPECIFIC_NOTES...', 'rows': 5}),
         }
 
     def __init__(self, *args, **kwargs):

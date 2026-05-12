@@ -531,7 +531,15 @@ class LocationDetailView(DetailView):
         # Canonical Store Link
         context['store'] = getattr(loc, 'store_canonical', None)
         
-        # Tank Mappings (Digital Twin)
+        # Specialized Linked Data
+        context['fuel_rack'] = getattr(loc, 'fuel_rack', None)
+        context['yard'] = getattr(loc, 'yard', None)
+
+        # Rack Status Sync
+        if context['fuel_rack']:
+            context['rack_status'] = rack_ops.get_rack_status(self.request.user, context['fuel_rack']) if self.request.user.is_authenticated else None
+
+        # Tank Mappings (Digital Twin) - Only for Stores
         if context['store']:
             context['tanks'] = StoreTankMapping.objects.filter(store=context['store']).order_by('tank_index')
         

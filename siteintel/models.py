@@ -162,139 +162,19 @@ class StoreUpdate(models.Model):
     # Hybrid Metadata Proposal
     proposed_metadata = models.JSONField(default=dict, blank=True, help_text="Proposed changes to site quirks")
 
+    # Specialized Data Proposals
+    rack_lockout_days = models.IntegerField(null=True, blank=True, help_text="Proposed lockout period for Fuel Rack")
+    rack_config_json = models.JSONField(default=dict, blank=True, help_text="Proposed Lane/Arm configuration for Fuel Rack")
+    yard_notes = models.TextField(null=True, blank=True, help_text="Proposed yard-specific operational details")
+
     def apply_update(self):
         """
         OPERATIONAL_SYNC:
         Transitions proposed field intelligence into the canonical system of record.
-        Ensures atomicity across Location, Store, and StoreTankMapping models.
-        
-        This method is the critical 'Commit' path for verified field observations.
-        It handles geospatial synchronization, canonical store updates, and the 
-        merging of the new Hybrid Metadata layer.
+        Delegates to siteintel.logic.proposal_processor for specialized handling.
         """
-        if self.status != 'APPROVED':
-            logger.warning(f"SYNC_HALTED: Attempted to apply unapproved StoreUpdate ID {self.id}")
-            raise ValueError("Only approved updates can be applied to canonical data.")
-
-        logger.info(f"SYNC_START: Processing Update ID {self.id} for Store {self.store_num}")
-
-        with transaction.atomic():
-            # 1. SITE_CLASSIFICATION: Determine the operational role of this site.
-            if self.location_type:
-                location_type = self.location_type
-                logger.info(f"SYNC_CLASSIFICATION: Using proposed LocationType '{location_type.name}'")
-            else:
-                loc_type_name = "Gas Station"
-                location_type, created = LocationType.objects.get_or_create(
-                    name=loc_type_name,
-                    defaults={'description': "Retail fuel site or convenience store."}
-                )
-                if created:
-                    logger.info(f"SYNC_CLASSIFICATION: Created fallback LocationType '{loc_type_name}'")
-
-            # 2. GEOSPATIAL_FOUNDATION: Create or update the parent Location record.
-            if not self.location:
-                # BOOTSTRAPPING: Site has no digital twin; create initial Location container.
-                self.location = Location.objects.create(
-                    name=self.store_name or f"Store #{self.store_num}",
-                    location_type=location_type,
-                    address=self.address,
-                    city=self.city,
-                    state=self.state,
-                    zip_code=self.zip_code,
-                    lat=self.lat,
-                    lon=self.lon,
-                    metadata=self.proposed_metadata
-                )
-                logger.info(f"SYNC_GEO: Bootstrapped new Location record ID {self.location.id}")
-            else:
-                # SYNCHRONIZATION: Update existing location with verified field data.
-                self.location.name = self.store_name or self.location.name
-                self.location.location_type = location_type
-                self.location.address = self.address or self.location.address
-                self.location.city = self.city or self.location.city
-                self.location.state = self.state or self.location.state
-                self.location.zip_code = self.zip_code or self.location.zip_code
-                self.location.lat = self.lat or self.location.lat
-                self.location.lon = self.lon or self.location.lon
-                
-                # METADATA_SYNCHRONIZATION: The proposal acts as the new source of truth 
-                # for site quirks. Replacing ensures that removals of stale data 
-                # (e.g., an old gate code) are reflected in the canonical record.
-                if self.proposed_metadata is not None:
-                    self.location.metadata = self.proposed_metadata
-                    logger.info(f"SYNC_METADATA: Synchronized {len(self.proposed_metadata)} attributes for Location ID {self.location.id}")
-                
-                self.location.save()
-                logger.info(f"SYNC_GEO: Updated geospatial foundation for Location ID {self.location.id}")
-
-            # 3. CANONICAL_STORE: Create or update the specialized Store record.
-            if not self.store:
-                # Check for existing store by physical IDs to prevent digital fragmentation
-                existing_store = None
-                if self.store_num:
-                    existing_store = Store.objects.filter(store_num=self.store_num).first()
-                if not existing_store and self.riso_num:
-                    existing_store = Store.objects.filter(riso_num=self.riso_num).first()
-                
-                if existing_store:
-                    self.store = existing_store
-                    logger.info(f"SYNC_STEP: Linked Update {self.id} to existing Store #{self.store.store_num}")
-                else:
-                    self.store = Store.objects.create(
-                        store_num=self.store_num,
-                        riso_num=self.riso_num,
-                        store_name=self.store_name,
-                        store_type=self.store_type,
-                        address=self.address,
-                        city=self.city,
-                        state=self.state,
-                        zip_code=self.zip_code,
-                        lat=self.lat,
-                        lon=self.lon,
-                        location=self.location
-                    )
-                    logger.info(f"SYNC_STEP: Created new Store record for Update {self.id}")
-            else:
-                # Update existing store specialized metadata
-                self.store.store_num = self.store_num or self.store.store_num
-                self.store.riso_num = self.riso_num or self.store.riso_num
-                self.store.store_name = self.store_name or self.store.store_name
-                self.store.store_type = self.store_type or self.store.store_type
-                self.store.address = self.address or self.store.address
-                self.store.city = self.city or self.store.city
-                self.store.state = self.state or self.store.state
-                self.store.zip_code = self.zip_code or self.store.zip_code
-                self.store.lat = self.lat or self.store.lat
-                self.store.lon = self.lon or self.store.lon
-                self.store.location = self.location
-                self.store.save()
-                logger.info(f"SYNC_STEP: Updated Store specialized metadata for #{self.store.store_num}")
-
-            # 4. TANK_SYNCHRONIZATION: Full Mirroring of physical tank hardware.
-            # Instead of a surgical 'update_or_create' (which fails if existing data is dirty/duplicated),
-            # we perform a clean sync. The approved proposal is the new source of truth.
-            tank_updates = self.tank_updates.all()
-            if tank_updates.exists():
-                logger.info(f"SYNC_STEP: Mirroring {tank_updates.count()} tank configurations for Store #{self.store.store_num}")
-                
-                # Clear existing mappings to prevent duplication conflicts (e.g., multiple None indices)
-                deleted_count, _ = StoreTankMapping.objects.filter(store=self.store).delete()
-                if deleted_count:
-                    logger.info(f"SYNC_STEP: Purged {deleted_count} stale/conflicting mappings.")
-
-                for tu in tank_updates:
-                    StoreTankMapping.objects.create(
-                        store=self.store,
-                        tank_index=tu.tank_index,
-                        tank_type=tu.tank_type,
-                        fuel_type=tu.fuel_type.lower()
-                    )
-                    logger.info(f"SYNC_STEP: Synchronized Store #{self.store.store_num} Tank {tu.tank_index}")
-            
-            self.save() # Final linkage persistence
-            logger.info(f"SYNC_COMPLETE: Successfully applied Update {self.id} to Store {self.store.store_num}")
-            logger.info(f"Successfully applied StoreUpdate ID {self.id} to Store {self.store.store_num}")
+        from .logic import proposal_processor
+        proposal_processor.apply_proposal(self)
 
     def save(self, *args, **kwargs):
         """
@@ -361,6 +241,28 @@ class TankUpdate(models.Model):
 
     def __str__(self):
         return f"Tank {self.tank_index}: {self.fuel_type} ({self.reported_capacity} gal)"
+
+class Yard(models.Model):
+    """
+    OPERATIONAL FLOW:
+    Represents a specialized yard or depot facility.
+    Links to a Location for geospatial data.
+    """
+    location = models.OneToOneField(
+        Location,
+        on_delete=models.CASCADE,
+        related_name="yard",
+        help_text="Geospatial parent for this yard"
+    )
+    
+    notes = models.TextField(blank=True, null=True, help_text="Yard-specific operational details")
+
+    class Meta:
+        verbose_name = "Yard"
+        verbose_name_plural = "Yards"
+
+    def __str__(self):
+        return f"Yard: {self.location.name}"
 
 class SiteIntelligence(models.Model):
     """
