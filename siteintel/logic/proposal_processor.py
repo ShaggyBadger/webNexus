@@ -13,7 +13,7 @@ def apply_proposal(proposal):
     
     This function is the critical 'Commit' path for verified field observations.
     """
-    from .models import Location, LocationType, FuelRack, Yard # Local import to avoid circularity
+    from siteintel.models import Location, LocationType, FuelRack, Yard # Local import to avoid circularity
 
     if proposal.status != 'APPROVED':
         logger.warning(f"SYNC_HALTED: Attempted to apply unapproved Update ID {proposal.id}")
@@ -142,7 +142,7 @@ def _sync_store(proposal):
 
 def _sync_fuel_rack(proposal):
     """Internal helper to synchronize Fuel Rack-specific data."""
-    from .models import FuelRack
+    from siteintel.models import FuelRack
     
     rack, created = FuelRack.objects.get_or_create(
         location=proposal.location,
@@ -164,7 +164,7 @@ def _sync_fuel_rack(proposal):
 
 def _sync_yard(proposal):
     """Internal helper to synchronize Yard-specific data."""
-    from .models import Yard
+    from siteintel.models import Yard
     
     yard, created = Yard.objects.get_or_create(
         location=proposal.location,
