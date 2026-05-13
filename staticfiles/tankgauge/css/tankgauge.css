@@ -179,6 +179,12 @@
   margin-bottom: 3rem !important;
 }
 
+@media (max-width: 576px) {
+  .tactical-card {
+    padding: 1rem 0.75rem;
+  }
+}
+
 .tactical-card::before {
   content: "";
   position: absolute;
@@ -301,6 +307,31 @@
   box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.4);
   padding: 1.5rem 1rem;
   margin-bottom: 3rem !important;
+}
+
+@media (max-width: 576px) {
+  .mission-summary {
+    padding: 1rem 0.75rem;
+  }
+  
+  .mission-summary h3 {
+    font-size: 0.9rem !important;
+  }
+
+  .spec-line {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 0.75rem;
+  }
+
+  .specs-label {
+    font-size: 0.7rem;
+    margin-bottom: 0.1rem;
+  }
+
+  .specs-value {
+    font-size: 0.95rem;
+  }
 }
 
 .mission-summary.db-mode {

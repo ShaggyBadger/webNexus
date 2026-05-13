@@ -47,6 +47,7 @@ const TacticalGPS = {
 
       navigator.geolocation.getCurrentPosition(
         async (position) => {
+          console.log("GPS Pulse Success:", position.coords.latitude, position.coords.longitude);
           localStorage.setItem(this.storageKey, "granted");
           try {
             const data = await this.updateUI(position.coords);
@@ -56,11 +57,15 @@ const TacticalGPS = {
           }
         },
         (error) => {
-          console.error("GPS Access Denied:", error);
-          alert("ACCESS DENIED: Field coordinates blocked by user.");
+          console.error("GPS Access Denied/Failed:", error);
+          if (error.code === 3) {
+            alert("TIMEOUT ERROR: GPS signal acquisition took too long. Please ensure you have a clear view of the sky.");
+          } else {
+            alert("ACCESS DENIED: Field coordinates blocked or unavailable.");
+          }
           reject(error);
         },
-        { enableHighAccuracy: true, timeout: 10000 }
+        { enableHighAccuracy: true, timeout: 15000 }
       );
     });
   },
@@ -70,6 +75,7 @@ const TacticalGPS = {
    * If not granted, it will attempt to request permission.
    */
   async pulse() {
+    console.log("TacticalGPS: Triggering fresh pulse...");
     if (localStorage.getItem(this.storageKey) !== "granted") {
       return await this.requestPermission();
     }
@@ -77,6 +83,7 @@ const TacticalGPS = {
     return new Promise((resolve, reject) => {
       navigator.geolocation.getCurrentPosition(
         async (position) => {
+          console.log("GPS Pulse Success (Pulse):", position.coords.latitude, position.coords.longitude);
           try {
             const data = await this.updateUI(position.coords);
             resolve(data);
@@ -90,7 +97,7 @@ const TacticalGPS = {
           if (display) display.innerText = "LOC_REF: SIGNAL_LOST";
           reject(error);
         },
-        { enableHighAccuracy: true, timeout: 10000 },
+        { enableHighAccuracy: true, timeout: 15000 },
       );
     });
   },
@@ -104,6 +111,15 @@ const TacticalGPS = {
     if (refDisplay) {
       refDisplay.innerHTML = `LOC_REF: <span class="text-primary">${lat}°N, ${lon}°W</span>`;
     }
+
+    // Dispatch global event for other modules (like RackManager)
+    document.dispatchEvent(new CustomEvent('webnexus:gps_pulse', { 
+        detail: { 
+            lat: coords.latitude, 
+            lon: coords.longitude,
+            accuracy: coords.accuracy
+        } 
+    }));
 
     try {
       const response = await fetch(
@@ -141,9 +157,4 @@ const TacticalGPS = {
 
 document.addEventListener("DOMContentLoaded", () => {
   TacticalGPS.init();
-  setInterval(() => {
-    if (localStorage.getItem(TacticalGPS.storageKey) === "granted") {
-      TacticalGPS.pulse().catch(() => {});
-    }
-  }, 10000);
 });
