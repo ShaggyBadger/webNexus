@@ -126,8 +126,16 @@ const TacticalGPS = {
         `/tankgauge/api/closest-store/?lat=${coords.latitude}&lon=${coords.longitude}`,
       );
       if (response.ok) {
-        const data = await response.json();
+        const rawData = await response.json();
         
+        // Handle the new list-based response format
+        const data = (rawData.results && rawData.results.length > 0) ? rawData.results[0] : null;
+        
+        if (!data) {
+            console.warn("No proximal targets identified.");
+            return null;
+        }
+
         // PERSISTENCE: Store with timestamp
         const storeIntel = {
             num: data.store_num,
@@ -138,7 +146,8 @@ const TacticalGPS = {
         // 2. Update Intel Overlay (if present)
         const intelDisplay = document.getElementById("loc-intel-display");
         if (intelDisplay) {
-          const distanceStr = data.distance_display || `${data.distance_feet.toLocaleString()} FT`;
+          const distanceVal = data.distance_feet != null ? `${data.distance_feet.toLocaleString()} FT` : "DISTANCE_UNKNOWN";
+          const distanceStr = data.distance_display || distanceVal;
           intelDisplay.style.display = "block";
           intelDisplay.innerHTML = `
                       ZONE: <span class="text-primary">${data.city.toUpperCase()}, ${data.state.toUpperCase()}</span> // 
