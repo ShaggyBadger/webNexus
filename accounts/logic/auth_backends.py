@@ -2,14 +2,16 @@ from django.contrib.auth.backends import ModelBackend
 from django.contrib.auth import get_user_model
 from django.db.models import Q
 
+
 class EmailOrUsernameBackend(ModelBackend):
     """
-    Custom authentication backend that allows users to log in using either 
+    Custom authentication backend that allows users to log in using either
     their email address or their username.
     """
+
     def authenticate(self, request, username=None, password=None, **kwargs):
         UserModel = get_user_model()
-        
+
         # If username is None, check kwargs (sometimes passed this way)
         if username is None:
             username = kwargs.get(UserModel.USERNAME_FIELD)
@@ -24,7 +26,9 @@ class EmailOrUsernameBackend(ModelBackend):
 
         if user.exists():
             user_obj = user.first()
-            if user_obj.check_password(password) and self.user_can_authenticate(user_obj):
+            if user_obj.check_password(password) and self.user_can_authenticate(
+                user_obj
+            ):
                 return user_obj
-        
+
         return None

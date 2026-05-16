@@ -4,7 +4,8 @@ from tankgauge.models import TankChart
 from .utils import haversine
 
 # Tactical Logger
-logger = logging.getLogger('tankgauge')
+logger = logging.getLogger("tankgauge")
+
 
 def perform_tank_calc(tank_type, fuel_type, current_inches, delivery_gallons):
     """
@@ -12,11 +13,13 @@ def perform_tank_calc(tank_type, fuel_type, current_inches, delivery_gallons):
     Executes the core volume estimation for a single tank.
     Translates physical depth into gallons, factors in planned delivery,
     and validates against safety limits (90% capacity).
-    
+
     Returns a dictionary of tactical results.
     """
-    logger.info(f"CALC_START: TankType '{tank_type}' ({fuel_type}) @ {current_inches} in + {delivery_gallons}G delivery")
-    
+    logger.info(
+        f"CALC_START: TankType '{tank_type}' ({fuel_type}) @ {current_inches} in + {delivery_gallons}G delivery"
+    )
+
     initial_gallons = get_volume_from_depth(tank_type, current_inches)
     final_gallons = initial_gallons + delivery_gallons
     final_inches = get_depth_from_volume(tank_type, final_gallons)
@@ -29,9 +32,11 @@ def perform_tank_calc(tank_type, fuel_type, current_inches, delivery_gallons):
 
     # NO_FIT_WARNING: Triggered if the final volume exceeds the 90% safety threshold.
     no_fit_warning = final_gallons > ninety_percent_limit
-    
+
     if no_fit_warning:
-        logger.warning(f"NO_FIT_ALERT: Final volume {int(final_gallons)}G exceeds 90% limit ({int(ninety_percent_limit)}G)")
+        logger.warning(
+            f"NO_FIT_ALERT: Final volume {int(final_gallons)}G exceeds 90% limit ({int(ninety_percent_limit)}G)"
+        )
 
     result = {
         "fuel_type": fuel_type,
@@ -43,8 +48,10 @@ def perform_tank_calc(tank_type, fuel_type, current_inches, delivery_gallons):
         "final_inches": final_inches,
         "no_fit_warning": no_fit_warning,
     }
-    
-    logger.info(f"CALC_COMPLETE: Initial {int(initial_gallons)}G -> Final {int(final_gallons)}G")
+
+    logger.info(
+        f"CALC_COMPLETE: Initial {int(initial_gallons)}G -> Final {int(final_gallons)}G"
+    )
     return result
 
 
@@ -52,7 +59,7 @@ def get_volume_from_depth(tank_type, depth):
     """
     TACTICAL INTEL:
     Converts physical depth (inches) to volume (gallons) using chart interpolation.
-    
+
     ALGORITHM:
     1. Exact Match: If the depth is an integer, fetch the exact chart entry.
     2. Linear Interpolation: For fractional depths, interpolate between bounding entries.
@@ -103,7 +110,7 @@ def get_depth_from_volume(tank_type, target_gallons):
     TACTICAL INTEL:
     Reverse calculation: Converts volume (gallons) to physical depth (inches).
     Used to estimate the 'Final Stick' reading after a delivery.
-    
+
     ALGORITHM:
     1. Bracketing: Finds chart entries immediately above and below the target volume.
     2. Linear Interpolation: Calculates precise floating-point depth.

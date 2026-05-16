@@ -6,13 +6,17 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('siteintel', '0004_storeupdate_store_type'),
+        ("siteintel", "0004_storeupdate_store_type"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='tankupdate',
-            name='tank_index',
-            field=models.IntegerField(blank=True, help_text='The physical tank number from the ATG printout (1, 2, 3...).', null=True),
+            model_name="tankupdate",
+            name="tank_index",
+            field=models.IntegerField(
+                blank=True,
+                help_text="The physical tank number from the ATG printout (1, 2, 3...).",
+                null=True,
+            ),
         ),
     ]

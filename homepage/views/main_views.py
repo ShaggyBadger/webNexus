@@ -2,7 +2,8 @@ import logging
 from django.shortcuts import render
 
 # Tactical Logger
-logger = logging.getLogger('django')
+logger = logging.getLogger("django")
+
 
 def index(request):
     """

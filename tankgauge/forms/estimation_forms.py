@@ -1,11 +1,13 @@
 from django import forms
 
+
 class DeliveryEstimationForm(forms.Form):
     """
     OPERATIONAL FLOW:
     Mission initialization form.
     Captures the target site identifier and the products slated for delivery.
     """
+
     FUEL_CHOICES = [
         ("regular", "Regular"),
         ("plus", "Plus"),
@@ -37,6 +39,7 @@ class TankDataForm(forms.Form):
     Real-time data entry for a specific physical tank.
     Captures stick readings and planned delivery amounts.
     """
+
     delivery_gallons = forms.FloatField(
         label="Delivery Gallons",
         widget=forms.NumberInput(

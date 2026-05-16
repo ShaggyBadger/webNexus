@@ -2,45 +2,95 @@ from django.contrib import admin
 from django.utils import timezone
 from ..models import StoreUpdate, TankUpdate, MapOverlayUpdate
 
+
 class TankUpdateInline(admin.TabularInline):
     model = TankUpdate
     extra = 0
-    fields = ('tank_index', 'fuel_type', 'reported_capacity', 'tank_type', 'is_unverified')
+    fields = (
+        "tank_index",
+        "fuel_type",
+        "reported_capacity",
+        "tank_type",
+        "is_unverified",
+    )
+
 
 @admin.register(StoreUpdate)
 class StoreUpdateAdmin(admin.ModelAdmin):
     """
     OPERATIONAL FLOW:
     Provides the administrative interface for reviewing and approving
-    field-submitted site intelligence. 
+    field-submitted site intelligence.
     """
-    list_display = ('store_name', 'store_type', 'status', 'submitted_by', 'submitted_at', 'approved_by')
-    list_filter = ('status', 'submitted_at', 'state', 'store_type')
-    search_fields = ('store_name', 'store_num', 'riso_num', 'submitted_by__username', 'store_type')
-    inlines = [TankUpdateInline]
-    
-    fieldsets = (
-        ('Proposal Status', {
-            'fields': ('status', 'location_type', 'submitted_by', 'submitted_at', 'approved_by', 'approved_at')
-        }),
-        ('Canonical Links', {
-            'fields': ('location', 'store')
-        }),
-        ('Proposed Site Details', {
-            'fields': ('store_name', 'store_type', 'store_num', 'riso_num', 'address', 'city', 'state', 'zip_code', 'lat', 'lon')
-        }),
-        ('Specialized Proposals', {
-            'fields': ('rack_lockout_days', 'rack_config_json', 'yard_notes'),
-            'description': 'Type-specific data for Fuel Racks and Yards'
-        }),
-        ('Proposed Metadata', {
-            'fields': ('proposed_metadata',),
-            'description': 'Site quirks and manifold data (JSON)'
-        }),
+
+    list_display = (
+        "store_name",
+        "store_type",
+        "status",
+        "submitted_by",
+        "submitted_at",
+        "approved_by",
     )
-    
-    readonly_fields = ('submitted_at', 'approved_at')
-    actions = ['approve_and_apply']
+    list_filter = ("status", "submitted_at", "state", "store_type")
+    search_fields = (
+        "store_name",
+        "store_num",
+        "riso_num",
+        "submitted_by__username",
+        "store_type",
+    )
+    inlines = [TankUpdateInline]
+
+    fieldsets = (
+        (
+            "Proposal Status",
+            {
+                "fields": (
+                    "status",
+                    "location_type",
+                    "submitted_by",
+                    "submitted_at",
+                    "approved_by",
+                    "approved_at",
+                )
+            },
+        ),
+        ("Canonical Links", {"fields": ("location", "store")}),
+        (
+            "Proposed Site Details",
+            {
+                "fields": (
+                    "store_name",
+                    "store_type",
+                    "store_num",
+                    "riso_num",
+                    "address",
+                    "city",
+                    "state",
+                    "zip_code",
+                    "lat",
+                    "lon",
+                )
+            },
+        ),
+        (
+            "Specialized Proposals",
+            {
+                "fields": ("rack_lockout_days", "rack_config_json", "yard_notes"),
+                "description": "Type-specific data for Fuel Racks and Yards",
+            },
+        ),
+        (
+            "Proposed Metadata",
+            {
+                "fields": ("proposed_metadata",),
+                "description": "Site quirks and manifold data (JSON)",
+            },
+        ),
+    )
+
+    readonly_fields = ("submitted_at", "approved_at")
+    actions = ["approve_and_apply"]
 
     def approve_and_apply(self, request, queryset):
         """
@@ -49,20 +99,29 @@ class StoreUpdateAdmin(admin.ModelAdmin):
         """
         success_count = 0
         for obj in queryset:
-            if obj.status == 'PENDING':
-                obj.status = 'APPROVED'
+            if obj.status == "PENDING":
+                obj.status = "APPROVED"
                 obj.approved_by = request.user
                 obj.approved_at = timezone.now()
                 try:
                     obj.apply_update()
                     success_count += 1
                 except Exception as e:
-                    self.message_user(request, f"Error applying update {obj.id}: {str(e)}", level='ERROR')
-        
-        if success_count:
-            self.message_user(request, f"Successfully approved and applied {success_count} site intelligence updates.")
+                    self.message_user(
+                        request,
+                        f"Error applying update {obj.id}: {str(e)}",
+                        level="ERROR",
+                    )
 
-    approve_and_apply.short_description = "[ APPROVE & APPLY ] Selected Site Intelligence"
+        if success_count:
+            self.message_user(
+                request,
+                f"Successfully approved and applied {success_count} site intelligence updates.",
+            )
+
+    approve_and_apply.short_description = (
+        "[ APPROVE & APPLY ] Selected Site Intelligence"
+    )
 
     def save_model(self, request, obj, form, change):
         """
@@ -70,13 +129,13 @@ class StoreUpdateAdmin(admin.ModelAdmin):
         Also triggers apply_update() if status is changing to APPROVED.
         """
         is_becoming_approved = False
-        if obj.status == 'APPROVED':
-            if not change: # New record created as APPROVED
+        if obj.status == "APPROVED":
+            if not change:  # New record created as APPROVED
                 is_becoming_approved = True
             else:
                 # Use a fresh fetch to see what's currently in the DB
                 old_status = StoreUpdate.objects.get(pk=obj.pk).status
-                if old_status != 'APPROVED':
+                if old_status != "APPROVED":
                     is_becoming_approved = True
 
         if is_becoming_approved:
@@ -84,32 +143,34 @@ class StoreUpdateAdmin(admin.ModelAdmin):
                 obj.approved_by = request.user
             if not obj.approved_at:
                 obj.approved_at = timezone.now()
-            
+
             # Canonical synchronization
             try:
-                # We save before applying to ensure the status is 'APPROVED' 
+                # We save before applying to ensure the status is 'APPROVED'
                 # inside apply_update's check.
                 super().save_model(request, obj, form, change)
                 obj.apply_update()
-                return # Skip the final super().save_model below
+                return  # Skip the final super().save_model below
             except Exception as e:
                 from django.contrib import messages
+
                 messages.error(request, f"SYNC_ERROR: {str(e)}")
-        
+
         super().save_model(request, obj, form, change)
+
 
 @admin.register(MapOverlayUpdate)
 class MapOverlayUpdateAdmin(admin.ModelAdmin):
-    list_display = ('location', 'status', 'submitted_by', 'submitted_at', 'approved_by')
-    list_filter = ('status', 'submitted_at')
-    search_fields = ('location__name', 'submitted_by__username')
-    actions = ['approve_and_apply']
+    list_display = ("location", "status", "submitted_by", "submitted_at", "approved_by")
+    list_filter = ("status", "submitted_at")
+    search_fields = ("location__name", "submitted_by__username")
+    actions = ["approve_and_apply"]
 
     def approve_and_apply(self, request, queryset):
         success_count = 0
         for obj in queryset:
-            if obj.status == 'PENDING':
-                obj.status = 'APPROVED'
+            if obj.status == "PENDING":
+                obj.status = "APPROVED"
                 obj.approved_by = request.user
                 obj.approved_at = timezone.now()
                 try:
@@ -117,9 +178,16 @@ class MapOverlayUpdateAdmin(admin.ModelAdmin):
                     obj.save()
                     success_count += 1
                 except Exception as e:
-                    self.message_user(request, f"Error applying overlay {obj.id}: {str(e)}", level='ERROR')
-        
+                    self.message_user(
+                        request,
+                        f"Error applying overlay {obj.id}: {str(e)}",
+                        level="ERROR",
+                    )
+
         if success_count:
-            self.message_user(request, f"Successfully approved and applied {success_count} tactical map overlays.")
+            self.message_user(
+                request,
+                f"Successfully approved and applied {success_count} tactical map overlays.",
+            )
 
     approve_and_apply.short_description = "[ APPROVE & APPLY ] Selected Map Overlays"

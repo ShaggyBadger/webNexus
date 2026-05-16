@@ -12,6 +12,7 @@ def split(value, key):
     """
     return value.split(key)
 
+
 @register.filter(name="markdown")
 def markdown_filter(value):
     """
@@ -20,8 +21,9 @@ def markdown_filter(value):
     if not value:
         return ""
     # Render markdown with common extensions
-    html = markdown.markdown(value, extensions=['extra', 'sane_lists', 'nl2br'])
+    html = markdown.markdown(value, extensions=["extra", "sane_lists", "nl2br"])
     return mark_safe(html)
+
 
 @register.filter(name="replace_underscore")
 def replace_underscore(value):
@@ -30,4 +32,4 @@ def replace_underscore(value):
     """
     if not isinstance(value, str):
         return value
-    return value.replace('_', ' ')
+    return value.replace("_", " ")

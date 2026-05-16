@@ -1,11 +1,13 @@
 from django.db import models
 
+
 class TankType(models.Model):
     """
     OPERATIONAL FLOW:
     Defines a specific hardware model of fuel tank (e.g., Highland 10k, Xerxes 12k).
     Contains structural dimensions and link to calibration charts.
     """
+
     name = models.CharField(max_length=255, null=True, blank=True)
     manufacturer = models.CharField(max_length=255, null=True, blank=True)
     model = models.CharField(max_length=255, null=True, blank=True)
@@ -25,6 +27,7 @@ class TankChart(models.Model):
     High-precision calibration data (The 'Stick Chart').
     Maps physical depth (inches) to volume (gallons) for a specific TankType.
     """
+
     tank_type = models.ForeignKey(
         TankType, on_delete=models.CASCADE, related_name="charts"
     )

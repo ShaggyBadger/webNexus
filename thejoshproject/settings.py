@@ -54,8 +54,8 @@ MIDDLEWARE = [
 ]
 
 AUTHENTICATION_BACKENDS = [
-    'accounts.logic.auth_backends.EmailOrUsernameBackend',
-    'django.contrib.auth.backends.ModelBackend',
+    "accounts.logic.auth_backends.EmailOrUsernameBackend",
+    "django.contrib.auth.backends.ModelBackend",
 ]
 
 ROOT_URLCONF = "thejoshproject.urls"
@@ -218,18 +218,18 @@ if not DEBUG:
     # 1. Force HTTPS redirect: Redirects all plain HTTP requests to HTTPS.
     # Critical for ensuring no data is ever sent in the clear.
     SECURE_SSL_REDIRECT = True
-    
-    # 2. Cookie Protections: Ensures sensitive session and CSRF cookies are 
+
+    # 2. Cookie Protections: Ensures sensitive session and CSRF cookies are
     # marked as 'Secure', meaning the browser will ONLY send them over HTTPS.
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
-    
+
     # 3. HTTP Strict Transport Security (HSTS): Tells the browser to remember
     # to ONLY access this site via HTTPS for the next year (31536000 seconds).
     SECURE_HSTS_SECONDS = 31536000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
-    
+
     # 4. Proxy Configuration: Trusts the 'X-Forwarded-Proto' header from Nginx.
     # This is essential when running behind a reverse proxy that handles SSL termination.
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")

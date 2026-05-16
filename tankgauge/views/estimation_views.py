@@ -5,7 +5,8 @@ from ..models import TankChart
 from ..logic.tank_lookup import get_store_and_preset_status, get_all_tank_mappings
 
 # Initialize logger for this module
-logger = logging.getLogger('tankgauge')
+logger = logging.getLogger("tankgauge")
+
 
 def delivery_form(request):
     """
@@ -34,7 +35,10 @@ def delivery_submit(request):
                 # SITE_ACQUISITION: Attempt to resolve the store identifier
                 store, is_preset = get_store_and_preset_status(store_number_input)
             except Exception as e:
-                logger.error(f"DATABASE_CONNECTION_ERROR: Failed to resolve store {store_number_input}", exc_info=True)
+                logger.error(
+                    f"DATABASE_CONNECTION_ERROR: Failed to resolve store {store_number_input}",
+                    exc_info=True,
+                )
                 return render(
                     request,
                     "tankgauge/delivery_form.html",
@@ -45,7 +49,9 @@ def delivery_submit(request):
                 )
 
             if not store:
-                logger.warning(f"STORE_NOT_FOUND: Store ID #{store_number_input} not in database.")
+                logger.warning(
+                    f"STORE_NOT_FOUND: Store ID #{store_number_input} not in database."
+                )
                 return render(
                     request,
                     "tankgauge/delivery_form.html",
@@ -55,12 +61,14 @@ def delivery_submit(request):
                     },
                 )
 
-            logger.info(f"FETCHING_DATA: Store #{store.store_num} accessed. Preset={is_preset}, Fuels={selected_fuels}")
+            logger.info(
+                f"FETCHING_DATA: Store #{store.store_num} accessed. Preset={is_preset}, Fuels={selected_fuels}"
+            )
             tanks_found = []
             for fuel in selected_fuels:
                 try:
                     mappings = get_all_tank_mappings(store, fuel)
-                    
+
                     if mappings:
                         num_mappings = len(mappings)
                         for idx, mapping in enumerate(mappings):
@@ -72,7 +80,9 @@ def delivery_submit(request):
                                 tanks_found.append(
                                     {
                                         "fuel_type": fuel.upper(),
-                                        "tank_index": idx + 1 if num_mappings > 1 else None,
+                                        "tank_index": (
+                                            idx + 1 if num_mappings > 1 else None
+                                        ),
                                         "tank_model": mapping.tank_type.name,
                                         "capacity": capacity,
                                         "max_depth": mapping.tank_type.max_depth,
@@ -82,16 +92,22 @@ def delivery_submit(request):
                                             prefix=f"tank_{mapping.id if not is_preset else fuel}",
                                         ),
                                         "is_preset": is_preset,
-                                        "mapping_id": mapping.id if not is_preset else None,
+                                        "mapping_id": (
+                                            mapping.id if not is_preset else None
+                                        ),
                                         "has_chart": has_chart,
-                                        "error": None if has_chart else "MISSING_CHART_DATA",
+                                        "error": (
+                                            None if has_chart else "MISSING_CHART_DATA"
+                                        ),
                                     }
                                 )
                             else:
                                 tanks_found.append(
                                     {
                                         "fuel_type": fuel.upper(),
-                                        "tank_index": idx + 1 if num_mappings > 1 else None,
+                                        "tank_index": (
+                                            idx + 1 if num_mappings > 1 else None
+                                        ),
                                         "is_missing": True,
                                         "error": "TANK_TYPE_NOT_DEFINED",
                                     }
@@ -109,12 +125,22 @@ def delivery_submit(request):
                             }
                         )
                 except Exception as e:
-                    logger.error("TANK_MAPPING_ERROR", extra={"store_id": store_number_input, "fuel": fuel, "error": str(e)}, exc_info=True)
-                    tanks_found.append({
-                        "fuel_type": fuel.upper(),
-                        "is_missing": True,
-                        "error": "SYSTEM_FETCH_ERROR"
-                    })
+                    logger.error(
+                        "TANK_MAPPING_ERROR",
+                        extra={
+                            "store_id": store_number_input,
+                            "fuel": fuel,
+                            "error": str(e),
+                        },
+                        exc_info=True,
+                    )
+                    tanks_found.append(
+                        {
+                            "fuel_type": fuel.upper(),
+                            "is_missing": True,
+                            "error": "SYSTEM_FETCH_ERROR",
+                        }
+                    )
 
             if is_preset:
                 context = {

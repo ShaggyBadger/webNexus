@@ -4,7 +4,8 @@ from django.http import JsonResponse
 from django.db import connection
 
 # Tactical Logger
-logger = logging.getLogger('django.server')
+logger = logging.getLogger("django.server")
+
 
 def health_check(request):
     """
@@ -20,7 +21,7 @@ def health_check(request):
         with connection.cursor() as cursor:
             cursor.execute("SELECT 1")
         latency = (time.time() - start_time) * 1000
-        
+
         status["db_status"] = "DB_READY"
         status["latency_ms"] = f"{latency:.2f}"
         logger.debug(f"HEALTH_CHECK: System operational. DB Latency: {latency:.2f}ms")

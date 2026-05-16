@@ -3,6 +3,7 @@ import re
 import json
 from ..models import SiteAttributeDefinition, StoreUpdate, TankUpdate
 
+
 class StoreUpdateForm(forms.ModelForm):
     """
     OPERATIONAL FLOW:
@@ -10,62 +11,107 @@ class StoreUpdateForm(forms.ModelForm):
     Includes tactical sanitization to prevent XSS and injection.
     Dynamically injects fields for SiteAttributeDefinition records.
     """
+
     # Hidden field to store custom attributes added via JS on the frontend
     custom_metadata_json = forms.CharField(widget=forms.HiddenInput(), required=False)
 
     class Meta:
         model = StoreUpdate
         fields = [
-            'location_type', 'store_num', 'riso_num', 'store_name', 'store_type',
-            'address', 'city', 'state', 'zip_code', 
-            'lat', 'lon',
-            'rack_lockout_days', 'rack_config_json', 'yard_notes'
+            "location_type",
+            "store_num",
+            "riso_num",
+            "store_name",
+            "store_type",
+            "address",
+            "city",
+            "state",
+            "zip_code",
+            "lat",
+            "lon",
+            "rack_lockout_days",
+            "rack_config_json",
+            "yard_notes",
         ]
         widgets = {
-            'location_type': forms.Select(attrs={'class': 'form-select mono', 'style': 'font-size: 0.8rem;'}),
-            'store_num': forms.TextInput(attrs={'class': 'form-control mono', 'placeholder': 'Physical Store #'}),
-            'riso_num': forms.TextInput(attrs={'class': 'form-control mono', 'placeholder': 'RISO ID'}),
-            'store_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Site Name'}),
-            'store_type': forms.HiddenInput(), # Handled by custom UI logic
-            'address': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Street Address'}),
-            'city': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'City'}),
-            'state': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'State'}),
-            'zip_code': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Zip Code'}),
-            'lat': forms.TextInput(attrs={'class': 'form-control mono', 'readonly': 'readonly'}),
-            'lon': forms.TextInput(attrs={'class': 'form-control mono', 'readonly': 'readonly'}),
-            
+            "location_type": forms.Select(
+                attrs={"class": "form-select mono", "style": "font-size: 0.8rem;"}
+            ),
+            "store_num": forms.TextInput(
+                attrs={"class": "form-control mono", "placeholder": "Physical Store #"}
+            ),
+            "riso_num": forms.TextInput(
+                attrs={"class": "form-control mono", "placeholder": "RISO ID"}
+            ),
+            "store_name": forms.TextInput(
+                attrs={"class": "form-control", "placeholder": "Site Name"}
+            ),
+            "store_type": forms.HiddenInput(),  # Handled by custom UI logic
+            "address": forms.TextInput(
+                attrs={"class": "form-control", "placeholder": "Street Address"}
+            ),
+            "city": forms.TextInput(
+                attrs={"class": "form-control", "placeholder": "City"}
+            ),
+            "state": forms.TextInput(
+                attrs={"class": "form-control", "placeholder": "State"}
+            ),
+            "zip_code": forms.TextInput(
+                attrs={"class": "form-control", "placeholder": "Zip Code"}
+            ),
+            "lat": forms.TextInput(
+                attrs={"class": "form-control mono", "readonly": "readonly"}
+            ),
+            "lon": forms.TextInput(
+                attrs={"class": "form-control mono", "readonly": "readonly"}
+            ),
             # Specialized Widgets
-            'rack_lockout_days': forms.NumberInput(attrs={'class': 'form-control mono', 'placeholder': 'Days to Lockout (e.g. 180)'}),
-            'rack_config_json': forms.HiddenInput(),
-            'yard_notes': forms.Textarea(attrs={'class': 'form-control tactical-input', 'placeholder': 'YARD_SPECIFIC_NOTES...', 'rows': 5}),
+            "rack_lockout_days": forms.NumberInput(
+                attrs={
+                    "class": "form-control mono",
+                    "placeholder": "Days to Lockout (e.g. 180)",
+                }
+            ),
+            "rack_config_json": forms.HiddenInput(),
+            "yard_notes": forms.Textarea(
+                attrs={
+                    "class": "form-control tactical-input",
+                    "placeholder": "YARD_SPECIFIC_NOTES...",
+                    "rows": 5,
+                }
+            ),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        
+
         # DYNAMIC_INJECTION: Add fields for all defined global attributes
         definitions = SiteAttributeDefinition.objects.all()
-        
-        # If we have an instance (e.g. updating an existing proposal), 
+
+        # If we have an instance (e.g. updating an existing proposal),
         # load current values from proposed_metadata.
         # If we are targeting an existing store/location, load from canonical metadata.
         current_metadata = {}
         if self.instance.pk:
             current_metadata = self.instance.proposed_metadata or {}
-        elif 'initial' in kwargs:
-            location_id = kwargs['initial'].get('location_id') or kwargs['initial'].get('location')
-            store_num = kwargs['initial'].get('store_num')
-            
+        elif "initial" in kwargs:
+            location_id = kwargs["initial"].get("location_id") or kwargs["initial"].get(
+                "location"
+            )
+            store_num = kwargs["initial"].get("store_num")
+
             from ..models import Location
+
             location = None
             if location_id:
                 location = Location.objects.filter(id=location_id).first()
             elif store_num:
                 from tankgauge.models import Store
+
                 store = Store.objects.filter(store_num=store_num).first()
                 if store:
                     location = store.location
-            
+
             if location:
                 current_metadata = location.metadata or {}
 
@@ -73,44 +119,50 @@ class StoreUpdateForm(forms.ModelForm):
             field_name = f"attr_{definition.field_key}"
             label = definition.label
             required = definition.is_required
-            initial_val = current_metadata.get(definition.field_key, '')
+            initial_val = current_metadata.get(definition.field_key, "")
 
-            if definition.field_type == 'boolean':
+            if definition.field_type == "boolean":
                 self.fields[field_name] = forms.ChoiceField(
-                    choices=[('', 'Unknown'), ('Yes', 'Yes'), ('No', 'No')],
+                    choices=[("", "Unknown"), ("Yes", "Yes"), ("No", "No")],
                     required=required,
                     label=label,
                     initial=initial_val,
-                    widget=forms.Select(attrs={'class': 'form-select mono'})
+                    widget=forms.Select(attrs={"class": "form-select mono"}),
                 )
-            elif definition.field_type == 'number':
+            elif definition.field_type == "number":
                 self.fields[field_name] = forms.DecimalField(
                     required=required,
                     label=label,
                     initial=initial_val,
-                    widget=forms.NumberInput(attrs={'class': 'form-control mono'})
+                    widget=forms.NumberInput(attrs={"class": "form-control mono"}),
                 )
-            else: # Text
+            else:  # Text
                 self.fields[field_name] = forms.CharField(
                     required=required,
                     label=label,
                     initial=initial_val,
-                    widget=forms.TextInput(attrs={'class': 'form-control mono'})
+                    widget=forms.TextInput(attrs={"class": "form-control mono"}),
                 )
-        
+
         # Load any non-global attributes into custom_metadata_json for the JS layer
-        custom_data = {k: v for k, v in current_metadata.items() if not definitions.filter(field_key=k).exists()}
-        self.fields['custom_metadata_json'].initial = json.dumps(custom_data)
+        custom_data = {
+            k: v
+            for k, v in current_metadata.items()
+            if not definitions.filter(field_key=k).exists()
+        }
+        self.fields["custom_metadata_json"].initial = json.dumps(custom_data)
 
     def clean_store_num(self):
         """
         Ensure store number is strictly numeric and clean of any artifacts.
         """
-        val = self.cleaned_data.get('store_num')
+        val = self.cleaned_data.get("store_num")
         if val is not None:
             # Check if it contains anything other than digits
-            if not re.match(r'^\d+$', str(val)):
-                raise forms.ValidationError("STORE_ID_ERROR: MUST BE NUMERIC DIGITS ONLY")
+            if not re.match(r"^\d+$", str(val)):
+                raise forms.ValidationError(
+                    "STORE_ID_ERROR: MUST BE NUMERIC DIGITS ONLY"
+                )
         return val
 
     def clean(self):
@@ -120,19 +172,19 @@ class StoreUpdateForm(forms.ModelForm):
         Also aggregates dynamic fields and custom JSON into proposed_metadata.
         """
         cleaned_data = super().clean()
-        
+
         # 1. HTML Sanitization
         for field in list(cleaned_data.keys()):
             value = cleaned_data.get(field)
             if isinstance(value, str):
                 # Strip HTML tags using regex for a zero-dependency tactical fix
                 # This ensures any <b> or <script> tags are removed before saving.
-                clean_value = re.sub(r'<[^>]*>', '', value)
+                clean_value = re.sub(r"<[^>]*>", "", value)
                 cleaned_data[field] = clean_value.strip()
 
         # 2. Metadata Aggregation
         proposed_metadata = {}
-        
+
         # Add values from dynamic global attribute fields
         definitions = SiteAttributeDefinition.objects.all()
         for definition in definitions:
@@ -144,17 +196,18 @@ class StoreUpdateForm(forms.ModelForm):
                     proposed_metadata[definition.field_key] = val
 
         # Add values from custom metadata JSON field
-        custom_json = cleaned_data.get('custom_metadata_json')
+        custom_json = cleaned_data.get("custom_metadata_json")
         if custom_json:
             try:
                 custom_data = json.loads(custom_json)
                 if isinstance(custom_data, dict):
                     proposed_metadata.update(custom_data)
             except json.JSONDecodeError:
-                pass # Silent fail for malformed custom JSON
+                pass  # Silent fail for malformed custom JSON
 
         self.instance.proposed_metadata = proposed_metadata
         return cleaned_data
+
 
 class TankUpdateForm(forms.ModelForm):
     """
@@ -162,33 +215,38 @@ class TankUpdateForm(forms.ModelForm):
     Captures a single tank configuration proposal.
     Integrates with the AJAX 'Tank Picker' on the frontend.
     """
+
     tank_index = forms.IntegerField(
         required=False,
-        widget=forms.NumberInput(attrs={'class': 'form-control mono', 'min': 1, 'placeholder': 'ATG Index'})
+        widget=forms.NumberInput(
+            attrs={"class": "form-control mono", "min": 1, "placeholder": "ATG Index"}
+        ),
     )
 
     class Meta:
         model = TankUpdate
         fields = [
-            'tank_index', 'fuel_type', 'reported_capacity', 
-            'tank_type', 'is_unverified'
+            "tank_index",
+            "fuel_type",
+            "reported_capacity",
+            "tank_type",
+            "is_unverified",
         ]
         widgets = {
-            'fuel_type': forms.Select(attrs={'class': 'form-select'}),
-            'reported_capacity': forms.NumberInput(attrs={'class': 'form-control mono', 'placeholder': 'Gallons'}),
-            'tank_type': forms.HiddenInput(),
-            'is_unverified': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            "fuel_type": forms.Select(attrs={"class": "form-select"}),
+            "reported_capacity": forms.NumberInput(
+                attrs={"class": "form-control mono", "placeholder": "Gallons"}
+            ),
+            "tank_type": forms.HiddenInput(),
+            "is_unverified": forms.CheckboxInput(attrs={"class": "form-check-input"}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['reported_capacity'].required = False
+        self.fields["reported_capacity"].required = False
+
 
 # Formset for handling multiple tanks per store update
 TankUpdateFormSet = forms.inlineformset_factory(
-    StoreUpdate, 
-    TankUpdate, 
-    form=TankUpdateForm, 
-    extra=1, 
-    can_delete=True
+    StoreUpdate, TankUpdate, form=TankUpdateForm, extra=1, can_delete=True
 )
