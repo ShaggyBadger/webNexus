@@ -108,6 +108,7 @@ env.bak/
 venv.bak/
 venvFiles/ 
 vevFiles/
+vevFiles_backup/
 
 # Static files (output of collectstatic)
 staticfiles/
