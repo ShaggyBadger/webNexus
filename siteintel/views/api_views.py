@@ -309,6 +309,7 @@ def site_lookup_api(request):
     if not q or not q.isdigit():
         return JsonResponse({"results": []})
 
+    # Log the search attempt with user context for tactical auditing
     user_str = request.user.username if request.user.is_authenticated else "ANONYMOUS"
     logger.info(f"TARGET_SCAN: Searching for site ID '{q}' by user {user_str}")
 
