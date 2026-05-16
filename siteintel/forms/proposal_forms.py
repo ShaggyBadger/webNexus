@@ -1,7 +1,7 @@
 from django import forms
 import re
-from .models import StoreUpdate, TankUpdate, SiteIntelligence
-from tankgauge.models import TankType
+import json
+from ..models import SiteAttributeDefinition, StoreUpdate, TankUpdate
 
 class StoreUpdateForm(forms.ModelForm):
     """
@@ -44,20 +44,30 @@ class StoreUpdateForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         
         # DYNAMIC_INJECTION: Add fields for all defined global attributes
-        from .models import SiteAttributeDefinition
         definitions = SiteAttributeDefinition.objects.all()
         
         # If we have an instance (e.g. updating an existing proposal), 
         # load current values from proposed_metadata.
-        # If we are targeting an existing store, load from its Location.metadata.
+        # If we are targeting an existing store/location, load from canonical metadata.
         current_metadata = {}
         if self.instance.pk:
             current_metadata = self.instance.proposed_metadata or {}
-        elif 'initial' in kwargs and 'store_num' in kwargs['initial']:
-            from tankgauge.models import Store
-            store = Store.objects.filter(store_num=kwargs['initial']['store_num']).first()
-            if store and store.location:
-                current_metadata = store.location.metadata or {}
+        elif 'initial' in kwargs:
+            location_id = kwargs['initial'].get('location_id') or kwargs['initial'].get('location')
+            store_num = kwargs['initial'].get('store_num')
+            
+            from ..models import Location
+            location = None
+            if location_id:
+                location = Location.objects.filter(id=location_id).first()
+            elif store_num:
+                from tankgauge.models import Store
+                store = Store.objects.filter(store_num=store_num).first()
+                if store:
+                    location = store.location
+            
+            if location:
+                current_metadata = location.metadata or {}
 
         for definition in definitions:
             field_name = f"attr_{definition.field_key}"
@@ -90,7 +100,6 @@ class StoreUpdateForm(forms.ModelForm):
         
         # Load any non-global attributes into custom_metadata_json for the JS layer
         custom_data = {k: v for k, v in current_metadata.items() if not definitions.filter(field_key=k).exists()}
-        import json
         self.fields['custom_metadata_json'].initial = json.dumps(custom_data)
 
     def clean_store_num(self):
@@ -125,7 +134,6 @@ class StoreUpdateForm(forms.ModelForm):
         proposed_metadata = {}
         
         # Add values from dynamic global attribute fields
-        from .models import SiteAttributeDefinition
         definitions = SiteAttributeDefinition.objects.all()
         for definition in definitions:
             field_name = f"attr_{definition.field_key}"
@@ -139,7 +147,6 @@ class StoreUpdateForm(forms.ModelForm):
         custom_json = cleaned_data.get('custom_metadata_json')
         if custom_json:
             try:
-                import json
                 custom_data = json.loads(custom_json)
                 if isinstance(custom_data, dict):
                     proposed_metadata.update(custom_data)
@@ -185,29 +192,3 @@ TankUpdateFormSet = forms.inlineformset_factory(
     extra=1, 
     can_delete=True
 )
-
-class SiteIntelligenceForm(forms.ModelForm):
-    """
-    OPERATIONAL FLOW:
-    Captures field intelligence (notes and stuff) for a specific site.
-    """
-    class Meta:
-        model = SiteIntelligence
-        fields = ['notes']
-        widgets = {
-            'notes': forms.Textarea(attrs={
-                'class': 'form-control tactical-input', 
-                'placeholder': 'ENTER_FIELD_OBSERVATIONS...',
-                'rows': 10
-            }),
-        }
-
-    def clean_notes(self):
-        """
-        TACTICAL SANITIZATION:
-        Strips HTML tags from notes.
-        """
-        notes = self.cleaned_data.get('notes')
-        if notes:
-            return re.sub(r'<[^>]*>', '', notes).strip()
-        return notes

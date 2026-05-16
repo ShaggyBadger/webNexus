@@ -1,6 +1,5 @@
 from django import forms
 
-
 class DeliveryEstimationForm(forms.Form):
     """
     OPERATIONAL FLOW:

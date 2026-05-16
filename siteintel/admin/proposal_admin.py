@@ -1,87 +1,6 @@
 from django.contrib import admin
-from .models import (
-    LocationType, Location, StoreUpdate, TankUpdate, SiteIntelligence, 
-    MapOverlayUpdate, FuelRack, RackCheckIn, SiteAttributeDefinition,
-    Yard
-)
-
-@admin.register(SiteAttributeDefinition)
-class SiteAttributeDefinitionAdmin(admin.ModelAdmin):
-    list_display = ('label', 'field_key', 'field_type', 'sort_weight', 'is_required')
-    list_editable = ('sort_weight', 'is_required')
-    search_fields = ('label', 'field_key')
-
-@admin.register(FuelRack)
-class FuelRackAdmin(admin.ModelAdmin):
-    list_display = ('location', 'lockout_days')
-    search_fields = ('location__name',)
-
-@admin.register(Yard)
-class YardAdmin(admin.ModelAdmin):
-    list_display = ('location',)
-    search_fields = ('location__name',)
-
-@admin.register(RackCheckIn)
-class RackCheckInAdmin(admin.ModelAdmin):
-    list_display = ('user', 'rack', 'timestamp', 'is_verified')
-    list_filter = ('is_verified', 'timestamp', 'user')
-    search_fields = ('user__username', 'rack__location__name')
-    readonly_fields = ('timestamp',)
-
-@admin.register(MapOverlayUpdate)
-class MapOverlayUpdateAdmin(admin.ModelAdmin):
-    list_display = ('location', 'status', 'submitted_by', 'submitted_at', 'approved_by')
-    list_filter = ('status', 'submitted_at')
-    search_fields = ('location__name', 'submitted_by__username')
-    actions = ['approve_and_apply']
-
-    def approve_and_apply(self, request, queryset):
-        success_count = 0
-        for obj in queryset:
-            if obj.status == 'PENDING':
-                obj.status = 'APPROVED'
-                obj.approved_by = request.user
-                from django.utils import timezone
-                obj.approved_at = timezone.now()
-                try:
-                    obj.apply_overlay()
-                    obj.save()
-                    success_count += 1
-                except Exception as e:
-                    self.message_user(request, f"Error applying overlay {obj.id}: {str(e)}", level='ERROR')
-        
-        if success_count:
-            self.message_user(request, f"Successfully approved and applied {success_count} tactical map overlays.")
-
-    approve_and_apply.short_description = "[ APPROVE & APPLY ] Selected Map Overlays"
-
-@admin.register(SiteIntelligence)
-class SiteIntelligenceAdmin(admin.ModelAdmin):
-    list_display = ('location', 'author', 'is_default', 'created_at')
-    list_filter = ('is_default', 'created_at', 'author')
-    search_fields = ('location__name', 'notes', 'author__username')
-
-@admin.register(LocationType)
-class LocationTypeAdmin(admin.ModelAdmin):
-    list_display = ('name', 'description')
-
-@admin.register(Location)
-class LocationAdmin(admin.ModelAdmin):
-    list_display = ('name', 'location_type', 'city', 'state', 'lat', 'lon')
-    list_filter = ('location_type', 'state')
-    search_fields = ('name', 'address', 'city')
-    fieldsets = (
-        ('Site Info', {
-            'fields': ('name', 'location_type', 'notes')
-        }),
-        ('Geospatial', {
-            'fields': ('address', 'city', 'state', 'zip_code', 'lat', 'lon', 'tactical_overlay')
-        }),
-        ('Hybrid Metadata', {
-            'fields': ('metadata',),
-            'description': 'Structured site quirks and manifold data (JSON)'
-        }),
-    )
+from django.utils import timezone
+from ..models import StoreUpdate, TankUpdate, MapOverlayUpdate
 
 class TankUpdateInline(admin.TabularInline):
     model = TankUpdate
@@ -133,7 +52,6 @@ class StoreUpdateAdmin(admin.ModelAdmin):
             if obj.status == 'PENDING':
                 obj.status = 'APPROVED'
                 obj.approved_by = request.user
-                from django.utils import timezone
                 obj.approved_at = timezone.now()
                 try:
                     obj.apply_update()
@@ -162,7 +80,6 @@ class StoreUpdateAdmin(admin.ModelAdmin):
                     is_becoming_approved = True
 
         if is_becoming_approved:
-            from django.utils import timezone
             if not obj.approved_by:
                 obj.approved_by = request.user
             if not obj.approved_at:
@@ -180,3 +97,29 @@ class StoreUpdateAdmin(admin.ModelAdmin):
                 messages.error(request, f"SYNC_ERROR: {str(e)}")
         
         super().save_model(request, obj, form, change)
+
+@admin.register(MapOverlayUpdate)
+class MapOverlayUpdateAdmin(admin.ModelAdmin):
+    list_display = ('location', 'status', 'submitted_by', 'submitted_at', 'approved_by')
+    list_filter = ('status', 'submitted_at')
+    search_fields = ('location__name', 'submitted_by__username')
+    actions = ['approve_and_apply']
+
+    def approve_and_apply(self, request, queryset):
+        success_count = 0
+        for obj in queryset:
+            if obj.status == 'PENDING':
+                obj.status = 'APPROVED'
+                obj.approved_by = request.user
+                obj.approved_at = timezone.now()
+                try:
+                    obj.apply_overlay()
+                    obj.save()
+                    success_count += 1
+                except Exception as e:
+                    self.message_user(request, f"Error applying overlay {obj.id}: {str(e)}", level='ERROR')
+        
+        if success_count:
+            self.message_user(request, f"Successfully approved and applied {success_count} tactical map overlays.")
+
+    approve_and_apply.short_description = "[ APPROVE & APPLY ] Selected Map Overlays"

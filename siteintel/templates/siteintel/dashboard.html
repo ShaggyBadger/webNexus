@@ -94,7 +94,7 @@
                             VIEW
                         </a>
                         {% endif %}
-                        <a href="{% url 'siteintel:proposal_create' %}?store_num={{ store.store_num }}" class="btn btn-outline-primary btn-sm mono py-1 px-3 flex-grow-1 flex-sm-grow-0" style="font-size: 0.7rem;">
+                        <a href="{% url 'siteintel:proposal_create' %}{% if store.location %}?location_id={{ store.location.id }}{% elif store.store_num %}?store_num={{ store.store_num }}{% endif %}" class="btn btn-outline-primary btn-sm mono py-1 px-3 flex-grow-1 flex-sm-grow-0" style="font-size: 0.7rem;">
                             UPDATE
                         </a>
                     </div>

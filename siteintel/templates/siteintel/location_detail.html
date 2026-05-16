@@ -117,9 +117,9 @@
                         <span class="d-md-none">SITE_CONFIG</span>
                     </div>
                     {% if user.is_authenticated %}
-                    <a href="{% url 'siteintel:proposal_create' %}{% if store %}?store_num={{ store.store_num }}{% endif %}" class="btn btn-outline-warning btn-sm mono py-0" style="font-size: 0.65rem;">
+                    <a href="{% url 'siteintel:proposal_create' %}?location_id={{ location.id }}" class="btn btn-outline-warning btn-sm mono py-0" style="font-size: 0.65rem;">
                         <span class="d-none d-md-inline">[ PROPOSE_UPDATE ]</span>
-                        <span class="d-md-none">UPDATE</span>
+                        <span class="d-none d-md-none">UPDATE</span>
                     </a>
                     {% endif %}
                 </div>
