@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     "tankgauge",
     "accounts",
     "siteintel",
+    "missionlog",
 ]
 
 
@@ -63,7 +64,10 @@ ROOT_URLCONF = "thejoshproject.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [BASE_DIR / "templates"],  # Add this line
+        "DIRS": [
+            BASE_DIR / "templates",
+            BASE_DIR / "frontend-missionlog" / "dist",
+        ],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -136,6 +140,7 @@ STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [
     BASE_DIR / "static_common",
+    BASE_DIR / "frontend-missionlog" / "dist",
 ]
 
 # Logging Configuration
