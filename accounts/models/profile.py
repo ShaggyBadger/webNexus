@@ -42,6 +42,35 @@ class Profile(models.Model):
         help_text="Preferred tactical mapping layer.",
     )
 
+    # MissionLog Settings
+    work_days = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Checked normal workdays (e.g., ['MON', 'TUE']).",
+    )
+    normal_shift_start = models.TimeField(
+        null=True,
+        blank=True,
+        help_text="Normal shift start time (e.g., 15:00).",
+    )
+    normal_shift_end = models.TimeField(
+        null=True,
+        blank=True,
+        help_text="Normal shift end time (e.g., 03:00).",
+    )
+    timezone = models.CharField(
+        max_length=100,
+        default="America/New_York",
+        help_text="Preferred timezone for display.",
+    )
+    hourly_pay_rate = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Agent hourly pay rate.",
+    )
+
     def __str__(self):
         """Returns the agent's identity record identifier."""
         return f"{self.user.username}'s Profile"

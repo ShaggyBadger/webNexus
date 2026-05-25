@@ -146,6 +146,8 @@ GitHub.sublime-settings
 
 # vibe code stuff
 GEMINI.md
+.antigravitycli/*
+.antigravitycli
 
 # other stuff
 *.png
@@ -179,6 +181,10 @@ GEMINI.md
 #  logs
 *.log
 *.log*
+
 # MissionLog Frontend
 frontend-missionlog/node_modules/
 !frontend-missionlog/dist/
+
+# other
+temp_thoughts.txt

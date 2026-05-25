@@ -79,6 +79,42 @@
                 <div class="tactical-label">[ LAST_NAME ]</div>
                 <div class="tactical-value">{{ user.last_name|default:"UNSPECIFIED"|upper }}</div>
             </div>
+            <div class="col-md-6 mb-3">
+                <div class="tactical-label">[ CALLSIGN ]</div>
+                <div class="tactical-value">{{ profile.callsign|default:"NONE"|upper }}</div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <div class="tactical-label">[ MAP_PREFERENCE ]</div>
+                <div class="tactical-value">{{ profile.map_preference|upper }}</div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <div class="tactical-label">[ NORMAL_SHIFT ]</div>
+                <div class="tactical-value">
+                    {% if profile.normal_shift_start %}
+                        {{ profile.normal_shift_start|time:"H:i" }} - {{ profile.normal_shift_end|time:"H:i" }}
+                    {% else %}
+                        UNSPECIFIED
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <div class="tactical-label">[ TIMEZONE ]</div>
+                <div class="tactical-value">{{ profile.timezone|upper }}</div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <div class="tactical-label">[ HOURLY_RATE ]</div>
+                <div class="tactical-value">
+                    {% if profile.hourly_pay_rate %}
+                        ${{ profile.hourly_pay_rate }} / HR
+                    {% else %}
+                        UNSPECIFIED
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <div class="tactical-label">[ NORMAL_WORKDAYS ]</div>
+                <div class="tactical-value">{{ profile.work_days|join:", "|upper|default:"UNSPECIFIED" }}</div>
+            </div>
             
             <div class="col-12 mt-3">
                 <div class="tactical-label">[ CLEARANCE_LEVEL ]</div>
