@@ -86,11 +86,19 @@ class TacticalProfileModelForm(forms.ModelForm):
             ),
             "normal_shift_start": forms.TimeInput(
                 format="%H:%M",
-                attrs={"class": "tactical-input", "type": "time", "placeholder": "HH:MM"},
+                attrs={
+                    "class": "tactical-input",
+                    "type": "time",
+                    "placeholder": "HH:MM",
+                },
             ),
             "normal_shift_end": forms.TimeInput(
                 format="%H:%M",
-                attrs={"class": "tactical-input", "type": "time", "placeholder": "HH:MM"},
+                attrs={
+                    "class": "tactical-input",
+                    "type": "time",
+                    "placeholder": "HH:MM",
+                },
             ),
             "timezone": forms.Select(
                 choices=TIMEZONE_CHOICES,

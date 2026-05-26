@@ -5,7 +5,7 @@
       <h1 class="mono text-light display-6 font-weight-bold uppercase">
         MISSION <span class="text-primary">LOGS</span>
       </h1>
-      <p class="mono text-muted-custom small">[ TACTICAL_HQ_DASHBOARD // VERSION_3.0 ]</p>
+      <p class="mono text-muted-custom small">[ TACTICAL_HQ_DASHBOARD // VERSION_{{ version }} ]</p>
     </div>
 
     <!-- Active Mission Warning/Resume -->
@@ -21,29 +21,26 @@
 
     <!-- Hub Controls -->
     <div class="row g-4 justify-content-center">
-      <!-- Start New Mission -->
-      <div v-if="!activeMission" class="col-12 col-md-8">
-        <div class="card bg-dark-custom border-secondary p-4 text-center">
+      <div class="col-12 col-md-8 d-grid gap-3">
+        <!-- Start New Mission -->
+        <div v-if="!activeMission" class="card bg-dark-custom border-secondary p-4 text-center mb-2">
           <div class="mono text-muted-custom small mb-4">[ MISSION_INITIALIZATION_PROTOCOL ]</div>
-          
           <button @click="startNewMission" class="btn btn-primary btn-tactical-lg mono fw-bold w-100">
             START_NEW_SHIFT
           </button>
         </div>
-      </div>
 
-      <!-- General Options -->
-      <div class="col-12 col-md-8 d-grid gap-3">
-        <button v-if="activeMission" @click="$emit('navigate', 'active')" class="btn btn-outline-primary btn-tactical-lg mono fw-bold py-3 text-start">
-          <i class="fas fa-play me-3"></i> 1. CONTINUE_CURRENT_SHIFT
+        <!-- General Options -->
+        <button v-if="activeMission" @click="$emit('navigate', 'active')" class="btn btn-outline-primary btn-tactical-lg mono fw-bold py-3 text-center">
+          <i class="fas fa-play me-3"></i> CONTINUE_CURRENT_SHIFT
         </button>
 
-        <button @click="$emit('navigate', 'history')" class="btn btn-outline-warning btn-tactical-lg mono fw-bold py-3 text-start">
-          <i class="fas fa-history me-3"></i> 2. EDIT_PREVIOUS_SHIFTS
+        <button @click="$emit('navigate', 'history')" class="btn btn-outline-warning btn-tactical-lg mono fw-bold py-3 text-center">
+          <i class="fas fa-history me-3"></i> EDIT_PREVIOUS_SHIFTS
         </button>
         
-        <button class="btn btn-outline-secondary btn-tactical-lg mono fw-bold py-3 text-start disabled" style="opacity: 0.4;">
-          <i class="fas fa-file-invoice me-3"></i> 3. GENERATE_REPORT [LOCKED]
+        <button class="btn btn-outline-secondary btn-tactical-lg mono fw-bold py-3 text-center disabled" style="opacity: 0.4;">
+          <i class="fas fa-file-invoice me-3"></i> GENERATE_REPORT [LOCKED]
         </button>
       </div>
     </div>
@@ -51,7 +48,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from 'vue';
+import { defineComponent, ref, onMounted } from 'vue';
 import api from '../api';
 
 export default defineComponent({
@@ -64,7 +61,19 @@ export default defineComponent({
   },
   emits: ['navigate', 'mission-started'],
   setup(_, { emit }) {
+    const version = ref<string>('0.0.0');
     const startMiles = ref<number | null>(null);
+
+    const fetchAgentInfo = async () => {
+        try {
+            const response = await api.get('/agent-info/');
+            version.value = response.data.version;
+        } catch (error) {
+            console.error("Failed to fetch agent info");
+        }
+    };
+
+    onMounted(fetchAgentInfo);
 
     const formatTime = (isoString: string) => {
       const d = new Date(isoString);
@@ -96,6 +105,7 @@ export default defineComponent({
     };
 
     return {
+      version,
       startMiles,
       formatTime,
       calculateElapsed,

@@ -266,6 +266,20 @@ export default defineComponent({
       return fuelTypeId.value !== null;
     });
 
+    // Automatically calculate expected end gallons based on start + gross
+    watch([startGallons, grossGal], ([newStartGallons, newGrossGal]) => {
+      if (newStartGallons !== null && newGrossGal !== null) {
+        // Calculate total expected end volume
+        const calculatedEndGallons = newStartGallons + newGrossGal;
+        
+        // Update the reactive endGallons
+        endGallons.value = calculatedEndGallons;
+        
+        // Trigger reverse inches lookup
+        triggerCalibrations('endGallons');
+      }
+    });
+
     // Event Handlers
     const onStoreChange = () => {
       triggerCalibrations();
@@ -275,51 +289,43 @@ export default defineComponent({
       triggerCalibrations();
     };
 
-    const triggerCalibrations = () => {
-      if (startInches.value !== null) onStartInchesChange();
-      if (endInches.value !== null) onEndInchesChange();
-    };
+    const triggerCalibrations = async (targetField?: 'startInches' | 'endGallons') => {
+      if (!storeId.value || !selectedFuelTypeName.value) return;
+      
+      const params: any = {
+        store_id: storeId.value,
+        fuel_type: selectedFuelTypeName.value
+      };
+      
+      if (startInches.value !== null && !isNaN(startInches.value)) params.start_inches = startInches.value;
+      
+      // If we are specifically calculating end inches based on gallons
+      if (targetField === 'endGallons' && endGallons.value !== null && !isNaN(endGallons.value)) {
+        params.end_gallons = endGallons.value;
+      } else if (endInches.value !== null && !isNaN(endInches.value)) {
+        params.end_inches = endInches.value;
+      }
+      
+      if (!params.start_inches && !params.end_inches && !params.end_gallons) return;
 
-    const onStartInchesChange = async () => {
-      if (startInches.value === null || !storeId.value || !selectedFuelTypeName.value) return;
-      loadingStartChart.value = true;
       try {
-        const response = await api.get('/stores/tank-chart/', {
-          params: {
-            store_id: storeId.value,
-            fuel_type: selectedFuelTypeName.value,
-            inches: startInches.value
-          }
-        });
+        const response = await api.get('/stores/tank-chart/', { params });
         if (response.data.status === 'success') {
-          startGallons.value = response.data.gallons;
+          if (response.data.start_gallons !== undefined) startGallons.value = response.data.start_gallons;
+          if (response.data.end_gallons !== undefined) endGallons.value = response.data.end_gallons;
+          if (response.data.end_inches !== undefined) endInches.value = response.data.end_inches;
         }
       } catch (error) {
-        logger_warn("No calibration found for start_inches.");
-      } finally {
-        loadingStartChart.value = false;
+        logger_warn("Tank chart calibration lookup failed.");
       }
     };
 
-    const onEndInchesChange = async () => {
-      if (endInches.value === null || !storeId.value || !selectedFuelTypeName.value) return;
-      loadingEndChart.value = true;
-      try {
-        const response = await api.get('/stores/tank-chart/', {
-          params: {
-            store_id: storeId.value,
-            fuel_type: selectedFuelTypeName.value,
-            inches: endInches.value
-          }
-        });
-        if (response.data.status === 'success') {
-          endGallons.value = response.data.gallons;
-        }
-      } catch (error) {
-        logger_warn("No calibration found for end_inches.");
-      } finally {
-        loadingEndChart.value = false;
-      }
+    const onStartInchesChange = () => {
+      triggerCalibrations();
+    };
+
+    const onEndInchesChange = () => {
+      triggerCalibrations();
     };
 
     const logger_warn = (msg: string) => {

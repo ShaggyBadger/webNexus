@@ -1,3 +1,4 @@
+from django.conf import settings
 import logging
 
 # Tactical Logger for Global Context
@@ -25,7 +26,7 @@ def global_config(request):
     return {
         # Core Identity
         "SITE_NAME": "WebNexus",
-        "VERSION": "2.7.0",
+        "VERSION": settings.APP_VERSION,
         # Tactical Color Palette (Profile-neutral constants)
         "PRIMARY_COLOR": "#8da35d",
         "BG_COLOR": "#121417",

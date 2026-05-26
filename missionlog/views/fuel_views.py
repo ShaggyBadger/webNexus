@@ -7,6 +7,7 @@ from ..models import Mission, TruckFuelLog
 
 logger = logging.getLogger("webnexus")
 
+
 @login_required
 def fuel_log_create(request, mission_id):
     """
@@ -16,27 +17,29 @@ def fuel_log_create(request, mission_id):
     if request.method == "POST":
         mission = get_object_or_404(Mission, pk=mission_id, user=request.user)
         if mission.is_completed:
-            return JsonResponse({"status": "error", "message": "Cannot modify a completed mission."}, status=400)
-            
+            return JsonResponse(
+                {"status": "error", "message": "Cannot modify a completed mission."},
+                status=400,
+            )
+
         try:
             data = json.loads(request.body)
             gallons = float(data.get("gallons"))
             price_per_gallon = float(data.get("price_per_gallon"))
-            
+
             fuel = TruckFuelLog.objects.create(
-                mission=mission,
-                gallons=gallons,
-                price_per_gallon=price_per_gallon
+                mission=mission, gallons=gallons, price_per_gallon=price_per_gallon
             )
-            logger.info(f"FUEL_CREATE: Truck fuel log logged under Mission #{mission.id} ({gallons} gal pumped).")
-            return JsonResponse({
-                "status": "success",
-                "fuel_log_id": fuel.id
-            }, status=201)
+            logger.info(
+                f"FUEL_CREATE: Truck fuel log logged under Mission #{mission.id} ({gallons} gal pumped)."
+            )
+            return JsonResponse(
+                {"status": "success", "fuel_log_id": fuel.id}, status=201
+            )
         except Exception as e:
             logger.error(f"FUEL_CREATE_FAIL: {str(e)}")
             return JsonResponse({"status": "error", "message": str(e)}, status=400)
-            
+
     return JsonResponse({"error": "Method not allowed"}, status=405)
 
 
@@ -49,7 +52,10 @@ def fuel_log_update_delete(request, pk):
     """
     fuel = get_object_or_404(TruckFuelLog, pk=pk, mission__user=request.user)
     if fuel.mission.is_completed:
-        return JsonResponse({"status": "error", "message": "Cannot modify a completed mission."}, status=400)
+        return JsonResponse(
+            {"status": "error", "message": "Cannot modify a completed mission."},
+            status=400,
+        )
 
     if request.method == "PUT":
         try:
@@ -59,14 +65,18 @@ def fuel_log_update_delete(request, pk):
             if "price_per_gallon" in data:
                 fuel.price_per_gallon = float(data["price_per_gallon"])
             fuel.save()
-            logger.info(f"FUEL_UPDATE: Truck fuel log ID {fuel.id} purchase values updated.")
+            logger.info(
+                f"FUEL_UPDATE: Truck fuel log ID {fuel.id} purchase values updated."
+            )
             return JsonResponse({"status": "success"})
         except Exception as e:
             logger.error(f"FUEL_UPDATE_FAIL: {str(e)}")
             return JsonResponse({"status": "error", "message": str(e)}, status=400)
 
     elif request.method == "DELETE":
-        logger.info(f"FUEL_DELETE: Truck fuel log ID {fuel.id} removed from Mission #{fuel.mission.id}.")
+        logger.info(
+            f"FUEL_DELETE: Truck fuel log ID {fuel.id} removed from Mission #{fuel.mission.id}."
+        )
         fuel.delete()
         return JsonResponse({"status": "success", "message": "Fuel log entry deleted."})
 

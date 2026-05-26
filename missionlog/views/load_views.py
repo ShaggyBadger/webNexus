@@ -5,9 +5,10 @@ from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
 from ..models import PurchaseOrder, LoadDelivery, FuelType
 from tankgauge.models.store_models import Store
-from ..logic.tank_calculations import calculate_gallons
+from ..logic.tank_calculations import calculate_gallons, calculate_inches
 
 logger = logging.getLogger("webnexus")
+
 
 @login_required
 def load_create(request, po_id):
@@ -16,14 +17,19 @@ def load_create(request, po_id):
     POST: Adds a physical delivery log to the designated PO.
     """
     if request.method == "POST":
-        po = get_object_or_404(PurchaseOrder, pk=po_id, mission__user=request.user)
-        if po.mission.is_completed:
-            return JsonResponse({"status": "error", "message": "Cannot modify a completed mission."}, status=400)
-            
+        po = get_object_or_404(
+            PurchaseOrder, pk=po_id, order_parent__mission__user=request.user
+        )
+        if po.order_parent.mission.is_completed:
+            return JsonResponse(
+                {"status": "error", "message": "Cannot modify a completed mission."},
+                status=400,
+            )
+
         try:
             data = json.loads(request.body)
             fuel_type = get_object_or_404(FuelType, pk=data["fuel_type_id"])
-            
+
             store_id = data.get("store_id")
             store = None
             if store_id:
@@ -43,16 +49,15 @@ def load_create(request, po_id):
                 end_inches=data.get("end_inches"),
                 end_gallons=data.get("end_gallons"),
             )
-            
-            logger.info(f"LOAD_CREATE: Load {fuel_type.name} to Store {store.store_num if store else 'Unlisted'} logged under PO #{po.po_number}.")
-            return JsonResponse({
-                "status": "success",
-                "load_id": load.id
-            }, status=201)
+
+            logger.info(
+                f"LOAD_CREATE: Load {fuel_type.name} to Store {store.store_num if store else 'Unlisted'} logged under PO #{po.po_number}."
+            )
+            return JsonResponse({"status": "success", "load_id": load.id}, status=201)
         except Exception as e:
             logger.error(f"LOAD_CREATE_FAIL: {str(e)}")
             return JsonResponse({"status": "error", "message": str(e)}, status=400)
-            
+
     return JsonResponse({"error": "Method not allowed"}, status=405)
 
 
@@ -63,9 +68,14 @@ def load_update_delete(request, pk):
     PUT: Modifies precise delivery metrics.
     DELETE: Deletes a load delivery record.
     """
-    load = get_object_or_404(LoadDelivery, pk=pk, purchase_order__mission__user=request.user)
-    if load.purchase_order.mission.is_completed:
-        return JsonResponse({"status": "error", "message": "Cannot modify a completed mission."}, status=400)
+    load = get_object_or_404(
+        LoadDelivery, pk=pk, purchase_order__order_parent__mission__user=request.user
+    )
+    if load.purchase_order.order_parent.mission.is_completed:
+        return JsonResponse(
+            {"status": "error", "message": "Cannot modify a completed mission."},
+            status=400,
+        )
 
     if request.method == "PUT":
         try:
@@ -101,7 +111,7 @@ def load_update_delete(request, pk):
             if "end_gallons" in data:
                 val = data["end_gallons"]
                 load.end_gallons = float(val) if val is not None else None
-            
+
             load.save()
             logger.info(f"LOAD_UPDATE: Load ID {load.id} delivery metrics updated.")
             return JsonResponse({"status": "success"})
@@ -125,16 +135,19 @@ def stores_list(request):
     """
     if request.method == "GET":
         stores = Store.objects.all().order_by("store_num")
-        return JsonResponse([
-            {
-                "id": s.id,
-                "store_num": s.store_num,
-                "store_name": s.store_name,
-                "address": s.address,
-                "city": s.city,
-            }
-            for s in stores
-        ], safe=False)
+        return JsonResponse(
+            [
+                {
+                    "id": s.id,
+                    "store_num": s.store_num,
+                    "store_name": s.store_name,
+                    "address": s.address,
+                    "city": s.city,
+                }
+                for s in stores
+            ],
+            safe=False,
+        )
     return JsonResponse({"error": "Method not allowed"}, status=405)
 
 
@@ -142,22 +155,42 @@ def stores_list(request):
 def tank_chart_lookup(request):
     """
     TANK_CHART_LOOKUP_API:
-    GET: Looks up the exact gallons volume based on store ID, fuel type name, and inches.
+    GET: Looks up the exact gallons volume based on store ID, fuel type name,
+    and optional inches for start/end, or inches based on gallons.
     """
     if request.method == "GET":
         store_id = request.GET.get("store_id")
         fuel_type = request.GET.get("fuel_type")
-        inches = request.GET.get("inches")
-        
-        if not all([store_id, fuel_type, inches]):
-            return JsonResponse({"status": "error", "message": "Parameters 'store_id', 'fuel_type', and 'inches' are required."}, status=400)
-            
+        start_inches = request.GET.get("start_inches")
+        end_inches = request.GET.get("end_inches")
+        end_gallons = request.GET.get("end_gallons")
+
+        if not all([store_id, fuel_type]):
+            return JsonResponse(
+                {
+                    "status": "error",
+                    "message": "Parameters 'store_id' and 'fuel_type' are required.",
+                },
+                status=400,
+            )
+
         try:
-            gallons = calculate_gallons(store_id, fuel_type, inches)
-            if gallons is not None:
-                return JsonResponse({"status": "success", "gallons": gallons})
-            return JsonResponse({"status": "fail", "message": "No matching chart configuration found."})
+            results = {"status": "success"}
+            if start_inches:
+                results["start_gallons"] = calculate_gallons(
+                    store_id, fuel_type, start_inches
+                )
+            if end_inches:
+                results["end_gallons"] = calculate_gallons(
+                    store_id, fuel_type, end_inches
+                )
+            if end_gallons:
+                results["end_inches"] = calculate_inches(
+                    store_id, fuel_type, end_gallons
+                )
+
+            return JsonResponse(results)
         except Exception as e:
             return JsonResponse({"status": "error", "message": str(e)}, status=400)
-            
+
     return JsonResponse({"error": "Method not allowed"}, status=405)
