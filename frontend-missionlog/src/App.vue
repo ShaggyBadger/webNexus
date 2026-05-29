@@ -3,26 +3,30 @@
     <div class="container-fluid" style="max-width: 800px;">
       <!-- Navigation Command Bar -->
       <nav class="d-flex justify-content-between align-items-center mb-4 border border-secondary p-2 bg-black-custom">
-        <div class="d-flex gap-2 align-items-center">
-          <i class="fas fa-microchip text-primary"></i>
-          <span class="mono text-light x-small fw-bold">[ CORE_SYS // AGENT: {{ agentName }} // STATUS: ONLINE ]</span>
+        <div class="d-flex gap-3 align-items-center">
+          <div class="d-none d-md-flex gap-2 align-items-center me-2">
+            <i class="fas fa-microchip text-primary"></i>
+            <span class="mono text-light x-small fw-bold">[ CORE_SYS ]</span>
+          </div>
+          <div class="d-flex gap-2">
+            <button 
+              @click="navigate('hub')" 
+              class="btn btn-outline-primary btn-xs mono fw-bold"
+              :class="{ active: currentView === 'hub' }"
+            >
+              LAUNCHER
+            </button>
+            <button 
+              @click="navigate('history')" 
+              class="btn btn-outline-primary btn-xs mono fw-bold"
+              :class="{ active: currentView === 'history' }"
+            >
+              ARCHIVES
+            </button>
+          </div>
         </div>
-        <div class="d-flex gap-2">
-          <button 
-            @click="navigate('hub')" 
-            class="btn btn-outline-primary btn-xs mono fw-bold"
-            :class="{ active: currentView === 'hub' }"
-          >
-            LAUNCHER
-          </button>
-          <button 
-            @click="navigate('history')" 
-            class="btn btn-outline-primary btn-xs mono fw-bold"
-            :class="{ active: currentView === 'history' }"
-          >
-            ARCHIVES
-          </button>
-          <a href="/" class="btn btn-outline-danger btn-xs mono fw-bold">
+        <div class="d-flex">
+          <a href="/" class="btn btn-outline-secondary btn-xs mono fw-bold px-3">
             EXIT_TO_HQ
           </a>
         </div>
@@ -39,13 +43,11 @@
         <!-- Dashboard Hub View -->
         <DashboardHub 
           v-if="currentView === 'hub'" 
-          :active-mission="activeMission"
           @navigate="navigate"
-          @mission-started="onMissionStarted"
         />
 
-        <!-- Active Mission View -->
-        <div v-else-if="currentView === 'active' && currentMission" class="active-mission-view">
+        <!-- Active Monolithic Form View -->
+        <div v-else-if="currentView === 'active'" class="active-mission-view">
           <!-- Back button -->
           <div class="text-start mb-3">
             <button @click="navigate('hub')" class="btn btn-outline-secondary btn-sm mono fw-bold">
@@ -54,167 +56,252 @@
           </div>
 
           <!-- Top Header -->
-          <ActiveHeader :mission="currentMission" />
-
-          <!-- PHASE 01: PRE-MISSION PARAMETERS -->
-          <div class="section-divider mb-4 mt-5">
-            <div class="divider-line"></div>
-            <div class="divider-text mono uppercase">PHASE 01 // PARAMETERS</div>
-            <div class="divider-line"></div>
+          <div class="card bg-dark-custom border-secondary p-4 text-center mb-4">
+            <h2 class="mono text-light h4 uppercase">[ {{ isEditing ? 'UPDATE_MISSION_LOG' : 'POST-TRIP LOGGING DECK' }} ]</h2>
+            <div class="mono text-primary x-small mt-1">[ PROTOCOL: {{ isEditing ? 'REVISION_INGESTION' : 'MONOLITHIC_INGESTION' }} ]</div>
           </div>
 
-          <!-- TOP BLOCK: MISSION_PARAMETERS (Time & Start Odo) -->
-          <div class="card bg-dark-custom border-secondary p-4 mb-4 text-center">
-            <div class="mono text-muted-custom small mb-3">[ MISSION_PARAMETERS_INITIALIZATION ]</div>
-            <div class="row g-3 justify-content-center">
-              <div class="col-12 col-md-6">
-                <label class="form-label mono x-small text-primary fw-bold mb-1">SHIFT START TIME (ADJUSTABLE)</label>
-                <input 
-                  type="datetime-local" 
-                  v-model="startTimeAdjust"
-                  class="tactical-input w-100 mono text-light text-center"
-                />
-              </div>
-              <div class="col-12 col-md-6">
-                <label class="form-label mono x-small text-primary fw-bold mb-1">STARTING ODOMETER (MILES)</label>
-                <input 
-                  v-model.number="currentMission.start_miles" 
-                  type="number" 
-                  class="tactical-input w-100 mono text-light text-center" 
-                  placeholder="0"
-                />
-              </div>
-              <div class="col-12 mt-3">
-                <button @click="saveMissionMetrics" class="btn btn-outline-primary btn-sm mono fw-bold px-5">
-                  SAVE_PARAMETERS
-                </button>
-              </div>
+          <!-- Monolithic Form -->
+          <form @submit.prevent="submitPostTripLog" class="card bg-dark-custom border-secondary p-4 mb-5">
+            <!-- SHIFT PARAMETERS TABLE -->
+            <div class="mono text-muted-custom small mb-3 text-center">[ OPERATIONAL_LOG_PARAMETERS ]</div>
+            <div class="table-responsive mb-4 mx-auto" style="max-width: 600px;">
+              <table class="table table-bordered border-secondary bg-black-custom mono x-small text-light mb-0">
+                <thead>
+                  <tr class="bg-dark-custom text-primary text-uppercase">
+                    <th scope="col" class="py-2 px-3">PARAMETER</th>
+                    <th scope="col" class="py-2 px-3 text-end">INPUT_VALUE</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="py-2 px-3 align-middle text-muted-custom">SHIFT START TIME</td>
+                    <td class="py-0 px-0">
+                      <input 
+                        type="datetime-local" 
+                        v-model="form.shift_start"
+                        class="tactical-input-table w-100 mono text-light text-end border-0"
+                        required
+                      />
+                    </td>
+                  </tr>
+                  <tr>
+                    <td class="py-2 px-3 align-middle text-muted-custom">HOURS ON DUTY</td>
+                    <td class="py-0 px-0">
+                      <input 
+                        type="text" 
+                        inputmode="decimal" 
+                        pattern="[0-9.]*" 
+                        v-model="form.hours_on_duty" 
+                        class="tactical-input-table w-100 mono text-light text-end border-0" 
+                        placeholder="0.0"
+                        required
+                      />
+                    </td>
+                  </tr>
+                  <tr>
+                    <td class="py-2 px-3 align-middle text-muted-custom">MILEAGE MODE</td>
+                    <td class="py-2 px-3 text-end">
+                      <div class="rocker-switch d-inline-flex flex-nowrap border border-secondary bg-black-custom">
+                        <button 
+                          type="button" 
+                          @click="mileageMode = 'direct'"
+                          class="rocker-btn btn btn-xs mono fw-bold px-3" 
+                          :class="{ 'active': mileageMode === 'direct' }"
+                        >
+                          DIRECT
+                        </button>
+                        <button 
+                          type="button" 
+                          @click="mileageMode = 'odo'"
+                          class="rocker-btn btn btn-xs mono fw-bold px-3 border-start border-secondary" 
+                          :class="{ 'active': mileageMode === 'odo' }"
+                        >
+                          ODO
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                  <template v-if="mileageMode === 'direct'">
+                    <tr>
+                      <td class="py-2 px-3 align-middle text-muted-custom">TOTAL MILES</td>
+                      <td class="py-0 px-0">
+                        <input 
+                          type="text" 
+                          inputmode="numeric" 
+                          pattern="[0-9]*" 
+                          v-model="form.total_miles"
+                          class="tactical-input-table w-100 mono text-light text-end border-0"
+                          placeholder="0"
+                          required
+                        />
+                      </td>
+                    </tr>
+                  </template>
+                  <template v-else>
+                    <tr>
+                      <td class="py-2 px-3 align-middle text-muted-custom">STARTING ODOMETER</td>
+                      <td class="py-0 px-0">
+                        <input 
+                          type="text" 
+                          inputmode="numeric" 
+                          pattern="[0-9]*" 
+                          v-model="form.start_miles"
+                          @input="calculateTotalMilesFromOdo"
+                          class="tactical-input-table w-100 mono text-light text-end border-0"
+                          placeholder="START"
+                        />
+                      </td>
+                    </tr>
+                    <tr>
+                      <td class="py-2 px-3 align-middle text-muted-custom">ENDING ODOMETER</td>
+                      <td class="py-0 px-0">
+                        <input 
+                          type="text" 
+                          inputmode="numeric" 
+                          pattern="[0-9]*" 
+                          v-model="form.end_miles"
+                          @input="calculateTotalMilesFromOdo"
+                          class="tactical-input-table w-100 mono text-light text-end border-0"
+                          placeholder="END"
+                        />
+                      </td>
+                    </tr>
+                    <tr v-if="computedTotalMiles !== null">
+                      <td class="py-2 px-3 align-middle text-muted-custom text-primary">[ COMPUTED TOTAL ]</td>
+                      <td class="py-2 px-3 text-end text-primary fw-bold">{{ computedTotalMiles }} MILES</td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
             </div>
-          </div>
 
-          <!-- PHASE 02: FIELD OPERATIONS -->
-          <div class="section-divider mb-4 mt-5">
-            <div class="divider-line"></div>
-            <div class="divider-text mono uppercase">PHASE 02 // OPERATIONS</div>
-            <div class="divider-line"></div>
-          </div>
-
-          <!-- Truck Fuel Logs Panel -->
-          <TruckFuelLogs 
-            :mission-id="currentMission.id" 
-            :fuel-logs="currentMission.fuel_logs"
-            @refresh="refreshActiveMission"
-          />
-
-          <!-- POs and Loads Deck -->
-          <PurchaseOrders 
-            :mission-id="currentMission.id"
-            :order-numbers="currentMission.order_numbers"
-            :stores="stores"
-            :fuel-types="fuelTypes"
-            @refresh="refreshActiveMission"
-          />
-
-          <!-- PHASE 03: POST-MISSION DEBRIEF -->
-          <div class="section-divider mb-4 mt-5">
-            <div class="divider-line"></div>
-            <div class="divider-text mono uppercase">PHASE 03 // DEBRIEF</div>
-            <div class="divider-line"></div>
-          </div>
-
-          <!-- Checkout / Debrief Console -->
-          <div class="card bg-dark-custom border-secondary p-4 text-center mb-5">
-            <div class="mono text-muted-custom small mb-4">[ MISSION_DEBRIEF_DECK ]</div>
+            <!-- DELIVERIES SECTION -->
+            <div class="mono text-muted-custom small mb-3">[ RETAIL_CARGO_DELIVERIES ]</div>
             
-            <div class="row g-4 justify-content-center">
-              <!-- MILEAGE SECTION -->
-              <div class="col-12 col-md-4">
-                <label class="form-label mono x-small text-primary fw-bold mb-2">ENDING ODOMETER (MILES)</label>
+            <div v-if="form.deliveries.length === 0" class="mono text-muted-custom small py-3 border border-dashed mb-4">
+              [ NO DELIVERIES RECORDED. PRESS 'ADD STORE DELIVERY' BELOW. ]
+            </div>
+
+            <div v-for="(deliv, dIdx) in form.deliveries" :key="dIdx" class="card bg-black-custom border-secondary p-3 mb-4 text-start">
+              <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2">
+                <span class="mono x-small text-warning fw-bold">DELIVERY #{{ String(dIdx + 1).padStart(2, '0') }}</span>
+              </div>
+
+              <!-- Store input with realtime async validation -->
+              <div class="mb-3">
+                <label class="form-label mono x-small text-primary fw-bold mb-1">STORE / RISO NUMBER</label>
                 <input 
-                  v-model.number="endMiles" 
-                  @input="onEndMilesChange"
-                  type="number" 
-                  class="tactical-input w-100 mono text-light text-center" 
-                  placeholder="0"
+                  type="text" 
+                  inputmode="numeric" 
+                  pattern="[0-9]*" 
+                  v-model="deliv.store_number_or_riso"
+                  @input="validateStoreDebounced(dIdx)"
+                  class="tactical-input w-100 mono text-light"
+                  placeholder="e.g. 4022"
+                  :style="{ borderColor: deliv.storeValid === true ? '#8da35d' : (deliv.storeValid === false ? '#e94560' : '') }"
+                  required
                 />
-              </div>
-
-              <div class="col-12 col-md-4">
-                <label class="form-label mono x-small text-primary fw-bold mb-2">TOTAL MILES TRAVELED</label>
-                <input 
-                  v-model.number="totalMiles" 
-                  @input="onTotalMilesChange"
-                  type="number" 
-                  class="tactical-input w-100 mono text-light text-center" 
-                  placeholder="0"
-                />
-              </div>
-
-              <!-- HOURS SECTION -->
-              <div class="col-12 col-md-4">
-                <label class="form-label mono x-small text-warning fw-bold mb-2">TOTAL HOURS (FROM LOGS)</label>
-                <input 
-                  v-model.number="hoursOnDuty" 
-                  type="number" 
-                  step="0.01"
-                  class="tactical-input w-100 mono text-light border-warning-custom text-center" 
-                  placeholder="0.00"
-                />
-              </div>
-
-              <!-- General Debrief Notes -->
-              <div class="col-12 mt-3">
-                <label class="form-label mono small text-muted-custom mb-2">OPERATIONAL NOTES / FIELD OBSERVATIONS</label>
-                <textarea 
-                  v-model="notes" 
-                  rows="3" 
-                  class="tactical-input w-100 mono text-light text-center" 
-                  placeholder="SITE QUIRKS, MANIFOLD DEFECTS, TRAFFIC..."
-                ></textarea>
-              </div>
-
-              <!-- Terminate active/Unsaved (Delete shift) -->
-              <div class="col-12 d-flex flex-column flex-md-row justify-content-center align-items-center gap-3 mt-4">
-                <button
-                  @click="saveFinalDebrief" 
-                  class="btn btn-primary btn-tactical mono fw-bold px-5 order-first order-md-1"
-                >
-                  {{ currentMission.is_completed ? 'SAVE_CHANGES' : 'DECLARE_MISSION_COMPLETE' }}
-                </button>
-
-                <!-- Confirmation UI -->
-                <div v-if="showConfirmSignOff" class="card bg-black-custom p-3 border border-warning">
-                  <p class="mono text-warning mb-2">ARE YOU SURE? THIS ACTION FINALIZES ALL LOGS.</p>
-                  <div class="d-flex gap-2 justify-content-center">
-                    <button @click="confirmSignOff" class="btn btn-warning mono fw-bold">CONFIRM_SIGN_OFF</button>
-                    <button @click="showConfirmSignOff = false" class="btn btn-outline-secondary mono">CANCEL</button>
-                  </div>
+                
+                <!-- Validation status -->
+                <div class="mt-1 d-flex align-items-center gap-2">
+                  <span v-if="deliv.loading" class="mono x-small text-muted-custom blink-tactical">[ VALIDATING_SITE... ]</span>
+                  <span v-else-if="deliv.storeValid === true" class="mono x-small text-primary fw-bold">✓ SECURE: {{ deliv.storeName }}</span>
+                  <span v-else-if="deliv.storeValid === false" class="mono x-small text-danger fw-bold">✗ HOSTILE: STORE NOT FOUND IN DATABASE</span>
+                  <span v-else class="mono x-small text-muted-custom">[ TYPE TO COMMENCE SECURE VALIDATION ]</span>
                 </div>
-                <button 
-                  v-if="currentMission.is_completed" 
-                  @click="exitAudits" 
-                  class="btn btn-outline-secondary btn-tactical mono fw-bold px-4 order-md-2"
-                >
-                  CLOSE_AUDIT
-                </button>
+              </div>
 
-                <button 
-                  v-if="!showConfirmAbort"
-                  @click="abortMission" 
-                  class="btn btn-outline-danger btn-sm mono fw-bold px-4 order-last order-md-0"
-                >
-                  {{ currentMission.is_completed ? 'DELETE_PERMANENTLY' : 'ABORT_MISSION (DELETE)' }}
+              <!-- Fuel Entries for this Store -->
+              <div class="table-responsive mb-2">
+                <table class="table table-sm table-bordered border-secondary bg-black-custom mono x-small text-light mb-0">
+                  <thead>
+                    <tr class="text-primary text-uppercase" style="font-size: 0.6rem;">
+                      <th class="py-1 px-2">FUEL_TYPE</th>
+                      <th class="py-1 px-2 text-center">VOLUME</th>
+                      <th class="py-1 px-2 text-end">ACT</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(fEntry, fIdx) in deliv.fuel_entries" :key="fIdx">
+                      <td class="py-0 px-0">
+                        <select v-model="fEntry.fuel_type_id" class="tactical-input-table w-100 border-0 py-2">
+                          <option v-for="ft in fuelTypes" :key="ft.id" :value="ft.id">{{ ft.name }}</option>
+                        </select>
+                      </td>
+                      <td class="py-0 px-0">
+                        <input 
+                          type="text" 
+                          inputmode="numeric" 
+                          pattern="[0-9]*" 
+                          v-model="fEntry.gallons"
+                          class="tactical-input-table w-100 text-center border-0 py-2"
+                          placeholder="GAL"
+                          required
+                        />
+                      </td>
+                      <td class="py-2 px-2 text-end align-middle">
+                        <button 
+                          type="button" 
+                          @click="removeFuelEntry(dIdx, fIdx)" 
+                          class="btn btn-outline-danger btn-xs"
+                          :disabled="deliv.fuel_entries.length <= 1"
+                          style="min-height: auto; padding: 2px 6px;"
+                        >
+                          ✗
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- Add Fuel Type and Remove Store -->
+              <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top border-secondary">
+                <button type="button" @click="removeDelivery(dIdx)" class="btn btn-outline-danger btn-xs mono">
+                  <i class="fas fa-trash-alt me-1"></i> DISCARD_SITE
                 </button>
-                <div v-else class="card bg-black-custom p-3 border border-danger">
-                  <p class="mono text-danger mb-2">CRITICAL: PERMANENTLY DELETE MISSION DATA?</p>
-                  <div class="d-flex gap-2 justify-content-center">
-                    <button @click="confirmAbortMission" class="btn btn-danger mono fw-bold">CONFIRM_ABORT</button>
-                    <button @click="showConfirmAbort = false" class="btn btn-outline-secondary mono">CANCEL</button>
-                  </div>
-                </div>
+                <button type="button" @click="addFuelEntry(dIdx)" class="btn btn-outline-primary btn-xs mono fw-bold">
+                  + ADD_FUEL_VARIANT
+                </button>
               </div>
             </div>
-          </div>
+
+            <!-- Add Delivery block -->
+            <button type="button" @click="addDelivery" class="btn btn-outline-warning w-100 mono fw-bold mb-4 py-3">
+              + ADD STORE DELIVERY
+            </button>
+
+            <!-- GENERAL DEBRIEF NOTES -->
+            <div class="mono text-muted-custom small mb-3">[ DEBRIEF_MEMORANDUM ]</div>
+            <div class="mb-4">
+              <textarea 
+                v-model="form.notes"
+                rows="3"
+                class="tactical-input w-100 mono text-light text-center"
+                placeholder="SITE QUIRKS, ROADBLOCKS, PUMP OBSERVATIONS..."
+              ></textarea>
+            </div>
+
+            <!-- Submit Status Indicators -->
+            <div v-if="submissionError" class="alert alert-danger bg-black-custom border-danger mono x-small text-danger mb-3">
+              ❌ INGESTION_ERROR: {{ submissionError }}
+            </div>
+            <div v-if="submissionSuccess" class="alert alert-success bg-black-custom border-primary mono x-small text-primary mb-3">
+              ✓ SECURED: POST-TRIP INGESTION PROTOCOL COMPLETE.
+            </div>
+
+            <!-- Submit action buttons -->
+            <div class="d-flex justify-content-center gap-3">
+              <button 
+                type="submit" 
+                class="btn btn-primary btn-tactical-lg mono fw-bold px-5"
+                :disabled="submitting || hasInvalidStores"
+              >
+                {{ submitting ? 'SECURING_LOGS...' : (isEditing ? 'COMMIT_MISSION_CHANGES' : 'SUBMIT_POST_TRIP_DEBRIEF') }}
+              </button>
+            </div>
+          </form>
         </div>
 
         <!-- Historical Archive View -->
@@ -222,60 +309,273 @@
           v-else-if="currentView === 'history'" 
           :missions="historicalMissions"
           @navigate="navigate"
-          @select-mission="auditHistoricalMission"
+          @select-mission="viewHistoricalMission"
         />
+
+        <!-- Read Only Historical Mission Audit View -->
+        <div v-else-if="currentView === 'audit' && selectedMission" class="historical-audit-view">
+          <div class="text-start mb-3">
+            <button @click="navigate('history')" class="btn btn-outline-secondary btn-sm mono fw-bold">
+              <i class="fas fa-arrow-left me-2"></i> RETURN_TO_ARCHIVES
+            </button>
+          </div>
+
+          <div class="card bg-dark-custom border-secondary p-4 mb-5">
+            <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2">
+              <h3 class="mono text-light h5 uppercase">[ MISSION_AUDIT // DEBRIEF_ID: {{ selectedMission.id }} ]</h3>
+              <span class="badge bg-black-custom text-primary border border-primary px-3 py-2 mono small">[ COMPLETED ]</span>
+            </div>
+
+            <!-- Tactical Parameter Table -->
+            <div class="table-responsive mb-4 mx-auto" style="max-width: 600px;">
+              <table class="table table-bordered border-secondary bg-black-custom mono x-small text-light mb-0">
+                <thead>
+                  <tr class="bg-dark-custom text-primary text-uppercase">
+                    <th scope="col" class="py-2 px-3">OPERATIONAL PARAMETER</th>
+                    <th scope="col" class="py-2 px-3 text-end">LOGGED VALUE</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="py-2 px-3 text-muted-custom">DEPARTURE TIME</td>
+                    <td class="py-2 px-3 text-end fw-bold">{{ formatDateTime(selectedMission.shift_start) }}</td>
+                  </tr>
+                  <tr>
+                    <td class="py-2 px-3 text-muted-custom">DEBRIEF SIGN-OFF</td>
+                    <td class="py-2 px-3 text-end fw-bold">{{ formatDateTime(selectedMission.shift_end) }}</td>
+                  </tr>
+                  <tr>
+                    <td class="py-2 px-3 text-muted-custom">DURATION LOGGED</td>
+                    <td class="py-2 px-3 text-end text-warning fw-bold">{{ selectedMission.hours_on_duty }} HOURS</td>
+                  </tr>
+                  <tr>
+                    <td class="py-2 px-3 text-muted-custom">MILES TRAVELED</td>
+                    <td class="py-2 px-3 text-end text-primary fw-bold">
+                      {{ selectedMission.total_miles }} MILES
+                      <span v-if="selectedMission.start_miles" class="text-muted-custom small ms-1">(Odo: {{ selectedMission.start_miles }} → {{ selectedMission.end_miles }})</span>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td class="py-2 px-3 text-muted-custom">UNIQUE STORES VISITED</td>
+                    <td class="py-2 px-3 text-end text-warning fw-bold">{{ selectedMission.total_stops }} STORES</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Load Deliveries summary -->
+            <div class="mono text-muted-custom small mb-2 text-start">[ FIELD_CARGO_RECORDS_BY_SITE ]</div>
+            <div class="card bg-black-custom border-secondary p-3 mb-4">
+              <div v-if="groupedDeliveries.length === 0" class="mono text-muted-custom x-small text-center py-2">
+                [ NO RECORDED CARGO RECORDS FOR THIS SHIFT ]
+              </div>
+              <div v-else>
+                <div v-for="site in groupedDeliveries" :key="site.store_num" class="border-bottom border-secondary py-3 last-border-none">
+                  <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="mono text-primary fw-bold">✓ STORE {{ site.store_num }}</span>
+                    <span class="mono text-muted-custom x-small">{{ site.store_name }}</span>
+                  </div>
+                  <!-- Nested fuels delivered -->
+                  <div class="d-flex flex-wrap gap-2 ps-3">
+                    <span 
+                      v-for="(fuel, fIdx) in site.fuels" 
+                      :key="fIdx"
+                      class="badge px-3 py-2 mono" 
+                      :style="{ backgroundColor: fuel.color || '#1c1f23', color: '#000' }"
+                    >
+                      {{ fuel.gallons }} GAL {{ fuel.name.toUpperCase() }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Notes summary -->
+            <div v-if="selectedMission.notes" class="text-start mb-4">
+              <div class="mono text-muted-custom small mb-1">[ FIELD_MEMORANDUM_RECORDS ]</div>
+              <div class="card bg-black-custom border-secondary p-3 mono text-light x-small">
+                {{ selectedMission.notes }}
+              </div>
+            </div>
+
+            <!-- Tactical Command Actions Deck -->
+            <div class="d-flex flex-column flex-md-row justify-content-center align-items-center gap-3 border-top border-secondary pt-4 mt-4">
+              <button 
+                type="button" 
+                @click="startEditingMission" 
+                class="btn btn-outline-warning btn-tactical mono fw-bold px-4 w-100 w-md-auto"
+              >
+                <i class="fas fa-edit me-2"></i> EDIT_LOGGED_SHIFTS
+              </button>
+
+              <!-- Deletion Confirmation Deck -->
+              <div v-if="showDeleteConfirm" class="card bg-black-custom p-3 border border-danger w-100 mb-0">
+                <p class="mono text-danger mb-2 x-small">[ WARNING: PERMANENTLY ERASE DEBRIEF FROM ARCHIVES? CANNOT BE UNDONE. ]</p>
+                <div class="d-flex gap-2 justify-content-center">
+                  <button type="button" @click="deleteMission" class="btn btn-danger btn-xs mono fw-bold px-3">CONFIRM_ERASE</button>
+                  <button type="button" @click="showDeleteConfirm = false" class="btn btn-outline-secondary btn-xs mono px-3">CANCEL</button>
+                </div>
+              </div>
+              <button 
+                v-else
+                type="button" 
+                @click="showDeleteConfirm = true" 
+                class="btn btn-outline-danger btn-tactical mono fw-bold px-4 w-100 w-md-auto"
+              >
+                <i class="fas fa-trash me-2"></i> ERASE_MISSION_LOG
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted } from 'vue';
+import { defineComponent, ref, computed, onMounted } from 'vue';
 import api from './api';
-
 import DashboardHub from './components/DashboardHub.vue';
-import ActiveHeader from './components/ActiveMission/ActiveHeader.vue';
-import TruckFuelLogs from './components/ActiveMission/TruckFuelLogs.vue';
-import PurchaseOrders from './components/ActiveMission/PurchaseOrders.vue';
 import MissionHistory from './components/History/MissionHistory.vue';
+
+interface FuelType {
+  id: number;
+  name: string;
+  color_name: string;
+  color_hex: string;
+}
+
+interface FuelEntry {
+  fuel_type_id: number;
+  gallons: string;
+}
+
+interface Delivery {
+  store_number_or_riso: string;
+  storeValid: boolean | null;
+  storeName: string;
+  loading: boolean;
+  debounceTimer: number | null;
+  fuel_entries: FuelEntry[];
+}
 
 export default defineComponent({
   name: 'App',
   components: {
     DashboardHub,
-    ActiveHeader,
-    TruckFuelLogs,
-    PurchaseOrders,
     MissionHistory
   },
   setup() {
     const currentView = ref<string>('hub');
     const loadingGlobal = ref<boolean>(true);
     const agentName = ref<string>('RECOGNIZING...');
-
-    // Lists
-    const stores = ref<any[]>([]);
-    const fuelTypes = ref<any[]>([]);
+    const fuelTypes = ref<FuelType[]>([]);
     const historicalMissions = ref<any[]>([]);
+    const selectedMission = ref<any | null>(null);
+    const isEditing = ref<number | null>(null);
+    const showDeleteConfirm = ref<boolean>(false);
 
-    // State missions
-    const activeMission = ref<any | null>(null);
-    const currentMission = ref<any | null>(null);
+    // Form inputs state
+    const mileageMode = ref<'direct' | 'odo'>('direct');
+    const submitting = ref<boolean>(false);
+    const submissionError = ref<string>('');
+    const submissionSuccess = ref<boolean>(false);
 
-    // Form inputs (checkout)
-    const endMiles = ref<number | null>(null);
-    const totalMiles = ref<number | null>(null);
-    const hoursOnDuty = ref<number | null>(null);
-    const startTimeAdjust = ref<string>('');
-    const notes = ref<string>('');
+    const form = ref({
+      shift_start: '',
+      hours_on_duty: '',
+      total_miles: '',
+      start_miles: '',
+      end_miles: '',
+      notes: '',
+      deliveries: [] as Delivery[]
+    });
+
+    const defaultFuelTypeId = computed(() => {
+      const reg = fuelTypes.value.find(f => f.name.toUpperCase() === 'REGULAR');
+      return reg ? reg.id : (fuelTypes.value[0]?.id || 1);
+    });
+
+    const computedTotalMiles = computed(() => {
+      if (mileageMode.value === 'odo') {
+        const start = parseInt(form.value.start_miles);
+        const end = parseInt(form.value.end_miles);
+        if (!isNaN(start) && !isNaN(end)) {
+          return end - start;
+        }
+        return null;
+      }
+      return parseInt(form.value.total_miles) || null;
+    });
+
+    const hasInvalidStores = computed(() => {
+      return form.value.deliveries.some(d => d.storeValid === false);
+    });
+
+    const groupedDeliveries = computed(() => {
+      if (!selectedMission.value) return [];
+      
+      const storesMap: Record<number, { store_num: number; store_name: string; fuels: { name: string; gallons: number; color: string }[] }> = {};
+      
+      const orders = selectedMission.value.order_numbers || [];
+      for (const ord of orders) {
+        const pos = ord.purchase_orders || [];
+        for (const po of pos) {
+          const loads = po.loads || [];
+          for (const ld of loads) {
+            if (!ld.store_num) continue;
+            if (!storesMap[ld.store_num]) {
+              storesMap[ld.store_num] = {
+                store_num: ld.store_num,
+                store_name: ld.store_name || 'Unlisted Store',
+                fuels: []
+              };
+            }
+            storesMap[ld.store_num].fuels.push({
+              name: ld.fuel_type_name,
+              gallons: ld.gross_gal || 0,
+              color: ld.fuel_type_color || '#8da35d'
+            });
+          }
+        }
+      }
+      return Object.values(storesMap);
+    });
 
     const navigate = (view: string) => {
       currentView.value = view;
+      submissionSuccess.value = false;
+      submissionError.value = '';
+      showDeleteConfirm.value = false;
       if (view === 'hub') {
-        refreshActiveMissionState();
+        resetForm();
+        isEditing.value = null;
       } else if (view === 'history') {
         refreshHistoricalMissions();
+      } else if (view === 'active') {
+        if (!isEditing.value) {
+          resetForm();
+          // Pre-populate date time
+          const now = new Date();
+          const offset = now.getTimezoneOffset() * 60000;
+          form.value.shift_start = new Date(now.getTime() - offset).toISOString().slice(0, 16);
+          // Default to one empty delivery
+          addDelivery();
+        }
       }
+    };
+
+    const resetForm = () => {
+      form.value = {
+        shift_start: '',
+        hours_on_duty: '',
+        total_miles: '',
+        start_miles: '',
+        end_miles: '',
+        notes: '',
+        deliveries: []
+      };
+      mileageMode.value = 'direct';
     };
 
     const fetchAgentInfo = async () => {
@@ -289,62 +589,10 @@ export default defineComponent({
 
     const loadCoreData = async () => {
       try {
-        // Fetch Stores
-        const storesResp = await api.get('/stores/');
-        stores.value = storesResp.data;
-
-        // Fetch Fuel Types
         const fuelResp = await api.get('/fuel-types/');
         fuelTypes.value = fuelResp.data;
       } catch (error) {
-        console.error("Failed to load stores or fuel types initializer.", error);
-      }
-    };
-
-    const refreshActiveMissionState = async () => {
-      try {
-        const response = await api.get('/missions/active/');
-        if (response.data.active) {
-          syncMissionState(response.data.mission);
-        } else {
-          activeMission.value = null;
-          currentMission.value = null;
-        }
-      } catch (error) {
-        console.error("Failed to check active mission state.", error);
-      }
-    };
-
-    const syncMissionState = (mission: any) => {
-      activeMission.value = mission;
-      currentMission.value = mission;
-      notes.value = mission.notes || '';
-      endMiles.value = mission.end_miles || null;
-      hoursOnDuty.value = mission.hours_on_duty || null;
-      
-      // Calculate total miles from current start/end
-      if (mission.start_miles !== null && mission.end_miles !== null) {
-        totalMiles.value = mission.end_miles - mission.start_miles;
-      } else {
-        totalMiles.value = null;
-      }
-
-      // Sync start time adjust (local ISO)
-      if (mission.shift_start) {
-        const d = new Date(mission.shift_start);
-        const offset = d.getTimezoneOffset() * 60000;
-        const localIso = new Date(d.getTime() - offset).toISOString().slice(0, 16);
-        startTimeAdjust.value = localIso;
-      }
-    };
-
-    const refreshActiveMission = async () => {
-      if (!currentMission.value) return;
-      try {
-        const response = await api.get(`/missions/${currentMission.value.id}/`);
-        syncMissionState(response.data);
-      } catch (error) {
-        console.error("Failed to refresh active mission payload.", error);
+        console.error("Failed to load standardized fuel parameters.", error);
       }
     };
 
@@ -353,126 +601,221 @@ export default defineComponent({
         const response = await api.get('/missions/');
         historicalMissions.value = response.data;
       } catch (error) {
-        console.error("Failed to query historical archives.", error);
+        console.error("Failed to fetch historical database archives.", error);
       }
     };
 
-    const onMissionStarted = (mission: any) => {
-      syncMissionState(mission);
-    };
+    // Store validation routines
+    const validateStoreDebounced = (index: number) => {
+      const deliv = form.value.deliveries[index];
+      const val = deliv.store_number_or_riso.trim();
 
-    const onEndMilesChange = () => {
-      if (currentMission.value && currentMission.value.start_miles !== null && endMiles.value !== null) {
-        totalMiles.value = endMiles.value - currentMission.value.start_miles;
+      // Clear any pending validation timers
+      if (deliv.debounceTimer) {
+        clearTimeout(deliv.debounceTimer);
       }
-    };
 
-    const onTotalMilesChange = () => {
-      if (!currentMission.value) return;
-      if (totalMiles.value !== null) {
-        if (currentMission.value.start_miles !== null) {
-          // Adjust end miles to match total
-          endMiles.value = currentMission.value.start_miles + totalMiles.value;
-        } else if (endMiles.value !== null) {
-          // Adjust start miles to match total
-          currentMission.value.start_miles = endMiles.value - totalMiles.value;
-        }
-      }
-    };
-
-    const saveMissionMetrics = async () => {
-      if (!currentMission.value) return;
-      try {
-        await api.put(`/missions/${currentMission.value.id}/`, {
-          start_miles: currentMission.value.start_miles,
-          shift_start: new Date(startTimeAdjust.value).toISOString()
-        });
-        alert("Mission parameters updated successfully.");
-        refreshActiveMission();
-      } catch (error) {
-        alert("Failed to save parameters.");
-      }
-    };
-
-    const showConfirmSignOff = ref<boolean>(false);
-    const showConfirmAbort = ref<boolean>(false);
-
-    const saveFinalDebrief = async () => {
-      if (!currentMission.value) return;
-
-      const payload = {
-        end_miles: endMiles.value,
-        notes: notes.value,
-        hours_on_duty: hoursOnDuty.value
-      };
-
-      if (currentMission.value.is_completed) {
-        try {
-          await api.put(`/missions/${currentMission.value.id}/`, payload);
-          refreshActiveMission();
-        } catch (error) {
-          // Inline error
-        }
+      if (val === '') {
+        deliv.storeValid = null;
+        deliv.storeName = '';
+        deliv.loading = false;
         return;
       }
 
-      showConfirmSignOff.value = true;
-    };
+      deliv.loading = true;
+      deliv.storeValid = null;
 
-    const confirmSignOff = async () => {
-        if (!currentMission.value) return;
-
-        const payload = {
-            end_miles: endMiles.value,
-            notes: notes.value,
-            hours_on_duty: hoursOnDuty.value
-        };
-
+      deliv.debounceTimer = window.setTimeout(async () => {
         try {
-            const response = await api.post(`/missions/${currentMission.value.id}/complete/`, payload);
-            if (response.data.status === 'success') {
-                activeMission.value = null;
-                currentMission.value = null;
-                showConfirmSignOff.value = false;
-                navigate('hub');
-            }
-        } catch (error) {
-            // Inline error feedback
+          const response = await api.get('/stores/validate/', {
+            params: { q: val }
+          });
+          if (response.data.valid) {
+            deliv.storeValid = true;
+            deliv.storeName = response.data.store_name;
+          } else {
+            deliv.storeValid = false;
+            deliv.storeName = '';
+          }
+        } catch (err) {
+          deliv.storeValid = false;
+          deliv.storeName = '';
+        } finally {
+          deliv.loading = false;
         }
+      }, 500);
     };
 
-    const abortMission = async () => {
-      if (!currentMission.value) return;
-      showConfirmAbort.value = true;
+    // Deliveries controls
+    const addDelivery = () => {
+      form.value.deliveries.push({
+        store_number_or_riso: '',
+        storeValid: null,
+        storeName: '',
+        loading: false,
+        debounceTimer: null,
+        fuel_entries: [
+          { fuel_type_id: defaultFuelTypeId.value, gallons: '' }
+        ]
+      });
     };
 
-    const confirmAbortMission = async () => {
-      if (!currentMission.value) return;
+    const removeDelivery = (index: number) => {
+      const deliv = form.value.deliveries[index];
+      if (deliv.debounceTimer) clearTimeout(deliv.debounceTimer);
+      form.value.deliveries.splice(index, 1);
+    };
+
+    const addFuelEntry = (deliveryIndex: number) => {
+      form.value.deliveries[deliveryIndex].fuel_entries.push({
+        fuel_type_id: defaultFuelTypeId.value,
+        gallons: ''
+      });
+    };
+
+    const removeFuelEntry = (deliveryIndex: number, fuelIndex: number) => {
+      form.value.deliveries[deliveryIndex].fuel_entries.splice(fuelIndex, 1);
+    };
+
+    const calculateTotalMilesFromOdo = () => {
+      // Handled reactively by computed total miles
+    };
+
+    // Submit post trip debrief log
+    const submitPostTripLog = async () => {
+      submitting.value = true;
+      submissionError.value = '';
+      submissionSuccess.value = false;
+
+      // Extract values
+      const miles = computedTotalMiles.value;
+      const startMiles = mileageMode.value === 'odo' ? parseInt(form.value.start_miles) : null;
+      const endMiles = mileageMode.value === 'odo' ? parseInt(form.value.end_miles) : null;
+
+      const payload = {
+        shift_start: form.value.shift_start,
+        hours_on_duty: form.value.hours_on_duty,
+        total_miles: miles,
+        start_miles: startMiles,
+        end_miles: endMiles,
+        notes: form.value.notes,
+        deliveries: form.value.deliveries.map(d => ({
+          store_number_or_riso: d.store_number_or_riso.trim(),
+          fuel_entries: d.fuel_entries.map(f => ({
+            fuel_type_id: f.fuel_type_id,
+            gallons: f.gallons.trim()
+          }))
+        }))
+      };
+
       try {
-        await api.delete(`/missions/${currentMission.value.id}/`);
-        activeMission.value = null;
-        currentMission.value = null;
-        showConfirmAbort.value = false;
-        navigate('hub');
-      } catch (error) {
-        // Inline error
+        let response;
+        if (isEditing.value) {
+          response = await api.put(`/missions/post-trip/${isEditing.value}/`, payload);
+        } else {
+          response = await api.post('/missions/post-trip/', payload);
+        }
+
+        if (response.data.status === 'success') {
+          submissionSuccess.value = true;
+          window.setTimeout(() => {
+            navigate('hub');
+          }, 1500);
+        }
+      } catch (error: any) {
+        submissionError.value = error.response?.data?.message || "Failed to submit post-trip log to command HQ.";
+      } finally {
+        submitting.value = false;
       }
     };
-    const auditHistoricalMission = (mission: any) => {
-      syncMissionState(mission);
+
+    const viewHistoricalMission = (mission: any) => {
+      selectedMission.value = mission;
+      currentView.value = 'audit';
+    };
+
+    const startEditingMission = () => {
+      if (!selectedMission.value) return;
+      
+      const m = selectedMission.value;
+      isEditing.value = m.id;
+      
+      // Populate form
+      // Handle date format for datetime-local (YYYY-MM-DDTHH:mm) in local time
+      const d = new Date(m.shift_start);
+      const offset = d.getTimezoneOffset() * 60000;
+      form.value.shift_start = new Date(d.getTime() - offset).toISOString().slice(0, 16);
+      
+      form.value.hours_on_duty = m.hours_on_duty ? String(m.hours_on_duty) : '';
+      form.value.notes = m.notes || '';
+      
+      if (m.start_miles || m.end_miles) {
+        mileageMode.value = 'odo';
+        form.value.start_miles = m.start_miles ? String(m.start_miles) : '';
+        form.value.end_miles = m.end_miles ? String(m.end_miles) : '';
+        form.value.total_miles = '';
+      } else {
+        mileageMode.value = 'direct';
+        form.value.total_miles = m.total_miles ? String(m.total_miles) : '';
+        form.value.start_miles = '';
+        form.value.end_miles = '';
+      }
+      
+      // Reconstruct deliveries
+      const deliveries: Delivery[] = [];
+      const storesMap: Record<number, Delivery> = {};
+      
+      const orders = m.order_numbers || [];
+      for (const ord of orders) {
+        for (const po of ord.purchase_orders || []) {
+          for (const ld of po.loads || []) {
+            if (!ld.store_num) continue;
+            if (!storesMap[ld.store_num]) {
+              storesMap[ld.store_num] = {
+                store_number_or_riso: String(ld.store_num),
+                storeValid: true,
+                storeName: ld.store_name || 'Unlisted Store',
+                loading: false,
+                debounceTimer: null,
+                fuel_entries: []
+              };
+              deliveries.push(storesMap[ld.store_num]);
+            }
+            storesMap[ld.store_num].fuel_entries.push({
+              fuel_type_id: ld.fuel_type_id,
+              gallons: String(ld.gross_gal || 0)
+            });
+          }
+        }
+      }
+      
+      form.value.deliveries = deliveries;
       currentView.value = 'active';
     };
 
-    const exitAudits = () => {
-      currentMission.value = null;
-      navigate('history');
+    const deleteMission = async () => {
+      if (!selectedMission.value) return;
+      try {
+        await api.delete(`/missions/${selectedMission.value.id}/`);
+        refreshHistoricalMissions();
+        navigate('history');
+      } catch (error) {
+        console.error("Failed to delete mission archive.", error);
+        submissionError.value = "CRITICAL_FAILURE: SYSTEM COULD NOT ERASE ARCHIVE.";
+      }
+    };
+
+    // Date/Time formatting help
+    const formatDateTime = (isoString: string) => {
+      if (!isoString) return '-';
+      const d = new Date(isoString);
+      return d.toLocaleString();
     };
 
     onMounted(async () => {
       loadingGlobal.value = true;
       await fetchAgentInfo();
       await loadCoreData();
-      await refreshActiveMissionState();
       loadingGlobal.value = false;
     });
 
@@ -480,30 +823,31 @@ export default defineComponent({
       currentView,
       loadingGlobal,
       agentName,
-      stores,
       fuelTypes,
       historicalMissions,
-      activeMission,
-      currentMission,
-      endMiles,
-      totalMiles,
-      hoursOnDuty,
-      startTimeAdjust,
-      notes,
+      selectedMission,
+      isEditing,
+      showDeleteConfirm,
+      mileageMode,
+      submitting,
+      submissionError,
+      submissionSuccess,
+      form,
+      computedTotalMiles,
+      hasInvalidStores,
+      groupedDeliveries,
       navigate,
-      onMissionStarted,
-      onEndMilesChange,
-      onTotalMilesChange,
-      refreshActiveMission,
-      saveMissionMetrics,
-      saveFinalDebrief,
-      showConfirmSignOff,
-      confirmSignOff,
-      showConfirmAbort,
-      abortMission,
-      confirmAbortMission,
-      auditHistoricalMission,
-      exitAudits
+      validateStoreDebounced,
+      addDelivery,
+      removeDelivery,
+      addFuelEntry,
+      removeFuelEntry,
+      calculateTotalMilesFromOdo,
+      submitPostTripLog,
+      viewHistoricalMission,
+      startEditingMission,
+      deleteMission,
+      formatDateTime
     };
   }
 });
@@ -567,6 +911,47 @@ body {
   border-color: var(--primary-color) !important;
   box-shadow: 0 0 10px rgba(141, 163, 93, 0.2) !important;
   outline: none;
+}
+
+.tactical-input-table {
+  background-color: transparent !important;
+  color: white !important;
+  font-family: "JetBrains Mono", monospace !important;
+  padding: 0.5rem 0.75rem !important;
+  outline: none;
+}
+
+.tactical-input-table:focus {
+  background-color: rgba(141, 163, 93, 0.05) !important;
+}
+
+.rocker-switch {
+  padding: 0;
+  border-radius: 0;
+  overflow: hidden;
+}
+
+.rocker-btn {
+  border: none !important;
+  color: var(--muted-text-color) !important;
+  background: #171a1d !important;
+  transition: all 0.2s ease;
+  min-width: 80px;
+  min-height: 40px !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rocker-btn:hover {
+  background: #1c2126 !important;
+  color: white !important;
+}
+
+.rocker-btn.active {
+  background: var(--primary-color) !important;
+  color: #121417 !important;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.4), 0 0 10px rgba(141, 163, 93, 0.3) !important;
 }
 
 .btn-tactical-lg {
@@ -714,5 +1099,20 @@ body {
 
 .card {
   margin-bottom: 2rem !important;
+}
+
+.pulse-tactical {
+  animation: pulse 2s infinite alternate;
+}
+@keyframes pulse {
+  0% { text-shadow: 0 0 5px rgba(141, 163, 93, 0.4); }
+  100% { text-shadow: 0 0 15px rgba(141, 163, 93, 0.9); }
+}
+
+.blink-tactical {
+  animation: blinker 1.5s linear infinite;
+}
+@keyframes blinker {
+  50% { opacity: 0.3; }
 }
 </style>

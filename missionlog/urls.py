@@ -1,6 +1,6 @@
 from django.urls import path, re_path
 from .views import spa_index
-from .views import mission_views, po_views, load_views, fuel_views
+from .views import mission_views, po_views, load_views, fuel_views, store_views, post_trip_views
 
 app_name = "missionlog"
 
@@ -10,6 +10,16 @@ urlpatterns = [
         "api/missions/",
         mission_views.mission_list_or_create,
         name="mission_list_or_create",
+    ),
+    path(
+        "api/missions/post-trip/",
+        post_trip_views.post_trip_create,
+        name="post_trip_create",
+    ),
+    path(
+        "api/missions/post-trip/<int:pk>/",
+        post_trip_views.post_trip_update,
+        name="post_trip_update",
     ),
     path("api/missions/active/", mission_views.active_mission, name="active_mission"),
     path(
@@ -21,6 +31,11 @@ urlpatterns = [
         "api/missions/<int:pk>/complete/",
         mission_views.complete_mission,
         name="complete_mission",
+    ),
+    path(
+        "api/stores/validate/",
+        store_views.validate_store,
+        name="validate_store",
     ),
     # Fuel Types API Endpoint
     path("api/fuel-types/", mission_views.fuel_types_list, name="fuel_types_list"),

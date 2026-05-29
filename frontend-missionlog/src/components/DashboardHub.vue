@@ -24,9 +24,9 @@
       <div class="col-12 col-md-8 d-grid gap-3">
         <!-- Start New Mission -->
         <div v-if="!activeMission" class="card bg-dark-custom border-secondary p-4 text-center mb-2">
-          <div class="mono text-muted-custom small mb-4">[ MISSION_INITIALIZATION_PROTOCOL ]</div>
-          <button @click="startNewMission" class="btn btn-primary btn-tactical-lg mono fw-bold w-100">
-            START_NEW_SHIFT
+          <div class="mono text-muted-custom small mb-4">[ MISSION_DEBRIEF_PROTOCOL ]</div>
+          <button @click="$emit('navigate', 'active')" class="btn btn-primary btn-tactical-lg mono fw-bold w-100">
+            ENTER_POST_TRIP_LOG
           </button>
         </div>
 
