@@ -282,9 +282,17 @@ const TankGaugeIntel = {
 
                 try {
                     // TacticalGPS is global from base.html
-                    const data = await TacticalGPS.pulse();
-                    storeInput.value = data.store_num;
-                    this.updateIntelUI(data);
+                    const rawData = await TacticalGPS.pulse();
+                    
+                    // Handle the list-based response format
+                    const data = (rawData.results && rawData.results.length > 0) ? rawData.results[0] : rawData;
+
+                    if (data && data.store_num) {
+                        storeInput.value = data.store_num;
+                        this.updateIntelUI(data);
+                    } else {
+                        throw new Error("NO_DATA_RETURNED");
+                    }
                 } catch (err) {
                     console.warn("Fresh Pulse Failed:", err);
                     const storedId = this.updateIntelUI();
@@ -343,7 +351,8 @@ const TankGaugeIntel = {
             if (directIntelStatus) {
                 directIntelStatus.style.visibility = "visible";
                 directIntelId.innerText = `#${data.store_num}`;
-                directIntelDist.innerText = data.distance_display || `${data.distance_feet.toLocaleString()} FT`;
+                const distanceVal = data.distance_feet != null ? `${data.distance_feet.toLocaleString()} FT` : "DISTANCE_UNKNOWN";
+                directIntelDist.innerText = data.distance_display || distanceVal;
             }
             return data.store_num;
         }
