@@ -81,7 +81,6 @@
                         type="datetime-local" 
                         v-model="form.shift_start"
                         class="tactical-input-table w-100 mono text-light text-end border-0"
-                        required
                       />
                     </td>
                   </tr>
@@ -91,11 +90,9 @@
                       <input 
                         type="text" 
                         inputmode="decimal" 
-                        pattern="[0-9.]*" 
                         v-model="form.hours_on_duty" 
                         class="tactical-input-table w-100 mono text-light text-end border-0" 
                         placeholder="0.0"
-                        required
                       />
                     </td>
                   </tr>
@@ -129,11 +126,9 @@
                         <input 
                           type="text" 
                           inputmode="numeric" 
-                          pattern="[0-9]*" 
                           v-model="form.total_miles"
                           class="tactical-input-table w-100 mono text-light text-end border-0"
                           placeholder="0"
-                          required
                         />
                       </td>
                     </tr>
@@ -145,7 +140,6 @@
                         <input 
                           type="text" 
                           inputmode="numeric" 
-                          pattern="[0-9]*" 
                           v-model="form.start_miles"
                           @input="calculateTotalMilesFromOdo"
                           class="tactical-input-table w-100 mono text-light text-end border-0"
@@ -159,7 +153,6 @@
                         <input 
                           type="text" 
                           inputmode="numeric" 
-                          pattern="[0-9]*" 
                           v-model="form.end_miles"
                           @input="calculateTotalMilesFromOdo"
                           class="tactical-input-table w-100 mono text-light text-end border-0"
@@ -194,13 +187,11 @@
                 <input 
                   type="text" 
                   inputmode="numeric" 
-                  pattern="[0-9]*" 
                   v-model="deliv.store_number_or_riso"
                   @input="validateStoreDebounced(dIdx)"
                   class="tactical-input w-100 mono text-light"
                   placeholder="e.g. 4022"
                   :style="{ borderColor: deliv.storeValid === true ? '#8da35d' : (deliv.storeValid === false ? '#e94560' : '') }"
-                  required
                 />
                 
                 <!-- Validation status -->
@@ -233,11 +224,9 @@
                         <input 
                           type="text" 
                           inputmode="numeric" 
-                          pattern="[0-9]*" 
                           v-model="fEntry.gallons"
                           class="tactical-input-table w-100 text-center border-0 py-2"
                           placeholder="GAL"
-                          required
                         />
                       </td>
                       <td class="py-2 px-2 text-end align-middle">
@@ -296,7 +285,7 @@
               <button 
                 type="submit" 
                 class="btn btn-primary btn-tactical-lg mono fw-bold px-5"
-                :disabled="submitting || hasInvalidStores"
+                :disabled="submitting"
               >
                 {{ submitting ? 'SECURING_LOGS...' : (isEditing ? 'COMMIT_MISSION_CHANGES' : 'SUBMIT_POST_TRIP_DEBRIEF') }}
               </button>
@@ -687,8 +676,66 @@ export default defineComponent({
       submissionError.value = '';
       submissionSuccess.value = false;
 
-      // Extract values
+      // --- MANUAL VALIDATION PHASE ---
+      if (!form.value.shift_start) {
+        submissionError.value = "VALIDATION_ERROR: SHIFT START TIME IS REQUIRED.";
+        submitting.value = false;
+        return;
+      }
+
+      if (!form.value.hours_on_duty || String(form.value.hours_on_duty).trim() === "") {
+        submissionError.value = "VALIDATION_ERROR: HOURS ON DUTY MUST BE LOGGED.";
+        submitting.value = false;
+        return;
+      }
+
       const miles = computedTotalMiles.value;
+      if (miles === null || isNaN(miles)) {
+        submissionError.value = "VALIDATION_ERROR: TOTAL MILEAGE IS REQUIRED OR INVALID.";
+        submitting.value = false;
+        return;
+      }
+
+      // Filter out entirely empty delivery blocks
+      const activeDeliveries = form.value.deliveries.filter(d => {
+        const hasStore = String(d.store_number_or_riso || "").trim() !== "";
+        const hasGallons = d.fuel_entries.some(f => String(f.gallons || "").trim() !== "");
+        return hasStore || hasGallons;
+      });
+
+      if (activeDeliveries.length === 0) {
+        submissionError.value = "VALIDATION_ERROR: AT LEAST ONE STORE DELIVERY RECORD IS REQUIRED.";
+        submitting.value = false;
+        return;
+      }
+
+      // Deep validation of active deliveries
+      for (const d of activeDeliveries) {
+        if (d.loading) {
+          submissionError.value = "VALIDATION_ERROR: STORE VALIDATION IN PROGRESS. PLEASE WAIT.";
+          submitting.value = false;
+          return;
+        }
+        if (!d.store_number_or_riso || String(d.store_number_or_riso).trim() === "") {
+          submissionError.value = "VALIDATION_ERROR: ONE OR MORE DELIVERIES ARE MISSING A STORE NUMBER.";
+          submitting.value = false;
+          return;
+        }
+        if (d.storeValid === false) {
+          submissionError.value = `VALIDATION_ERROR: STORE '${d.store_number_or_riso}' IS NOT RECOGNIZED BY HQ.`;
+          submitting.value = false;
+          return;
+        }
+        
+        const validFuelEntries = d.fuel_entries.filter(f => String(f.gallons || "").trim() !== "");
+        if (validFuelEntries.length === 0) {
+          submissionError.value = `VALIDATION_ERROR: STORE ${d.store_number_or_riso} HAS NO VOLUME (GALLONS) LOGGED.`;
+          submitting.value = false;
+          return;
+        }
+      }
+
+      // --- PAYLOAD CONSTRUCTION ---
       const startMiles = mileageMode.value === 'odo' ? parseInt(form.value.start_miles) : null;
       const endMiles = mileageMode.value === 'odo' ? parseInt(form.value.end_miles) : null;
 
@@ -699,12 +746,14 @@ export default defineComponent({
         start_miles: startMiles,
         end_miles: endMiles,
         notes: form.value.notes,
-        deliveries: form.value.deliveries.map(d => ({
-          store_number_or_riso: d.store_number_or_riso.trim(),
-          fuel_entries: d.fuel_entries.map(f => ({
-            fuel_type_id: f.fuel_type_id,
-            gallons: f.gallons.trim()
-          }))
+        deliveries: activeDeliveries.map(d => ({
+          store_number_or_riso: String(d.store_number_or_riso || "").trim(),
+          fuel_entries: d.fuel_entries
+            .filter(f => String(f.gallons || "").trim() !== "")
+            .map(f => ({
+              fuel_type_id: f.fuel_type_id,
+              gallons: String(f.gallons || "").trim()
+            }))
         }))
       };
 
@@ -718,12 +767,15 @@ export default defineComponent({
 
         if (response.data.status === 'success') {
           submissionSuccess.value = true;
+          // Scroll to top to show success message on mobile
+          window.scrollTo({ top: 0, behavior: 'smooth' });
           window.setTimeout(() => {
             navigate('hub');
           }, 1500);
         }
       } catch (error: any) {
-        submissionError.value = error.response?.data?.message || "Failed to submit post-trip log to command HQ.";
+        submissionError.value = error.response?.data?.message || "POST_TRIP_PROTOCOL_FAILURE: SERVER REJECTED INGESTION.";
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       } finally {
         submitting.value = false;
       }
