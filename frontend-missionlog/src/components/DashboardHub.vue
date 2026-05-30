@@ -10,12 +10,12 @@
 
     <!-- Active Mission Warning/Resume -->
     <div v-if="activeMission" class="card bg-dark-custom border-primary p-4 mb-4 text-center select-panel">
-      <div class="mono text-primary small mb-2 blink-tactical">⚠️ ACTIVE MISSION IN PROGRESS</div>
-      <h3 class="mono text-light h5 mb-3">MISSION INITIALIZED AT {{ formatTime(activeMission.shift_start) }}</h3>
-      <p class="mono text-muted-custom small mb-4">Odometer Start: {{ activeMission.start_miles }} MI // Current Elapsed: {{ calculateElapsed(activeMission.shift_start) }}</p>
+      <div class="mono text-primary small mb-2 blink-tactical">⚠️ ACTIVE_SHIFT_DETECTED</div>
+      <h3 class="mono text-light h5 mb-3">OPERATIONAL_START: {{ formatTime(activeMission.shift_start) }}</h3>
+      <p class="mono text-muted-custom small mb-4">MI_ODO_START: {{ activeMission.start_miles || '---' }} // ELAPSED_TIME: {{ calculateElapsed(activeMission.shift_start) }}</p>
       
       <button @click="$emit('navigate', 'active')" class="btn btn-primary btn-tactical-lg mono fw-bold w-100">
-        CONTINUE_ACTIVE_MISSION
+        RESUME_ACTIVE_SHIFT
       </button>
     </div>
 
@@ -24,9 +24,9 @@
       <div class="col-12 col-md-8 d-grid gap-3">
         <!-- Start New Mission -->
         <div v-if="!activeMission" class="card bg-dark-custom border-secondary p-4 text-center mb-2">
-          <div class="mono text-muted-custom small mb-4">[ MISSION_DEBRIEF_PROTOCOL ]</div>
+          <div class="mono text-muted-custom small mb-4">[ SHIFT_INITIALIZATION_PROTOCOL ]</div>
           <button @click="$emit('navigate', 'active')" class="btn btn-primary btn-tactical-lg mono fw-bold w-100">
-            ENTER_POST_TRIP_LOG
+            INITIALIZE_SHIFT
           </button>
         </div>
 

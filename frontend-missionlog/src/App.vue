@@ -43,6 +43,7 @@
         <!-- Dashboard Hub View -->
         <DashboardHub 
           v-if="currentView === 'hub'" 
+          :activeMission="activeMissionData"
           @navigate="navigate"
         />
 
@@ -57,237 +58,60 @@
 
           <!-- Top Header -->
           <div class="card bg-dark-custom border-secondary p-4 text-center mb-4">
-            <h2 class="mono text-light h4 uppercase">[ {{ isEditing ? 'UPDATE_MISSION_LOG' : 'POST-TRIP LOGGING DECK' }} ]</h2>
-            <div class="mono text-primary x-small mt-1">[ PROTOCOL: {{ isEditing ? 'REVISION_INGESTION' : 'MONOLITHIC_INGESTION' }} ]</div>
+            <h2 class="mono text-light h4 uppercase">[ {{ (isEditing || activeMissionId) ? 'ACTIVE_MISSION_CONSOLE' : 'SHIFT_INITIALIZATION' }} ]</h2>
+            <div class="mono text-primary x-small mt-1">[ PROTOCOL: {{ (isEditing || activeMissionId) ? 'REAL_TIME_INGESTION' : 'NEW_DEPLOYMENT' }} ]</div>
           </div>
 
           <!-- Monolithic Form -->
-          <form @submit.prevent="submitPostTripLog" class="card bg-dark-custom border-secondary p-4 mb-5">
-            <!-- SHIFT PARAMETERS TABLE -->
-            <div class="mono text-muted-custom small mb-3 text-center">[ OPERATIONAL_LOG_PARAMETERS ]</div>
-            <div class="table-responsive mb-4 mx-auto" style="max-width: 600px;">
-              <table class="table table-bordered border-secondary bg-black-custom mono x-small text-light mb-0">
-                <thead>
-                  <tr class="bg-dark-custom text-primary text-uppercase">
-                    <th scope="col" class="py-2 px-3">PARAMETER</th>
-                    <th scope="col" class="py-2 px-3 text-end">INPUT_VALUE</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td class="py-2 px-3 align-middle text-muted-custom">SHIFT START TIME</td>
-                    <td class="py-0 px-0">
-                      <input 
-                        type="datetime-local" 
-                        v-model="form.shift_start"
-                        class="tactical-input-table w-100 mono text-light text-end border-0"
-                      />
-                    </td>
-                  </tr>
-                  <tr>
-                    <td class="py-2 px-3 align-middle text-muted-custom">HOURS ON DUTY</td>
-                    <td class="py-0 px-0">
-                      <input 
-                        type="text" 
-                        inputmode="decimal" 
-                        v-model="form.hours_on_duty" 
-                        class="tactical-input-table w-100 mono text-light text-end border-0" 
-                        placeholder="0.0"
-                      />
-                    </td>
-                  </tr>
-                  <tr>
-                    <td class="py-2 px-3 align-middle text-muted-custom">MILEAGE MODE</td>
-                    <td class="py-2 px-3 text-end">
-                      <div class="rocker-switch d-inline-flex flex-nowrap border border-secondary bg-black-custom">
-                        <button 
-                          type="button" 
-                          @click="mileageMode = 'direct'"
-                          class="rocker-btn btn btn-xs mono fw-bold px-3" 
-                          :class="{ 'active': mileageMode === 'direct' }"
-                        >
-                          DIRECT
-                        </button>
-                        <button 
-                          type="button" 
-                          @click="mileageMode = 'odo'"
-                          class="rocker-btn btn btn-xs mono fw-bold px-3 border-start border-secondary" 
-                          :class="{ 'active': mileageMode === 'odo' }"
-                        >
-                          ODO
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                  <template v-if="mileageMode === 'direct'">
-                    <tr>
-                      <td class="py-2 px-3 align-middle text-muted-custom">TOTAL MILES</td>
-                      <td class="py-0 px-0">
-                        <input 
-                          type="text" 
-                          inputmode="numeric" 
-                          v-model="form.total_miles"
-                          class="tactical-input-table w-100 mono text-light text-end border-0"
-                          placeholder="0"
-                        />
-                      </td>
-                    </tr>
-                  </template>
-                  <template v-else>
-                    <tr>
-                      <td class="py-2 px-3 align-middle text-muted-custom">STARTING ODOMETER</td>
-                      <td class="py-0 px-0">
-                        <input 
-                          type="text" 
-                          inputmode="numeric" 
-                          v-model="form.start_miles"
-                          @input="calculateTotalMilesFromOdo"
-                          class="tactical-input-table w-100 mono text-light text-end border-0"
-                          placeholder="START"
-                        />
-                      </td>
-                    </tr>
-                    <tr>
-                      <td class="py-2 px-3 align-middle text-muted-custom">ENDING ODOMETER</td>
-                      <td class="py-0 px-0">
-                        <input 
-                          type="text" 
-                          inputmode="numeric" 
-                          v-model="form.end_miles"
-                          @input="calculateTotalMilesFromOdo"
-                          class="tactical-input-table w-100 mono text-light text-end border-0"
-                          placeholder="END"
-                        />
-                      </td>
-                    </tr>
-                    <tr v-if="computedTotalMiles !== null">
-                      <td class="py-2 px-3 align-middle text-muted-custom text-primary">[ COMPUTED TOTAL ]</td>
-                      <td class="py-2 px-3 text-end text-primary fw-bold">{{ computedTotalMiles }} MILES</td>
-                    </tr>
-                  </template>
-                </tbody>
-              </table>
-            </div>
-
-            <!-- DELIVERIES SECTION -->
-            <div class="mono text-muted-custom small mb-3">[ RETAIL_CARGO_DELIVERIES ]</div>
+          <form @submit.prevent="() => {}" class="card bg-dark-custom border-secondary p-4 mb-5">
             
-            <div v-if="form.deliveries.length === 0" class="mono text-muted-custom small py-3 border border-dashed mb-4">
-              [ NO DELIVERIES RECORDED. PRESS 'ADD STORE DELIVERY' BELOW. ]
-            </div>
+            <ShiftParameters v-model="form.shift_start" />
 
-            <div v-for="(deliv, dIdx) in form.deliveries" :key="dIdx" class="card bg-black-custom border-secondary p-3 mb-4 text-start">
-              <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2">
-                <span class="mono x-small text-warning fw-bold">DELIVERY #{{ String(dIdx + 1).padStart(2, '0') }}</span>
-              </div>
+            <CargoDeliveries 
+              :deliveries="form.deliveries"
+              :fuelTypes="fuelTypes"
+              @validate-store="validateStoreDebounced"
+              @add-delivery="addDelivery"
+              @remove-delivery="removeDelivery"
+              @add-fuel-entry="addFuelEntry"
+              @remove-fuel-entry="removeFuelEntry"
+            />
 
-              <!-- Store input with realtime async validation -->
-              <div class="mb-3">
-                <label class="form-label mono x-small text-primary fw-bold mb-1">STORE / RISO NUMBER</label>
-                <input 
-                  type="text" 
-                  inputmode="numeric" 
-                  v-model="deliv.store_number_or_riso"
-                  @input="validateStoreDebounced(dIdx)"
-                  class="tactical-input w-100 mono text-light"
-                  placeholder="e.g. 4022"
-                  :style="{ borderColor: deliv.storeValid === true ? '#8da35d' : (deliv.storeValid === false ? '#e94560' : '') }"
-                />
-                
-                <!-- Validation status -->
-                <div class="mt-1 d-flex align-items-center gap-2">
-                  <span v-if="deliv.loading" class="mono x-small text-muted-custom blink-tactical">[ VALIDATING_SITE... ]</span>
-                  <span v-else-if="deliv.storeValid === true" class="mono x-small text-primary fw-bold">✓ SECURE: {{ deliv.storeName }}</span>
-                  <span v-else-if="deliv.storeValid === false" class="mono x-small text-danger fw-bold">✗ HOSTILE: STORE NOT FOUND IN DATABASE</span>
-                  <span v-else class="mono x-small text-muted-custom">[ TYPE TO COMMENCE SECURE VALIDATION ]</span>
-                </div>
-              </div>
+            <TruckFuelEntry v-model="form.truck_fuel" />
 
-              <!-- Fuel Entries for this Store -->
-              <div class="table-responsive mb-2">
-                <table class="table table-sm table-bordered border-secondary bg-black-custom mono x-small text-light mb-0">
-                  <thead>
-                    <tr class="text-primary text-uppercase" style="font-size: 0.6rem;">
-                      <th class="py-1 px-2">FUEL_TYPE</th>
-                      <th class="py-1 px-2 text-center">VOLUME</th>
-                      <th class="py-1 px-2 text-end">ACT</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr v-for="(fEntry, fIdx) in deliv.fuel_entries" :key="fIdx">
-                      <td class="py-0 px-0">
-                        <select v-model="fEntry.fuel_type_id" class="tactical-input-table w-100 border-0 py-2">
-                          <option v-for="ft in fuelTypes" :key="ft.id" :value="ft.id">{{ ft.name }}</option>
-                        </select>
-                      </td>
-                      <td class="py-0 px-0">
-                        <input 
-                          type="text" 
-                          inputmode="numeric" 
-                          v-model="fEntry.gallons"
-                          class="tactical-input-table w-100 text-center border-0 py-2"
-                          placeholder="GAL"
-                        />
-                      </td>
-                      <td class="py-2 px-2 text-end align-middle">
-                        <button 
-                          type="button" 
-                          @click="removeFuelEntry(dIdx, fIdx)" 
-                          class="btn btn-outline-danger btn-xs"
-                          :disabled="deliv.fuel_entries.length <= 1"
-                          style="min-height: auto; padding: 2px 6px;"
-                        >
-                          ✗
-                        </button>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-
-              <!-- Add Fuel Type and Remove Store -->
-              <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top border-secondary">
-                <button type="button" @click="removeDelivery(dIdx)" class="btn btn-outline-danger btn-xs mono">
-                  <i class="fas fa-trash-alt me-1"></i> DISCARD_SITE
-                </button>
-                <button type="button" @click="addFuelEntry(dIdx)" class="btn btn-outline-primary btn-xs mono fw-bold">
-                  + ADD_FUEL_VARIANT
-                </button>
-              </div>
-            </div>
-
-            <!-- Add Delivery block -->
-            <button type="button" @click="addDelivery" class="btn btn-outline-warning w-100 mono fw-bold mb-4 py-3">
-              + ADD STORE DELIVERY
-            </button>
-
-            <!-- GENERAL DEBRIEF NOTES -->
-            <div class="mono text-muted-custom small mb-3">[ DEBRIEF_MEMORANDUM ]</div>
-            <div class="mb-4">
-              <textarea 
-                v-model="form.notes"
-                rows="3"
-                class="tactical-input w-100 mono text-light text-center"
-                placeholder="SITE QUIRKS, ROADBLOCKS, PUMP OBSERVATIONS..."
-              ></textarea>
-            </div>
+            <MissionMetrics 
+              :form="form"
+              :mileageMode="mileageMode"
+              :computedTotalMiles="computedTotalMiles"
+              @update:mileage-mode="val => mileageMode = val"
+            />
 
             <!-- Submit Status Indicators -->
             <div v-if="submissionError" class="alert alert-danger bg-black-custom border-danger mono x-small text-danger mb-3">
               ❌ INGESTION_ERROR: {{ submissionError }}
             </div>
             <div v-if="submissionSuccess" class="alert alert-success bg-black-custom border-primary mono x-small text-primary mb-3">
-              ✓ SECURED: POST-TRIP INGESTION PROTOCOL COMPLETE.
+              ✓ SECURED: DATA_STREAM_SYNC_COMPLETE.
             </div>
 
             <!-- Submit action buttons -->
-            <div class="d-flex justify-content-center gap-3">
+            <div class="d-flex flex-column gap-3">
               <button 
-                type="submit" 
-                class="btn btn-primary btn-tactical-lg mono fw-bold px-5"
+                type="button" 
+                @click="submitShiftLog(false)"
+                class="btn btn-outline-primary btn-tactical-lg mono fw-bold w-100"
                 :disabled="submitting"
               >
-                {{ submitting ? 'SECURING_LOGS...' : (isEditing ? 'COMMIT_MISSION_CHANGES' : 'SUBMIT_POST_TRIP_DEBRIEF') }}
+                {{ submitting ? 'SYNCING...' : 'SAVE_OPERATIONAL_PROGRESS' }}
+              </button>
+              
+              <button 
+                type="button" 
+                @click="submitShiftLog(true)"
+                class="btn btn-primary btn-tactical-lg mono fw-bold w-100"
+                :disabled="submitting"
+              >
+                {{ submitting ? 'FINALIZING...' : 'COMMIT_MISSION_TO_ARCHIVES' }}
               </button>
             </div>
           </form>
@@ -347,6 +171,12 @@
                   <tr>
                     <td class="py-2 px-3 text-muted-custom">UNIQUE STORES VISITED</td>
                     <td class="py-2 px-3 text-end text-warning fw-bold">{{ selectedMission.total_stops }} STORES</td>
+                  </tr>
+                  <tr v-if="selectedMission.fuel_logs && selectedMission.fuel_logs.length > 0">
+                    <td class="py-2 px-3 text-muted-custom">TRUCK FUEL USED</td>
+                    <td class="py-2 px-3 text-end text-primary fw-bold">
+                      {{ selectedMission.fuel_logs[0].gallons }} GAL @ ${{ selectedMission.fuel_logs[0].price_per_gallon }}
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -426,6 +256,10 @@ import { defineComponent, ref, computed, onMounted } from 'vue';
 import api from './api';
 import DashboardHub from './components/DashboardHub.vue';
 import MissionHistory from './components/History/MissionHistory.vue';
+import ShiftParameters from './components/ActiveMission/ShiftParameters.vue';
+import CargoDeliveries from './components/ActiveMission/CargoDeliveries.vue';
+import TruckFuelEntry from './components/ActiveMission/TruckFuelEntry.vue';
+import MissionMetrics from './components/ActiveMission/MissionMetrics.vue';
 
 interface FuelType {
   id: number;
@@ -452,7 +286,11 @@ export default defineComponent({
   name: 'App',
   components: {
     DashboardHub,
-    MissionHistory
+    MissionHistory,
+    ShiftParameters,
+    CargoDeliveries,
+    TruckFuelEntry,
+    MissionMetrics
   },
   setup() {
     const currentView = ref<string>('hub');
@@ -460,6 +298,7 @@ export default defineComponent({
     const agentName = ref<string>('RECOGNIZING...');
     const fuelTypes = ref<FuelType[]>([]);
     const historicalMissions = ref<any[]>([]);
+    const activeMissionData = ref<any | null>(null);
     const selectedMission = ref<any | null>(null);
     const isEditing = ref<number | null>(null);
     const showDeleteConfirm = ref<boolean>(false);
@@ -477,8 +316,11 @@ export default defineComponent({
       start_miles: '',
       end_miles: '',
       notes: '',
+      truck_fuel: { gallons: '', price_per_gallon: '' },
       deliveries: [] as Delivery[]
     });
+
+    const activeMissionId = computed(() => activeMissionData.value?.id || null);
 
     const defaultFuelTypeId = computed(() => {
       const reg = fuelTypes.value.find(f => f.name.toUpperCase() === 'REGULAR');
@@ -537,12 +379,13 @@ export default defineComponent({
       submissionError.value = '';
       showDeleteConfirm.value = false;
       if (view === 'hub') {
+        refreshActiveMission();
         resetForm();
         isEditing.value = null;
       } else if (view === 'history') {
         refreshHistoricalMissions();
       } else if (view === 'active') {
-        if (!isEditing.value) {
+        if (!isEditing.value && !activeMissionId.value) {
           resetForm();
           // Pre-populate date time
           const now = new Date();
@@ -550,6 +393,9 @@ export default defineComponent({
           form.value.shift_start = new Date(now.getTime() - offset).toISOString().slice(0, 16);
           // Default to one empty delivery
           addDelivery();
+        } else if (activeMissionId.value && !isEditing.value) {
+          // Resume active mission
+          populateFormFromMission(activeMissionData.value);
         }
       }
     };
@@ -562,6 +408,7 @@ export default defineComponent({
         start_miles: '',
         end_miles: '',
         notes: '',
+        truck_fuel: { gallons: '', price_per_gallon: '' },
         deliveries: []
       };
       mileageMode.value = 'direct';
@@ -582,6 +429,19 @@ export default defineComponent({
         fuelTypes.value = fuelResp.data;
       } catch (error) {
         console.error("Failed to load standardized fuel parameters.", error);
+      }
+    };
+
+    const refreshActiveMission = async () => {
+      try {
+        const response = await api.get('/missions/active/');
+        if (response.data.active) {
+          activeMissionData.value = response.data.mission;
+        } else {
+          activeMissionData.value = null;
+        }
+      } catch (error) {
+        console.error("Failed to resolve active mission.");
       }
     };
 
@@ -666,34 +526,31 @@ export default defineComponent({
       form.value.deliveries[deliveryIndex].fuel_entries.splice(fuelIndex, 1);
     };
 
-    const calculateTotalMilesFromOdo = () => {
-      // Handled reactively by computed total miles
-    };
-
-    // Submit post trip debrief log
-    const submitPostTripLog = async () => {
+    const submitShiftLog = async (complete: boolean) => {
       submitting.value = true;
       submissionError.value = '';
       submissionSuccess.value = false;
 
-      // --- MANUAL VALIDATION PHASE ---
+      // --- VALIDATION PHASE ---
       if (!form.value.shift_start) {
         submissionError.value = "VALIDATION_ERROR: SHIFT START TIME IS REQUIRED.";
         submitting.value = false;
         return;
       }
 
-      if (!form.value.hours_on_duty || String(form.value.hours_on_duty).trim() === "") {
-        submissionError.value = "VALIDATION_ERROR: HOURS ON DUTY MUST BE LOGGED.";
-        submitting.value = false;
-        return;
-      }
+      if (complete) {
+        if (!form.value.hours_on_duty || String(form.value.hours_on_duty).trim() === "") {
+          submissionError.value = "VALIDATION_ERROR: HOURS ON DUTY MUST BE LOGGED FOR FINALIZATION.";
+          submitting.value = false;
+          return;
+        }
 
-      const miles = computedTotalMiles.value;
-      if (miles === null || isNaN(miles)) {
-        submissionError.value = "VALIDATION_ERROR: TOTAL MILEAGE IS REQUIRED OR INVALID.";
-        submitting.value = false;
-        return;
+        const miles = computedTotalMiles.value;
+        if (miles === null || isNaN(miles)) {
+          submissionError.value = "VALIDATION_ERROR: TOTAL MILEAGE IS REQUIRED FOR FINALIZATION.";
+          submitting.value = false;
+          return;
+        }
       }
 
       // Filter out entirely empty delivery blocks
@@ -702,12 +559,6 @@ export default defineComponent({
         const hasGallons = d.fuel_entries.some(f => String(f.gallons || "").trim() !== "");
         return hasStore || hasGallons;
       });
-
-      if (activeDeliveries.length === 0) {
-        submissionError.value = "VALIDATION_ERROR: AT LEAST ONE STORE DELIVERY RECORD IS REQUIRED.";
-        submitting.value = false;
-        return;
-      }
 
       // Deep validation of active deliveries
       for (const d of activeDeliveries) {
@@ -739,13 +590,15 @@ export default defineComponent({
       const startMiles = mileageMode.value === 'odo' ? parseInt(form.value.start_miles) : null;
       const endMiles = mileageMode.value === 'odo' ? parseInt(form.value.end_miles) : null;
 
-      const payload = {
+      const payload: any = {
         shift_start: form.value.shift_start,
+        is_completed: complete,
         hours_on_duty: form.value.hours_on_duty,
-        total_miles: miles,
+        total_miles: computedTotalMiles.value,
         start_miles: startMiles,
         end_miles: endMiles,
         notes: form.value.notes,
+        truck_fuel: (form.value.truck_fuel.gallons && form.value.truck_fuel.price_per_gallon) ? form.value.truck_fuel : null,
         deliveries: activeDeliveries.map(d => ({
           store_number_or_riso: String(d.store_number_or_riso || "").trim(),
           fuel_entries: d.fuel_entries
@@ -759,41 +612,34 @@ export default defineComponent({
 
       try {
         let response;
-        if (isEditing.value) {
-          response = await api.put(`/missions/post-trip/${isEditing.value}/`, payload);
+        const targetId = isEditing.value || activeMissionId.value;
+        if (targetId) {
+          response = await api.put(`/missions/post-trip/${targetId}/`, payload);
         } else {
           response = await api.post('/missions/post-trip/', payload);
         }
 
         if (response.data.status === 'success') {
           submissionSuccess.value = true;
-          // Scroll to top to show success message on mobile
           window.scrollTo({ top: 0, behavior: 'smooth' });
           window.setTimeout(() => {
-            navigate('hub');
+            if (complete) {
+              navigate('hub');
+            } else {
+              submissionSuccess.value = false;
+              refreshActiveMission();
+            }
           }, 1500);
         }
       } catch (error: any) {
-        submissionError.value = error.response?.data?.message || "POST_TRIP_PROTOCOL_FAILURE: SERVER REJECTED INGESTION.";
+        submissionError.value = error.response?.data?.message || "OPERATIONAL_FAILURE: SERVER REJECTED DATA STREAM.";
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } finally {
         submitting.value = false;
       }
     };
 
-    const viewHistoricalMission = (mission: any) => {
-      selectedMission.value = mission;
-      currentView.value = 'audit';
-    };
-
-    const startEditingMission = () => {
-      if (!selectedMission.value) return;
-      
-      const m = selectedMission.value;
-      isEditing.value = m.id;
-      
-      // Populate form
-      // Handle date format for datetime-local (YYYY-MM-DDTHH:mm) in local time
+    const populateFormFromMission = (m: any) => {
       const d = new Date(m.shift_start);
       const offset = d.getTimezoneOffset() * 60000;
       form.value.shift_start = new Date(d.getTime() - offset).toISOString().slice(0, 16);
@@ -812,18 +658,23 @@ export default defineComponent({
         form.value.start_miles = '';
         form.value.end_miles = '';
       }
+
+      if (m.fuel_logs && m.fuel_logs.length > 0) {
+        form.value.truck_fuel.gallons = String(m.fuel_logs[0].gallons);
+        form.value.truck_fuel.price_per_gallon = String(m.fuel_logs[0].price_per_gallon);
+      } else {
+        form.value.truck_fuel = { gallons: '', price_per_gallon: '' };
+      }
       
-      // Reconstruct deliveries
       const deliveries: Delivery[] = [];
-      const storesMap: Record<number, Delivery> = {};
-      
       const orders = m.order_numbers || [];
       for (const ord of orders) {
         for (const po of ord.purchase_orders || []) {
           for (const ld of po.loads || []) {
             if (!ld.store_num) continue;
-            if (!storesMap[ld.store_num]) {
-              storesMap[ld.store_num] = {
+            let existing = deliveries.find(d => d.store_number_or_riso === String(ld.store_num));
+            if (!existing) {
+              existing = {
                 store_number_or_riso: String(ld.store_num),
                 storeValid: true,
                 storeName: ld.store_name || 'Unlisted Store',
@@ -831,9 +682,9 @@ export default defineComponent({
                 debounceTimer: null,
                 fuel_entries: []
               };
-              deliveries.push(storesMap[ld.store_num]);
+              deliveries.push(existing);
             }
-            storesMap[ld.store_num].fuel_entries.push({
+            existing.fuel_entries.push({
               fuel_type_id: ld.fuel_type_id,
               gallons: String(ld.gross_gal || 0)
             });
@@ -841,7 +692,20 @@ export default defineComponent({
         }
       }
       
-      form.value.deliveries = deliveries;
+      form.value.deliveries = deliveries.length > 0 ? deliveries : [
+          { store_number_or_riso: '', storeValid: null, storeName: '', loading: false, debounceTimer: null, fuel_entries: [{ fuel_type_id: defaultFuelTypeId.value, gallons: '' }] }
+      ];
+    };
+
+    const viewHistoricalMission = (mission: any) => {
+      selectedMission.value = mission;
+      currentView.value = 'audit';
+    };
+
+    const startEditingMission = () => {
+      if (!selectedMission.value) return;
+      isEditing.value = selectedMission.value.id;
+      populateFormFromMission(selectedMission.value);
       currentView.value = 'active';
     };
 
@@ -857,7 +721,6 @@ export default defineComponent({
       }
     };
 
-    // Date/Time formatting help
     const formatDateTime = (isoString: string) => {
       if (!isoString) return '-';
       const d = new Date(isoString);
@@ -868,6 +731,7 @@ export default defineComponent({
       loadingGlobal.value = true;
       await fetchAgentInfo();
       await loadCoreData();
+      await refreshActiveMission();
       loadingGlobal.value = false;
     });
 
@@ -877,6 +741,8 @@ export default defineComponent({
       agentName,
       fuelTypes,
       historicalMissions,
+      activeMissionData,
+      activeMissionId,
       selectedMission,
       isEditing,
       showDeleteConfirm,
@@ -894,8 +760,7 @@ export default defineComponent({
       removeDelivery,
       addFuelEntry,
       removeFuelEntry,
-      calculateTotalMilesFromOdo,
-      submitPostTripLog,
+      submitShiftLog,
       viewHistoricalMission,
       startEditingMission,
       deleteMission,

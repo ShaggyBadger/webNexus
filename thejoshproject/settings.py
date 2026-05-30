@@ -238,4 +238,4 @@ if not DEBUG:
     # 4. Proxy Configuration: Trusts the 'X-Forwarded-Proto' header from Nginx.
     # This is essential when running behind a reverse proxy that handles SSL termination.
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-APP_VERSION = "2.4.0"
+APP_VERSION = "2.4.2"
