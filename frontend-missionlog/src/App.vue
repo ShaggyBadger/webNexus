@@ -728,11 +728,18 @@ export default defineComponent({
     };
 
     onMounted(async () => {
-      loadingGlobal.value = true;
-      await fetchAgentInfo();
-      await loadCoreData();
-      await refreshActiveMission();
-      loadingGlobal.value = false;
+      try {
+        loadingGlobal.value = true;
+        await Promise.all([
+          fetchAgentInfo(),
+          loadCoreData(),
+          refreshActiveMission()
+        ]);
+      } catch (err) {
+        console.error("INITIALIZATION_FAILURE: TACTICAL_HQ_UNREACHABLE.", err);
+      } finally {
+        loadingGlobal.value = false;
+      }
     });
 
     return {

@@ -8,7 +8,8 @@
           <input 
             type="text" 
             inputmode="decimal" 
-            v-model="modelValue.gallons"
+            :value="modelValue.gallons"
+            @input="updateField('gallons', ($event.target as HTMLInputElement).value)"
             class="tactical-input w-100 mono text-light"
             placeholder="0.00"
           />
@@ -18,7 +19,8 @@
           <input 
             type="text" 
             inputmode="decimal" 
-            v-model="modelValue.price_per_gallon"
+            :value="modelValue.price_per_gallon"
+            @input="updateField('price_per_gallon', ($event.target as HTMLInputElement).value)"
             class="tactical-input w-100 mono text-light"
             placeholder="0.000"
           />
@@ -33,17 +35,18 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, computed } from 'vue';
+import { defineComponent, computed, type PropType } from 'vue';
 
 export default defineComponent({
   name: 'TruckFuelEntry',
   props: {
     modelValue: {
-      type: Object as () => { gallons: string; price_per_gallon: string },
+      type: Object as PropType<{ gallons: string; price_per_gallon: string }>,
       required: true
     }
   },
-  setup(props) {
+  emits: ['update:modelValue'],
+  setup(props, { emit }) {
     const computedTotal = computed(() => {
       const g = parseFloat(props.modelValue.gallons);
       const p = parseFloat(props.modelValue.price_per_gallon);
@@ -53,8 +56,16 @@ export default defineComponent({
       return null;
     });
 
+    const updateField = (field: 'gallons' | 'price_per_gallon', value: string) => {
+      emit('update:modelValue', {
+        ...props.modelValue,
+        [field]: value
+      });
+    };
+
     return {
-      computedTotal
+      computedTotal,
+      updateField
     };
   }
 });

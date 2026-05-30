@@ -83,7 +83,9 @@ export default defineComponent({
     };
 
     const calculateElapsed = (isoString: string) => {
+      if (!isoString) return '0H 0M';
       const start = new Date(isoString).getTime();
+      if (isNaN(start)) return '0H 0M';
       const elapsedMs = Date.now() - start;
       const hours = Math.floor(elapsedMs / 3600000);
       const minutes = Math.floor((elapsedMs % 3600000) / 60000);

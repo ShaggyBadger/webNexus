@@ -108,22 +108,23 @@
 </template>
 
 <script lang="ts">
-import { defineComponent } from 'vue';
+import { defineComponent, type PropType } from 'vue';
 
 export default defineComponent({
   name: 'MissionMetrics',
   props: {
     form: {
-      type: Object,
+      type: Object as PropType<any>,
       required: true
     },
     mileageMode: {
-      type: String,
+      type: String as PropType<string>,
       required: true
     },
     computedTotalMiles: {
-      type: [Number, null] as any,
-      required: true
+      type: Number as PropType<number | null>,
+      required: false,
+      default: null
     }
   },
   emits: ['update:mileage-mode']
