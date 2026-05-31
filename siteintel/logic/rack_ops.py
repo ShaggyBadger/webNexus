@@ -24,7 +24,7 @@ def get_rack_status(user, rack):
             "label": "Expired (No Check-in)",
         }
 
-    delta = datetime.now(timezone.utc) - last_checkin.timestamp
+    delta = datetime.now(timezone.utc).date() - last_checkin.timestamp.date()
     days_remaining = max(0, rack.lockout_days - delta.days)
 
     if days_remaining > 60:
