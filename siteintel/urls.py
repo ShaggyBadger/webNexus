@@ -29,6 +29,11 @@ urlpatterns = [
         views.MapOverlayUpdateView.as_view(),
         name="map_edit",
     ),
+    path(
+        "site/<int:pk>/hand-map/",
+        views.HandDrawnMapEditView.as_view(),
+        name="hand_map_edit",
+    ),
     path("racks/", views.FuelRackListView.as_view(), name="rack_list"),
     path("selector/", views.SiteSelectorView.as_view(), name="selector"),
     path(
@@ -44,4 +49,9 @@ urlpatterns = [
     path("api/site-lookup/", views.site_lookup_api, name="api_site_lookup"),
     path("api/rack-status/", views.rack_status_api, name="api_rack_status"),
     path("api/rack-checkin/", views.rack_checkin_api, name="api_rack_checkin"),
+    path(
+        "api/site/<int:location_id>/hand-map/save/",
+        views.hand_drawn_map_save_api,
+        name="api_hand_map_save",
+    ),
 ]

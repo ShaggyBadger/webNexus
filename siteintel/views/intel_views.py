@@ -8,6 +8,7 @@ from ..models import (
     SiteIntelligence,
     MapOverlayUpdate,
     SiteAttributeDefinition,
+    HandDrawnMap,
 )
 from tankgauge.models import StoreTankMapping
 from ..forms import SiteIntelligenceForm
@@ -67,8 +68,18 @@ class LocationDetailView(DetailView):
             location=loc, is_default=True
         ).first()
 
+        # Hand-Drawn Map Layer
+        personal_hand_map = None
+        default_hand_map = HandDrawnMap.objects.filter(
+            location=loc, is_default=True
+        ).first()
+
         if self.request.user.is_authenticated:
             personal_intel = SiteIntelligence.objects.filter(
+                location=loc, author=self.request.user
+            ).first()
+
+            personal_hand_map = HandDrawnMap.objects.filter(
                 location=loc, author=self.request.user
             ).first()
 
@@ -81,6 +92,8 @@ class LocationDetailView(DetailView):
 
         context["personal_intel"] = personal_intel
         context["default_intel"] = default_intel
+        context["personal_hand_map"] = personal_hand_map
+        context["default_hand_map"] = default_hand_map
 
         # Hybrid Metadata Layer: Order by Global Definitions, then Custom
         # This ensures that standard fields (e.g., Manifolds) appear in a fixed,

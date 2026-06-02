@@ -321,6 +321,54 @@
 
         <!-- Right Column: Map -->
         <div class="col-12 col-lg-5">
+            <!-- Hand-Drawn Tactical Map -->
+            <div class="mb-4">
+                <div class="intel-section-header">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="d-none d-md-inline">[ TACTICAL_SKETCH ]</span>
+                        <span class="d-md-none">SKETCH</span>
+                    </div>
+                    {% if user.is_authenticated %}
+                    <a href="{% url 'siteintel:hand_map_edit' location.id %}" class="btn btn-outline-warning btn-sm mono py-0" style="font-size: 0.65rem;">
+                        <span class="d-none d-md-inline">{% if personal_hand_map %}[ EDIT_SKETCH ]{% else %}[ ADD_SKETCH ]{% endif %}</span>
+                        <span class="d-md-none">{% if personal_hand_map %}EDIT{% else %}ADD{% endif %}</span>
+                    </a>
+                    {% endif %}
+                </div>
+
+                <div id="hand-drawn-map-container" class="border border-secondary bg-dark-custom position-relative overflow-hidden" style="min-height: 200px; display: flex; align-items: center; justify-content: center; background: #1a1d21;">
+                    {% if personal_hand_map %}
+                        <img src="{{ personal_hand_map.image_data }}" class="img-fluid w-100 sketch-img" alt="Personal Tactical Sketch" style="cursor: zoom-in;" data-bs-toggle="modal" data-bs-target="#sketchModal">
+                        <div class="position-absolute bottom-0 end-0 p-1 mono text-primary" style="font-size: 0.5rem; background: rgba(0,0,0,0.7); border-top-left-radius: 4px; border-left: 1px solid var(--navbar-border); border-top: 1px solid var(--navbar-border);">YOUR_LAYER</div>
+                    {% elif default_hand_map %}
+                        <img src="{{ default_hand_map.image_data }}" class="img-fluid w-100 sketch-img" alt="Default Tactical Sketch" style="cursor: zoom-in;" data-bs-toggle="modal" data-bs-target="#sketchModal">
+                        <div class="position-absolute bottom-0 end-0 p-1 mono text-muted-custom" style="font-size: 0.5rem; background: rgba(0,0,0,0.7); border-top-left-radius: 4px; border-left: 1px solid var(--navbar-border); border-top: 1px solid var(--navbar-border);">SHARED_LAYER</div>
+                    {% else %}
+                        <div class="text-center p-4">
+                            <i class="fas fa-map-marked-alt text-muted-custom mb-3" style="font-size: 2rem; opacity: 0.3;"></i>
+                            <div class="mono text-muted-custom small mb-3">NO TACTICAL SKETCH AVAILABLE</div>
+                            {% if user.is_authenticated %}
+                            <a href="{% url 'siteintel:hand_map_edit' location.id %}" class="btn btn-outline-primary btn-sm mono">
+                                [ CREATE_INITIAL_SKETCH ]
+                            </a>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Sketch Full-Screen Modal -->
+            <div class="modal fade" id="sketchModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-fullscreen">
+                    <div class="modal-content bg-dark-custom">
+                        <div class="modal-body p-0 d-flex align-items-center justify-content-center">
+                            <img src="" class="img-fluid" id="modal-sketch-img" alt="Full Screen Sketch">
+                            <button type="button" class="btn-close btn-close-white position-absolute top-0 end-0 m-3" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div id="intel-map" 
                  class="mb-3"
                  data-lat="{{ location.lat }}" 
@@ -351,4 +399,15 @@
 
 {% block extra_scripts %}
 <script type="module" src="{% static 'js/siteintel/intel_main.js' %}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const sketchModal = document.getElementById('sketchModal');
+        const modalImg = document.getElementById('modal-sketch-img');
+        
+        sketchModal.addEventListener('show.bs.modal', function (event) {
+            const trigger = event.relatedTarget;
+            modalImg.src = trigger.src;
+        });
+    });
+</script>
 {% endblock %}

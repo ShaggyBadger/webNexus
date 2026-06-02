@@ -1,0 +1,359 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}HAND_DRAWN_MAP // {{ location.name }} | {{ SITE_NAME }}{% endblock %}
+
+{% block extra_head %}
+<!-- Fabric.js for Hand Drawing -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+
+<style>
+    body, html {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        overflow: hidden;
+    }
+    main {
+        padding-top: 0 !important;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+    }
+    .command-bar {
+        display: none !important; /* Hide command bar for full screen app feel */
+    }
+    footer {
+        display: none !important;
+    }
+    #canvas-container {
+        flex-grow: 1;
+        position: relative;
+        background: #1a1d21;
+        overflow: hidden;
+    }
+    canvas {
+        border: none;
+    }
+    .map-controls {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        z-index: 1000;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        max-width: 200px;
+    }
+    .map-actions {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        z-index: 1000;
+        display: flex;
+        gap: 10px;
+    }
+    .tool-panel {
+        background: rgba(18, 20, 23, 0.9);
+        border: 1px solid var(--navbar-border);
+        padding: 10px;
+        border-radius: 4px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    .control-label {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.6rem;
+        color: var(--muted-text-color);
+        text-transform: uppercase;
+        margin-bottom: 2px;
+    }
+    .mode-toggle-container {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: rgba(18, 20, 23, 0.9);
+        border: 1px solid var(--navbar-border);
+        padding: 5px 15px;
+        border-radius: 20px;
+    }
+    .mode-label {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.7rem;
+        color: var(--muted-text-color);
+    }
+    .mode-label.active {
+        color: var(--primary-color);
+        font-weight: bold;
+    }
+    /* Switch styling */
+    .form-check-input:checked {
+        background-color: var(--primary-color);
+        border-color: var(--primary-color);
+    }
+    .btn-tactical {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.75rem;
+        padding: 8px 15px;
+        text-transform: uppercase;
+    }
+    .advanced-tools {
+        display: none;
+    }
+    .advanced-tools.show {
+        display: flex;
+    }
+    .color-btn {
+        width: 24px;
+        height: 24px;
+        border: 1px solid transparent;
+        border-radius: 2px;
+        cursor: pointer;
+    }
+    .color-btn.active {
+        border-color: #fff !important;
+        box-shadow: 0 0 5px var(--primary-color);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="canvas-container">
+    <canvas id="hand-map-canvas"></canvas>
+
+    <!-- Overlay Controls -->
+    <div class="map-controls">
+        <div class="mode-toggle-container">
+            <span id="label-basic" class="mode-label active">BASIC</span>
+            <div class="form-check form-switch m-0">
+                <input class="form-check-input" type="checkbox" role="switch" id="mode-toggle">
+            </div>
+            <span id="label-advanced" class="mode-label">ADVANCED</span>
+        </div>
+
+        <div class="tool-panel">
+            <div>
+                <div class="control-label">Stroke_Color</div>
+                <div class="d-flex gap-2">
+                    <div class="color-btn active" data-color="#ffb86c" style="background: #ffb86c;"></div>
+                    <div class="color-btn" data-color="#50fa7b" style="background: #50fa7b;"></div>
+                    <div class="color-btn" data-color="#ff5555" style="background: #ff5555;"></div>
+                    <div class="color-btn" data-color="#ffffff" style="background: #ffffff;"></div>
+                </div>
+            </div>
+            <div>
+                <div class="control-label">Stroke_Width</div>
+                <input type="range" class="form-range" id="stroke-width" min="1" max="20" value="3">
+            </div>
+            <div class="advanced-tools flex-column gap-2">
+                 <button class="btn btn-outline-secondary btn-sm mono" id="btn-add-text" style="font-size: 0.65rem;">[ ADD_LABEL ]</button>
+                 <button class="btn btn-outline-secondary btn-sm mono" id="btn-add-rect" style="font-size: 0.65rem;">[ ADD_BOX ]</button>
+                 <button class="btn btn-outline-secondary btn-sm mono" id="btn-delete-selected" style="font-size: 0.65rem;">[ DELETE_OBJ ]</button>
+            </div>
+            <button class="btn btn-outline-danger btn-sm mono mt-2" id="btn-clear-canvas" style="font-size: 0.65rem;">[ CLEAR_ALL ]</button>
+        </div>
+        
+        <div class="tool-panel mt-2 mono text-muted-custom" style="font-size: 0.55rem;">
+            SITE: {{ location.name }}<br>
+            COORDS: {{ location.lat }}, {{ location.lon }}
+        </div>
+    </div>
+
+    <div class="map-actions">
+        <button id="btn-save-map" class="btn btn-primary btn-tactical shadow">[ COMMIT_INTEL ]</button>
+        <a href="{% url 'siteintel:location_detail' location.id %}" class="btn btn-outline-secondary btn-tactical shadow" style="background: rgba(18, 20, 23, 0.8);">[ ABORT ]</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const canvas = new fabric.Canvas('hand-map-canvas', {
+            isDrawingMode: true,
+            width: window.innerWidth,
+            height: window.innerHeight,
+            backgroundColor: '#1a1d21'
+        });
+
+        // Initialize brush
+        canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
+        canvas.freeDrawingBrush.color = '#ffb86c';
+        canvas.freeDrawingBrush.width = 3;
+
+        // Resize handler
+        window.addEventListener('resize', function() {
+            canvas.setWidth(window.innerWidth);
+            canvas.setHeight(window.innerHeight);
+            canvas.renderAll();
+        });
+
+        // Mode Toggle
+        const modeToggle = document.getElementById('mode-toggle');
+        const labelBasic = document.getElementById('label-basic');
+        const labelAdvanced = document.getElementById('label-advanced');
+        const advancedTools = document.querySelector('.advanced-tools');
+
+        modeToggle.addEventListener('change', function() {
+            if (this.checked) {
+                // Advanced Mode
+                canvas.isDrawingMode = false;
+                labelBasic.classList.remove('active');
+                labelAdvanced.classList.add('active');
+                advancedTools.classList.add('show');
+                canvas.selection = true;
+                canvas.forEachObject(obj => obj.selectable = true);
+            } else {
+                // Basic Mode
+                canvas.isDrawingMode = true;
+                labelBasic.classList.add('active');
+                labelAdvanced.classList.remove('active');
+                advancedTools.classList.remove('show');
+                canvas.selection = false;
+                canvas.forEachObject(obj => obj.selectable = false);
+            }
+        });
+
+        // Color buttons
+        const colorBtns = document.querySelectorAll('.color-btn');
+        colorBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                const color = this.getAttribute('data-color');
+                canvas.freeDrawingBrush.color = color;
+                
+                // If an object is selected, change its color
+                const activeObject = canvas.getActiveObject();
+                if (activeObject) {
+                    if (activeObject.type === 'i-text') {
+                        activeObject.set('fill', color);
+                    } else {
+                        activeObject.set('stroke', color);
+                    }
+                    canvas.renderAll();
+                }
+
+                colorBtns.forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+            });
+        });
+
+        // Stroke width
+        const strokeWidthInput = document.getElementById('stroke-width');
+        strokeWidthInput.addEventListener('input', function() {
+            const width = parseInt(this.value, 10) || 1;
+            canvas.freeDrawingBrush.width = width;
+            
+            const activeObject = canvas.getActiveObject();
+            if (activeObject && activeObject.type !== 'i-text') {
+                activeObject.set('strokeWidth', width);
+                canvas.renderAll();
+            }
+        });
+
+        // Clear Canvas
+        document.getElementById('btn-clear-canvas').addEventListener('click', function() {
+            if (confirm('CLEAR_ENTIRE_CANVAS? ALL_DATA_WILL_BE_LOST.')) {
+                canvas.clear();
+                canvas.backgroundColor = '#1a1d21';
+                canvas.renderAll();
+            }
+        });
+
+        // Add Text (Advanced)
+        document.getElementById('btn-add-text').addEventListener('click', function() {
+            const text = new fabric.IText('NEW_LABEL', {
+                left: window.innerWidth / 2 - 50,
+                top: window.innerHeight / 2 - 10,
+                fontFamily: 'JetBrains Mono',
+                fontSize: 20,
+                fill: canvas.freeDrawingBrush.color,
+                selectable: true
+            });
+            canvas.add(text);
+            canvas.setActiveObject(text);
+        });
+
+        // Add Rect (Advanced)
+        document.getElementById('btn-add-rect').addEventListener('click', function() {
+            const rect = new fabric.Rect({
+                left: window.innerWidth / 2 - 50,
+                top: window.innerHeight / 2 - 50,
+                fill: 'transparent',
+                stroke: canvas.freeDrawingBrush.color,
+                strokeWidth: canvas.freeDrawingBrush.width,
+                width: 100,
+                height: 100,
+                selectable: true
+            });
+            canvas.add(rect);
+            canvas.setActiveObject(rect);
+        });
+
+        // Delete Selected
+        document.getElementById('btn-delete-selected').addEventListener('click', function() {
+            const activeObjects = canvas.getActiveObjects();
+            canvas.discardActiveObject();
+            if (activeObjects.length) {
+                canvas.remove(...activeObjects);
+            }
+        });
+
+        // Load existing map if any
+        {% if existing_map %}
+        try {
+            const existingData = JSON.parse('{{ existing_map.fabric_json|escapejs }}');
+            canvas.loadFromJSON(existingData, function() {
+                canvas.renderAll();
+                // Ensure initial mode is respected for loaded objects
+                const isAdvanced = modeToggle.checked;
+                canvas.forEachObject(obj => obj.selectable = isAdvanced);
+            });
+        } catch (e) {
+            console.error("Failed to load existing map data", e);
+        }
+        {% endif %}
+
+        // Save Map
+        document.getElementById('btn-save-map').addEventListener('click', function() {
+            const btn = this;
+            btn.disabled = true;
+            btn.innerText = '[ COMMITTING... ]';
+
+            const fabricJson = JSON.stringify(canvas.toJSON());
+            const imageData = canvas.toDataURL({
+                format: 'png',
+                quality: 0.8
+            });
+
+            fetch('{% url "siteintel:api_hand_map_save" location.id %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({
+                    fabric_json: fabricJson,
+                    image_data: imageData
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    window.location.href = '{% url "siteintel:location_detail" location.id %}';
+                } else {
+                    alert('ERROR: ' + data.message);
+                    btn.disabled = false;
+                    btn.innerText = '[ COMMIT_INTEL ]';
+                }
+            })
+            .catch(error => {
+                console.error('Error saving map:', error);
+                alert('CRITICAL_FAILURE: UNABLE_TO_REACH_COMMAND_NODE.');
+                btn.disabled = false;
+                btn.innerText = '[ COMMIT_INTEL ]';
+            });
+        });
+    });
+</script>
+{% endblock %}
