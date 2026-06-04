@@ -97,7 +97,18 @@
             </div>
 
             <!-- Submit action buttons -->
-            <div class="d-flex flex-column gap-3">
+            <div class="d-flex flex-column gap-4 mt-2">
+              <button 
+                type="button" 
+                @click="submitShiftLog(false)"
+                class="btn btn-outline-primary btn-tactical-lg mono fw-bold w-100"
+                :disabled="submitting"
+              >
+                {{ submitting ? 'SYNCHRONIZING...' : 'SAVE_PROGRESS_ONLY' }}
+              </button>
+
+              <div class="border-top border-secondary opacity-25 my-1"></div>
+
               <button 
                 type="button" 
                 @click="submitShiftLog(true)"

@@ -1,6 +1,13 @@
 from django.urls import path, re_path
 from .views import spa_index
-from .views import mission_views, po_views, load_views, fuel_views, store_views, post_trip_views
+from .views import (
+    mission_views,
+    po_views,
+    load_views,
+    fuel_views,
+    store_views,
+    post_trip_views,
+)
 
 app_name = "missionlog"
 

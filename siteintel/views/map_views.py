@@ -12,12 +12,14 @@ from ..models import Location, HandDrawnMap
 
 logger = logging.getLogger("webnexus")
 
+
 class HandDrawnMapEditView(LoginRequiredMixin, DetailView):
     """
     OPERATIONAL FLOW:
     Provides a full-screen Fabric.js canvas for hand-drawing tactical maps.
     Supports basic (finger drawing) and advanced (labels/shapes) modes.
     """
+
     model = Location
     template_name = "siteintel/hand_map_edit.html"
     context_object_name = "location"
@@ -29,6 +31,7 @@ class HandDrawnMapEditView(LoginRequiredMixin, DetailView):
             location=self.object, author=self.request.user
         ).first()
         return context
+
 
 @login_required
 @require_POST
@@ -44,7 +47,9 @@ def hand_drawn_map_save_api(request, location_id):
         image_data = data.get("image_data")
 
         if not fabric_json or not image_data:
-            return JsonResponse({"status": "error", "message": "Missing map data"}, status=400)
+            return JsonResponse(
+                {"status": "error", "message": "Missing map data"}, status=400
+            )
 
         location = get_object_or_404(Location, id=location_id)
 
@@ -56,7 +61,7 @@ def hand_drawn_map_save_api(request, location_id):
                 defaults={
                     "fabric_json": fabric_json,
                     "image_data": image_data,
-                }
+                },
             )
 
             if not created:
@@ -66,12 +71,18 @@ def hand_drawn_map_save_api(request, location_id):
 
             # Logic for default map:
             # If no map is marked as default for this location, make this one the default.
-            if not HandDrawnMap.objects.filter(location=location, is_default=True).exists():
+            if not HandDrawnMap.objects.filter(
+                location=location, is_default=True
+            ).exists():
                 hand_map.is_default = True
                 hand_map.save()
-                logger.info(f"MAP_DEFAULT_AUTO: Set initial map for Location {location.id} as default.")
+                logger.info(
+                    f"MAP_DEFAULT_AUTO: Set initial map for Location {location.id} as default."
+                )
 
-        logger.info(f"MAP_SAVE_SUCCESS: Hand-drawn map saved for Location {location.id} by {request.user.username}")
+        logger.info(
+            f"MAP_SAVE_SUCCESS: Hand-drawn map saved for Location {location.id} by {request.user.username}"
+        )
         return JsonResponse({"status": "success", "message": "Map saved successfully"})
 
     except Exception as e:

@@ -360,7 +360,23 @@ export function useMissionLog() {
       if (targetId) {
         response = await api.put(`/missions/post-trip/${targetId}/`, payload);
       } else {
-        response = await api.post('/missions/post-trip/', payload);
+        try {
+          response = await api.post('/missions/post-trip/', payload);
+        } catch (postError: any) {
+          // Handle Duplicate Active Mission Safeguard
+          if (postError.response?.data?.code === 'ACTIVE_EXISTS') {
+            console.warn("ACTIVE_MISSION_EXISTS: RE-SYNCING CONTEXT.");
+            await refreshActiveMission();
+            const newId = activeMissionId.value;
+            if (newId) {
+                response = await api.put(`/missions/post-trip/${newId}/`, payload);
+            } else {
+                throw postError;
+            }
+          } else {
+            throw postError;
+          }
+        }
       }
 
       if (response.data.status === 'success') {

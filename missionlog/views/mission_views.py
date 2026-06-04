@@ -111,7 +111,7 @@ def mission_list_or_create(request):
             active_shift = Mission.objects.filter(
                 user=request.user,
                 is_completed=False,
-                shift_start__gte=timezone.now() - timedelta(hours=14),
+                shift_start__gte=timezone.now() - timedelta(hours=48),
             ).first()
 
             if active_shift:
