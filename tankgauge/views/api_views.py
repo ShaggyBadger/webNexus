@@ -82,7 +82,8 @@ def closest_store_api(request):
             )
 
         logger.info(
-            f"GEOLOCATION_SUCCESS: Identified {len(results)} proximal targets for Agent GPS."
+            f"GEOLOCATION_SUCCESS: Identified {len(results)} proximal targets for Agent GPS.",
+            extra={"lat": lat, "lon": lon}
         )
         return JsonResponse({"results": results})
 

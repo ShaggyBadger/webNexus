@@ -62,11 +62,13 @@ def record_checkin(user, rack, lat=None, lon=None, accuracy=None):
             if distance_miles <= 0.31:
                 is_verified = True
                 logger.info(
-                    f"RACK_CHECKIN: Verified proximity for {user.username} @ {rack.location.name}"
+                    f"RACK_CHECKIN: Verified proximity for {user.username} @ {rack.location.name}",
+                    extra={"lat": lat, "lon": lon}
                 )
             else:
                 logger.warning(
-                    f"RACK_CHECKIN: Distance check failed ({distance_miles:.2f} miles) for {user.username}"
+                    f"RACK_CHECKIN: Distance check failed ({distance_miles:.2f} miles) for {user.username}",
+                    extra={"lat": lat, "lon": lon}
                 )
 
     checkin = RackCheckIn.objects.create(
@@ -79,6 +81,7 @@ def record_checkin(user, rack, lat=None, lon=None, accuracy=None):
     )
 
     logger.info(
-        f"RACK_CHECKIN: Recorded {'VERIFIED' if is_verified else 'MANUAL'} check-in for {user.username} @ {rack.location.name}"
+        f"RACK_CHECKIN: Recorded {'VERIFIED' if is_verified else 'MANUAL'} check-in for {user.username} @ {rack.location.name}",
+        extra={"lat": lat, "lon": lon}
     )
     return checkin

@@ -1,0 +1,23 @@
+{% extends "admin/index.html" %}
+
+{% block content %}
+    {{ block.super }}
+    
+    <div id="content-main" style="margin-top: 20px; border-top: 2px solid #ffb86c; padding-top: 20px;">
+        <div class="module">
+            <table style="width: 100%;">
+                <caption>
+                    <a href="{% url 'siteintel:admin_oversight' %}" class="section" style="background: #282a36; color: #ffb86c; border: 1px solid #44475a;">
+                        TACTICAL OVERSIGHT CONSOLE
+                    </a>
+                </caption>
+                <tr>
+                    <td style="padding: 15px; background: #1e1f29; color: #f8f8f2;">
+                        <p class="small">Live telemetry stream, agent tracking, and GPS heatmap analysis.</p>
+                        <a href="{% url 'siteintel:admin_oversight' %}" class="addlink" style="color: #50fa7b;">ACCESS COMMAND CENTER</a>
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+{% endblock %}

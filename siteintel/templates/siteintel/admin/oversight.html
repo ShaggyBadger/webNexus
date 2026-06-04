@@ -1,0 +1,533 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block extrahead %}
+{{ block.super }}
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<!-- JetBrains Mono -->
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+<style>
+    :root {
+        --tactical-amber: #ffb86c;
+        --tactical-red: #ff5555;
+        --tactical-green: #50fa7b;
+        --bg-charcoal: #1e1f29;
+        --border-muted: #44475a;
+    }
+
+    #content { padding: 0 !important; }
+    
+    .oversight-container {
+        background-color: var(--bg-charcoal);
+        color: #f8f8f2;
+        font-family: 'JetBrains Mono', monospace;
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - 100px);
+        overflow: hidden;
+    }
+
+    .oversight-header {
+        background: #282a36;
+        padding: 10px 20px;
+        border-bottom: 1px solid var(--border-muted);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .stat-box {
+        display: flex;
+        gap: 20px;
+    }
+
+    .stat-item {
+        border-left: 2px solid var(--tactical-amber);
+        padding-left: 10px;
+    }
+
+    .stat-label { font-size: 0.7rem; color: #6272a4; text-transform: uppercase; }
+    .stat-value { font-size: 1.1rem; font-weight: bold; color: var(--tactical-amber); }
+
+    .main-grid {
+        display: grid;
+        grid-template-columns: 1fr 380px;
+        grid-template-rows: 400px 1fr;
+        flex-grow: 1;
+        gap: 1px;
+        background: var(--border-muted);
+        min-height: 0; /* Critical for grid item overflow */
+    }
+
+    #sector-map {
+        grid-column: 1 / 2;
+        grid-row: 1 / 2;
+        background: #eee;
+    }
+
+    .activity-sidebar {
+        grid-column: 2 / 3;
+        grid-row: 1 / 3;
+        background: #282a36;
+        padding: 15px;
+        overflow-y: auto;
+        border-left: 1px solid var(--border-muted);
+    }
+
+    .terminal-wrapper {
+        grid-column: 1 / 2;
+        grid-row: 2 / 3;
+        display: flex;
+        flex-direction: column;
+        background: #000;
+        min-height: 0;
+        border-top: 1px solid var(--tactical-amber);
+    }
+
+    .terminal-header {
+        background: #111;
+        color: var(--tactical-amber);
+        font-size: 0.7rem;
+        padding: 5px 10px;
+        border-bottom: 1px solid #333;
+        z-index: 10;
+        flex-shrink: 0;
+    }
+
+    .terminal-container {
+        flex-grow: 1;
+        padding: 10px;
+        overflow-y: auto;
+    }
+
+    .log-line {
+        font-size: 0.75rem;
+        line-height: 1.2;
+        white-space: pre-wrap;
+        margin-bottom: 2px;
+        color: #50fa7b;
+    }
+
+    .log-line.error { color: var(--tactical-red); }
+    .log-line.warning { color: var(--tactical-amber); }
+    .log-line.info { color: #8be9fd; }
+
+    .agent-card {
+        background: #1e1f29;
+        border: 1px solid #44475a;
+        padding: 8px;
+        margin-bottom: 8px;
+        font-size: 0.75rem;
+    }
+
+    .agent-name { color: var(--tactical-amber); font-weight: bold; }
+    .agent-time { color: #6272a4; font-size: 0.65rem; }
+    .agent-action { color: #f8f8f2; margin-top: 4px; border-top: 1px solid #333; padding-top: 4px;}
+
+    h3 {
+        font-size: 0.8rem;
+        color: #6272a4;
+        text-transform: uppercase;
+        margin-bottom: 10px;
+        border-bottom: 1px solid #44475a;
+    }
+
+    /* Tactical Progress Bars */
+    .tactical-bar-container {
+        height: 12px;
+        background: #111;
+        border: 1px solid var(--border-muted);
+        margin-bottom: 12px;
+        position: relative;
+    }
+    .tactical-bar-fill {
+        height: 100%;
+        background: var(--tactical-amber);
+        box-shadow: 0 0 10px rgba(255, 184, 108, 0.3);
+    }
+    .tactical-bar-label {
+        position: absolute;
+        top: -14px;
+        right: 0;
+        font-size: 0.6rem;
+        color: #6272a4;
+    }
+
+    /* Intelligence Feed */
+    .intel-feed-item {
+        border-left: 2px solid var(--tactical-green);
+        background: rgba(80, 250, 123, 0.05);
+        padding: 6px 10px;
+        margin-bottom: 8px;
+        font-size: 0.7rem;
+    }
+
+    /* Map Legend */
+    .map-legend {
+        position: absolute;
+        bottom: 20px;
+        left: 20px;
+        background: rgba(30, 31, 41, 0.9);
+        border: 1px solid var(--border-muted);
+        padding: 10px;
+        z-index: 1000;
+        font-size: 0.7rem;
+        color: #f8f8f2;
+        pointer-events: none;
+    }
+    .legend-title {
+        color: var(--tactical-amber);
+        text-transform: uppercase;
+        font-weight: bold;
+        margin-bottom: 8px;
+        border-bottom: 1px solid #333;
+        padding-bottom: 2px;
+    }
+    .legend-item {
+        display: flex;
+        align-items: center;
+        margin-bottom: 4px;
+        gap: 8px;
+    }
+    .legend-marker {
+        width: 10px;
+        height: 100%;
+        min-height: 10px;
+    }
+    .marker-circle { border-radius: 50%; width: 10px; height: 10px; border: 1px solid #fff; }
+    .marker-diamond { width: 8px; height: 8px; border: 1px solid #fff; transform: rotate(45deg); margin: 0 1px; }
+
+    /* Theme Toggle Switch */
+    .theme-toggle {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.65rem;
+        color: #6272a4;
+        text-transform: uppercase;
+        cursor: pointer;
+    }
+    .switch {
+        position: relative;
+        display: inline-block;
+        width: 34px;
+        height: 18px;
+    }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background-color: #44475a;
+        transition: .4s;
+        border-radius: 18px;
+    }
+    .slider:before {
+        position: absolute;
+        content: "";
+        height: 12px;
+        width: 12px;
+        left: 3px;
+        bottom: 3px;
+        background-color: #f8f8f2;
+        transition: .4s;
+        border-radius: 50%;
+    }
+    input:checked + .slider { background-color: var(--tactical-amber); }
+    input:checked + .slider:before { transform: translateX(16px); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="oversight-container">
+    <div class="oversight-header">
+        <div class="brand">
+            <span style="color: var(--tactical-amber)">[</span> 
+            TACTICAL OVERSIGHT CONSOLE v1.0 
+            <span style="color: var(--tactical-amber)">]</span>
+            <label class="theme-toggle" style="margin-left: 20px;">
+                <span>Light</span>
+                <span class="switch">
+                    <input type="checkbox" id="map-theme-toggle">
+                    <span class="slider"></span>
+                </span>
+                <span>Dark</span>
+            </label>
+        </div>
+        <div class="stat-box">
+            <div class="stat-item">
+                <div class="stat-label">Active Agents</div>
+                <div class="stat-value" id="val-agents">{{ active_agents|length }}</div>
+            </div>
+            <div class="stat-item" style="border-left-color: var(--tactical-red)">
+                <div class="stat-label">System Alerts</div>
+                <div class="stat-value" id="val-errors" style="color: var(--tactical-red)">{{ error_count }}</div>
+            </div>
+            <div class="stat-item" style="border-left-color: var(--tactical-green)">
+                <div class="stat-label">System Pulse</div>
+                <div class="stat-value" id="val-db-status" style="color: var(--tactical-green); font-size: 0.8rem;">INIT...</div>
+                <div id="val-latency" style="font-size: 0.6rem; color: #6272a4;">0.00ms</div>
+            </div>
+            <div class="stat-item" style="border-left-color: #8be9fd">
+                <div class="stat-label">Log Pulse</div>
+                <div class="stat-value" style="color: #8be9fd">ACTIVE</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="main-grid">
+        <div id="sector-map" style="position: relative;">
+            <div class="map-legend">
+                <div class="legend-title">Site Intel Legend</div>
+                <div class="legend-item">
+                    <div class="marker-diamond" style="background: #50fa7b;"></div>
+                    <span>FUEL RACK</span>
+                </div>
+                <div class="legend-item">
+                    <div class="marker-circle" style="background: #ff5555;"></div>
+                    <span>EXXON</span>
+                </div>
+                <div class="legend-item">
+                    <div class="marker-circle" style="background: #8be9fd;"></div>
+                    <span>MOBIL</span>
+                </div>
+                <div class="legend-item">
+                    <div class="marker-circle" style="background: #ffb86c;"></div>
+                    <span>7-ELEVEN</span>
+                </div>
+                <div class="legend-item">
+                    <div class="marker-circle" style="background: #f1fa8c;"></div>
+                    <span>SPEEDWAY</span>
+                </div>
+                <div class="legend-item">
+                    <div class="marker-circle" style="background: #bd93f9;"></div>
+                    <span>OTHER BRANDS</span>
+                </div>
+                <div class="legend-item" style="margin-top: 5px; border-top: 1px solid #333; padding-top: 5px;">
+                    <div style="width: 10px; height: 10px; background: red; opacity: 0.6; border-radius: 2px;"></div>
+                    <span>ACTIVE HEAT</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="activity-sidebar">
+            <h3>Operational Pulse</h3>
+            <div id="agent-list">
+                {% for user, data in active_agents.items %}
+                <div class="agent-card">
+                    <div class="d-flex justify-content-between">
+                        <span class="agent-name">{{ user|upper }}</span>
+                        <span class="agent-time">{{ data.last_seen }}</span>
+                    </div>
+                    <div class="agent-action">{{ data.last_action }}</div>
+                </div>
+                {% empty %}
+                <div class="text-muted small">NO ACTIVE AGENTS DETECTED</div>
+                {% endfor %}
+            </div>
+
+            <h3 style="margin-top: 20px;">App Hit Density</h3>
+            <div id="app-hits" class="small">
+                {% for app, count in app_hits.items %}
+                <div class="tactical-bar-container">
+                    <div class="tactical-bar-label">{{ app|upper }} // {{ count }}</div>
+                    <div class="tactical-bar-fill" style="width: {{ count }}%"></div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <h3 style="margin-top: 20px;">Latest Intelligence</h3>
+            <div id="intel-feed">
+                {% for prop in latest_proposals %}
+                <div class="intel-feed-item">
+                    <div class="d-flex justify-content-between">
+                        <span style="color: var(--tactical-amber)">PROPOSAL_{{ prop.id }}</span>
+                        <span class="text-muted" style="font-size: 0.6rem;">{{ prop.submitted_at|timesince }} ago</span>
+                    </div>
+                    <div>{{ prop.store_name|default:"NEW SITE" }}</div>
+                    <div style="font-size: 0.6rem; color: #6272a4;">BY: {{ prop.submitted_by.username|upper }}</div>
+                </div>
+                {% empty %}
+                <div class="text-muted small">NO PENDING INTELLIGENCE</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="terminal-wrapper">
+            <div class="terminal-header">LIVE_TELEMETRY_STREAM // {{ SITE_NAME }}</div>
+            <div class="terminal-container" id="terminal">
+                <div id="log-content">
+                    {% for line in terminal_logs %}
+                        <div class="log-line {% if 'ERROR' in line or 'CRITICAL' in line %}error{% elif 'WARNING' in line %}warning{% elif 'INFO' in line %}info{% endif %}">{{ line }}</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Leaflet & Heatmap Plugin -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://leaflet.github.io/Leaflet.heat/dist/leaflet-heat.js"></script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // 1. Initialize Sector Map (Centered on NC)
+        const map = L.map('sector-map', {
+            zoomControl: true,
+            attributionControl: false
+        }).setView([35.7596, -79.0193], 6.5);
+
+        // Define Tile Layers
+        const lightTiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19
+        });
+        const darkTiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            maxZoom: 20
+        });
+
+        // Set Initial Theme
+        lightTiles.addTo(map);
+
+        // Handle Theme Toggle
+        const themeToggle = document.getElementById('map-theme-toggle');
+        themeToggle.addEventListener('change', function() {
+            if (this.checked) {
+                map.removeLayer(lightTiles);
+                darkTiles.addTo(map);
+            } else {
+                map.removeLayer(darkTiles);
+                lightTiles.addTo(map);
+            }
+        });
+
+        // 2. Heatmap Layer
+        const heatmapData = {{ heatmap_data|safe }};
+        const heat = L.heatLayer(heatmapData, {
+            radius: 40,
+            blur: 20,
+            maxZoom: 10,
+            gradient: {0.4: 'blue', 0.65: 'lime', 1: 'red'}
+        }).addTo(map);
+
+        // 3. Site Markers Layer
+        const siteMarkers = {{ site_markers|safe }};
+        const markerLayer = L.layerGroup().addTo(map);
+
+        const getMarkerColor = (brand) => {
+            if (brand.includes('EXXON')) return '#ff5555'; // Hazard Red
+            if (brand.includes('MOBIL')) return '#8be9fd'; // Tactical Blue
+            if (brand.includes('7-ELEVEN') || brand.includes('7-11')) return '#ffb86c'; // Safety Orange
+            if (brand.includes('SPEEDWAY')) return '#f1fa8c'; // Caution Yellow
+            if (brand.includes('FUEL_RACK')) return '#50fa7b'; // Tactical Green
+            return '#bd93f9'; // Muted Purple for others
+        };
+
+        siteMarkers.forEach(site => {
+            const color = getMarkerColor(site.brand);
+            
+            if (site.type === 'RACK') {
+                // RACK: Square Marker
+                const rackIcon = L.divIcon({
+                    className: 'rack-marker',
+                    html: `<div style="width:12px; height:12px; background:${color}; border:2px solid #fff; transform: rotate(45deg);"></div>`,
+                    iconSize: [12, 12]
+                });
+                L.marker([site.lat, site.lon], { icon: rackIcon })
+                    .bindPopup(`<strong>${site.name}</strong><br>TYPE: FUEL RACK`)
+                    .addTo(markerLayer);
+            } else {
+                // STORE: Circle Marker
+                L.circleMarker([site.lat, site.lon], {
+                    radius: 6,
+                    fillColor: color,
+                    color: "#fff",
+                    weight: 1,
+                    opacity: 1,
+                    fillOpacity: 0.8
+                })
+                .bindPopup(`<strong>${site.name}</strong><br>BRAND: ${site.brand}`)
+                .addTo(markerLayer);
+            }
+        });
+
+        // REMOVED: map.fitBounds(bounds) - Prevents snapping to single points like Mount Airy.
+
+        // 4. Terminal Auto-Scroll
+        const terminal = document.getElementById('terminal');
+        terminal.scrollTop = terminal.scrollHeight;
+
+        // 5. Real-time Refresh (Tactical Pulse)
+        setInterval(async () => {
+            try {
+                const response = await fetch('{% url "siteintel:api_tactical_telemetry" %}');
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    // Update Map
+                    heat.setLatLngs(data.heatmap);
+                    
+                    // Update Stats
+                    document.getElementById('val-agents').innerText = Object.keys(data.agents).length;
+                    document.getElementById('val-errors').innerText = data.error_count;
+
+                    // Update System Health
+                    const dbEl = document.getElementById('val-db-status');
+                    const latEl = document.getElementById('val-latency');
+                    dbEl.innerText = data.system_health.db_status;
+                    dbEl.style.color = data.system_health.db_status === 'DB_READY' ? 'var(--tactical-green)' : 'var(--tactical-red)';
+                    latEl.innerText = `${data.system_health.latency_ms}ms`;
+                    
+                    // Update App Hits Density
+                    const appHitsContainer = document.getElementById('app-hits');
+                    appHitsContainer.innerHTML = '';
+                    Object.entries(data.app_hits).forEach(([app, count]) => {
+                        const bar = `
+                            <div class="tactical-bar-container">
+                                <div class="tactical-bar-label">${app.toUpperCase()} // ${count}</div>
+                                <div class="tactical-bar-fill" style="width: ${Math.min(count, 100)}%"></div>
+                            </div>
+                        `;
+                        appHitsContainer.innerHTML += bar;
+                    });
+
+                    // Update Intelligence Feed
+                    const intelFeed = document.getElementById('intel-feed');
+                    intelFeed.innerHTML = '';
+                    data.latest_proposals.forEach(prop => {
+                        const item = `
+                            <div class="intel-feed-item">
+                                <div class="d-flex justify-content-between">
+                                    <span style="color: var(--tactical-amber)">PROPOSAL_${prop.id}</span>
+                                    <span class="text-muted" style="font-size: 0.6rem;">${prop.time_ago}</span>
+                                </div>
+                                <div>${prop.store_name}</div>
+                                <div style="font-size: 0.6rem; color: #6272a4;">BY: ${prop.submitted_by}</div>
+                            </div>
+                        `;
+                        intelFeed.innerHTML += item;
+                    });
+
+                    // Update Terminal
+                    const logContent = document.getElementById('log-content');
+                    logContent.innerHTML = '';
+                    data.terminal.forEach(line => {
+                        const div = document.createElement('div');
+                        div.className = 'log-line';
+                        if (line.includes('ERROR') || line.includes('CRITICAL')) div.classList.add('error');
+                        else if (line.includes('WARNING')) div.classList.add('warning');
+                        else if (line.includes('INFO')) div.classList.add('info');
+                        div.innerText = line;
+                        logContent.appendChild(div);
+                    });
+                    terminal.scrollTop = terminal.scrollHeight;
+                }
+            } catch (e) {
+                console.error("TELEMETRY_PULSE_FAILED", e);
+            }
+        }, 5000); // 5 second pulse
+    });
+</script>
+{% endblock %}

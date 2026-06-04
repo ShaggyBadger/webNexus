@@ -30,7 +30,8 @@ def reverse_geocode_api(request):
         return JsonResponse({"error": "LAT and LON are required"}, status=400)
 
     logger.info(
-        f"GEOCODE_REQUEST: Lat {lat}, Lon {lon} triggered by user {request.user}"
+        f"GEOCODE_REQUEST: Lat {lat}, Lon {lon} triggered by user {request.user}",
+        extra={"lat": lat, "lon": lon}
     )
     url = (
         f"https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat={lat}&lon={lon}"
@@ -59,7 +60,8 @@ def reverse_geocode_api(request):
                 "zip_code": address.get("postcode", ""),
             }
             logger.info(
-                f"GEOCODE_SUCCESS: Decoded to {result.get('address')}, {result.get('city')}"
+                f"GEOCODE_SUCCESS: Decoded to {result.get('address')}, {result.get('city')}",
+                extra={"lat": lat, "lon": lon}
             )
             return JsonResponse(result)
 
@@ -117,11 +119,13 @@ def proximity_check_api(request):
 
     if matches:
         logger.warning(
-            f"PROXIMITY_ALERT: {len(matches)} sites detected near Lat {lat}, Lon {lon} by user {request.user}"
+            f"PROXIMITY_ALERT: {len(matches)} sites detected near Lat {lat}, Lon {lon} by user {request.user}",
+            extra={"lat": lat, "lon": lon}
         )
     else:
         logger.info(
-            f"PROXIMITY_CLEARED: No conflicting sites detected for Lat {lat}, Lon {lon}"
+            f"PROXIMITY_CLEARED: No conflicting sites detected for Lat {lat}, Lon {lon}",
+            extra={"lat": lat, "lon": lon}
         )
 
     return JsonResponse({"matches": matches})
