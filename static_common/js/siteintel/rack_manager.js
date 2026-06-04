@@ -7,6 +7,9 @@ const RackManager = {
     racks: [],
     nearestRack: null,
     currentCoords: null,
+    currentDistance: null,
+    proximityConfirmed: false,
+    confirmTimeout: null,
 
     init() {
         console.log("RACK_MANAGER: Initializing...");
@@ -79,6 +82,7 @@ const RackManager = {
         }
 
         this.nearestRack = closest;
+        this.currentDistance = minDistance;
         this.renderUI(minDistance);
     },
 
@@ -142,7 +146,32 @@ const RackManager = {
         if (!this.nearestRack) return;
 
         const btn = document.getElementById('rack-checkin-btn');
-        const originalText = btn.innerText;
+        const originalText = `CHECK-IN @ ${this.nearestRack.name.split(' ')[0].toUpperCase()}`;
+        
+        // PROXIMITY_LOCK: Check if user is within 500ft (~0.0947 miles)
+        const distanceFeet = this.currentDistance * 5280;
+        const outOfRange = distanceFeet > 500;
+
+        if (outOfRange && !this.proximityConfirmed) {
+            console.warn("RACK_MANAGER: Proximity warning triggered.");
+            this.proximityConfirmed = true;
+            btn.innerText = "OUT OF RANGE - PROCEED?";
+            btn.classList.replace('btn-outline-warning', 'btn-danger');
+            
+            // AUTO_RESET: Clear confirmation after 5 seconds of inactivity
+            if (this.confirmTimeout) clearTimeout(this.confirmTimeout);
+            this.confirmTimeout = setTimeout(() => {
+                this.proximityConfirmed = false;
+                btn.innerText = originalText;
+                btn.classList.replace('btn-danger', 'btn-outline-warning');
+            }, 5000);
+            return;
+        }
+
+        // RESET_CONFIRMATION: If we proceed, clear any pending timeouts
+        if (this.confirmTimeout) clearTimeout(this.confirmTimeout);
+        this.proximityConfirmed = false;
+
         btn.disabled = true;
         btn.innerText = "RECORDING...";
 
@@ -170,6 +199,7 @@ const RackManager = {
                 // Visual feedback
                 btn.innerText = "CHECK-IN SUCCESS";
                 btn.classList.replace('btn-outline-warning', 'btn-success');
+                btn.classList.replace('btn-danger', 'btn-success'); // Ensure red is removed if it was there
                 
                 setTimeout(() => {
                     btn.classList.replace('btn-success', 'btn-outline-warning');
@@ -182,6 +212,7 @@ const RackManager = {
         } catch (error) {
             console.error("RACK_MANAGER: Check-in error", error);
             btn.innerText = "ERROR - RETRY";
+            btn.classList.replace('btn-danger', 'btn-outline-warning');
             btn.disabled = false;
         }
     },

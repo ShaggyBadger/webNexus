@@ -51,3 +51,28 @@ class RackOpsUnitTests(SimpleTestCase):
                     6,
                     f"Expected 6 days remaining for calendar-day logic, got {status['days_remaining']}",
                 )
+
+    def test_record_checkin_proximity(self):
+        """
+        Verify that is_verified is set correctly based on proximity.
+        Threshold is 500 meters (~0.31 miles).
+        """
+        from siteintel.logic.rack_ops import record_checkin
+
+        user = MagicMock(username="testuser")
+        rack = MagicMock()
+        rack.location.name = "Test Rack"
+        # 45.0, -93.0
+        rack.location.lat = 45.0
+        rack.location.lon = -93.0
+
+        with patch("siteintel.models.RackCheckIn.objects.create") as mock_create:
+            # Case 1: Within range (roughly 100 meters away)
+            record_checkin(user, rack, lat=45.0001, lon=-93.0)
+            args, kwargs = mock_create.call_args
+            self.assertTrue(kwargs["is_verified"], "Check-in should be verified within 500m")
+
+            # Case 2: Out of range (roughly 2 miles away)
+            record_checkin(user, rack, lat=45.03, lon=-93.0)
+            args, kwargs = mock_create.call_args
+            self.assertFalse(kwargs["is_verified"], "Check-in should NOT be verified outside 500m")
