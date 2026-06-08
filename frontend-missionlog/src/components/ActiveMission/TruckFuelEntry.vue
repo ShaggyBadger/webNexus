@@ -10,7 +10,7 @@
             inputmode="decimal" 
             :value="modelValue.gallons"
             @input="updateField('gallons', ($event.target as HTMLInputElement).value)"
-            @blur="$emit('update:modelValue', modelValue)"
+           
             class="tactical-input w-100 mono text-light"
             placeholder="0.00"
           />
@@ -22,7 +22,7 @@
             inputmode="decimal" 
             :value="modelValue.price_per_gallon"
             @input="updateField('price_per_gallon', ($event.target as HTMLInputElement).value)"
-            @blur="$emit('update:modelValue', modelValue)"
+           
             class="tactical-input w-100 mono text-light"
             placeholder="0.000"
           />

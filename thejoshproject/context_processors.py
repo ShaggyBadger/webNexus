@@ -28,7 +28,7 @@ def global_config(request):
         "SITE_NAME": "WebNexus",
         "VERSION": settings.APP_VERSION,
         # Tactical Color Palette (Profile-neutral constants)
-        "PRIMARY_COLOR": "#8da35d",
+        "PRIMARY_COLOR": "#ffb86c",
         "BG_COLOR": "#121417",
         "TEXT_COLOR": "#f8f9fa",
         "MUTED_TEXT_COLOR": "#adb5bd",

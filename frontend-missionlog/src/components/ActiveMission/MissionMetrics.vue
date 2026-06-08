@@ -18,7 +18,7 @@
                 type="text" 
                 inputmode="decimal" 
                 v-model="form.hours_on_duty" 
-                @blur="$emit('auto-save')"
+               
                 class="tactical-input-table w-100 mono text-light text-end border-0" 
                 placeholder="0.0"
               />
@@ -55,7 +55,7 @@
                   type="text" 
                   inputmode="numeric" 
                   v-model="form.total_miles"
-                  @blur="$emit('auto-save')"
+                 
                   class="tactical-input-table w-100 mono text-light text-end border-0"
                   placeholder="0"
                 />
@@ -70,7 +70,7 @@
                   type="text" 
                   inputmode="numeric" 
                   v-model="form.start_miles"
-                  @blur="$emit('auto-save')"
+                 
                   class="tactical-input-table w-100 mono text-light text-end border-0"
                   placeholder="START"
                 />
@@ -83,7 +83,7 @@
                   type="text" 
                   inputmode="numeric" 
                   v-model="form.end_miles"
-                  @blur="$emit('auto-save')"
+                 
                   class="tactical-input-table w-100 mono text-light text-end border-0"
                   placeholder="END"
                 />
@@ -103,7 +103,7 @@
     <div class="mb-4">
       <textarea 
         v-model="form.notes"
-        @blur="$emit('auto-save')"
+       
         rows="3"
         class="tactical-input w-100 mono text-light text-center"
         placeholder="SITE QUIRKS, ROADBLOCKS, PUMP OBSERVATIONS..."

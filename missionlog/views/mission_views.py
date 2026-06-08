@@ -111,7 +111,7 @@ def mission_list_or_create(request):
             active_shift = Mission.objects.filter(
                 user=request.user,
                 is_completed=False,
-                shift_start__gte=timezone.now() - timedelta(hours=48),
+                shift_start__gte=timezone.now() - timedelta(hours=24),
             ).first()
 
             if active_shift:
@@ -149,10 +149,10 @@ def mission_list_or_create(request):
 def active_mission(request):
     """
     ACTIVE_MISSION_API:
-    GET: Resolves and returns the currently running mission (if active and within 14h window).
+    GET: Resolves and returns the currently running mission (if active and within 24h window).
     """
     if request.method == "GET":
-        cutoff = timezone.now() - timedelta(hours=14)
+        cutoff = timezone.now() - timedelta(hours=24)
         mission = Mission.objects.filter(
             user=request.user, is_completed=False, shift_start__gte=cutoff
         ).first()

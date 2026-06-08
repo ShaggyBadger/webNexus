@@ -22,18 +22,14 @@
     <!-- Hub Controls -->
     <div class="row g-4 justify-content-center">
       <div class="col-12 col-md-8 d-grid gap-3">
-        <!-- Start New Mission -->
-        <div v-if="!activeMission" class="card bg-dark-custom border-secondary p-4 text-center mb-2">
-          <div class="mono text-muted-custom small mb-4">[ SHIFT_INITIALIZATION_PROTOCOL ]</div>
-          <button @click="$emit('navigate', 'active')" class="btn btn-primary btn-tactical-lg mono fw-bold w-100">
+        <!-- Start New Mission (Visible if no active mission or as secondary option) -->
+        <div class="card bg-dark-custom border-secondary p-4 text-center mb-2">
+          <div v-if="!activeMission" class="mono text-muted-custom small mb-4">[ SHIFT_INITIALIZATION_PROTOCOL ]</div>
+          <div v-else class="mono text-muted-custom x-small mb-4">[ START_NEW_MISSION_OVERRIDE ]</div>
+          <button @click="$emit('navigate', 'active')" class="btn btn-outline-primary btn-tactical-lg mono fw-bold w-100">
             INITIALIZE_SHIFT
           </button>
         </div>
-
-        <!-- General Options -->
-        <button v-if="activeMission" @click="$emit('navigate', 'active')" class="btn btn-outline-primary btn-tactical-lg mono fw-bold py-3 text-center">
-          <i class="fas fa-play me-3"></i> CONTINUE_CURRENT_SHIFT
-        </button>
 
         <button @click="$emit('navigate', 'history')" class="btn btn-outline-warning btn-tactical-lg mono fw-bold py-3 text-center">
           <i class="fas fa-history me-3"></i> EDIT_PREVIOUS_SHIFTS
@@ -122,8 +118,8 @@ export default defineComponent({
   animation: pulse 2s infinite alternate;
 }
 @keyframes pulse {
-  0% { text-shadow: 0 0 5px rgba(141, 163, 93, 0.4); }
-  100% { text-shadow: 0 0 15px rgba(141, 163, 93, 0.9); }
+  0% { text-shadow: 0 0 5px rgba(255, 184, 108, 0.4); }
+  100% { text-shadow: 0 0 15px rgba(255, 184, 108, 0.9); }
 }
 .blink-tactical {
   animation: blinker 1.5s linear infinite;

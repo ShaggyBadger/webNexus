@@ -164,7 +164,7 @@ export default defineComponent({
             storesMap[ld.store_num].fuels.push({
               name: ld.fuel_type_name,
               gallons: ld.gross_gal || 0,
-              color: ld.fuel_type_color || '#8da35d'
+              color: ld.fuel_type_color || '#ffb86c'
             });
           }
         }

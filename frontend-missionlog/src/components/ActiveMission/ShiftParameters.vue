@@ -17,7 +17,6 @@
                 type="datetime-local" 
                 :value="modelValue"
                 @input="$emit('update:modelValue', ($event.target as HTMLInputElement).value)"
-                @blur="$emit('auto-save')"
                 class="tactical-input-table w-100 mono text-light text-end border-0"
               />
             </td>

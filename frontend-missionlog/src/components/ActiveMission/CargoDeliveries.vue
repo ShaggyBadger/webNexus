@@ -19,10 +19,9 @@
           inputmode="numeric" 
           v-model="deliv.store_number_or_riso"
           @input="$emit('validate-store', dIdx)"
-          @blur="$emit('auto-save')"
           class="tactical-input w-100 mono text-light"
           placeholder="e.g. 4022"
-          :style="{ borderColor: deliv.storeValid === true ? '#8da35d' : (deliv.storeValid === false ? '#e94560' : '') }"
+          :style="{ borderColor: deliv.storeValid === true ? '#ffb86c' : (deliv.storeValid === false ? '#e94560' : '') }"
         />
         
         <!-- Validation status -->
@@ -49,7 +48,6 @@
               <td class="py-0 px-0">
                 <select 
                   v-model="fEntry.fuel_type_id" 
-                  @change="$emit('auto-save')"
                   class="tactical-input-table w-100 border-0 py-2"
                 >
                   <option v-for="ft in fuelTypes" :key="ft.id" :value="ft.id">{{ ft.name }}</option>
@@ -60,7 +58,6 @@
                   type="text" 
                   inputmode="numeric" 
                   v-model="fEntry.gallons"
-                  @blur="$emit('auto-save')"
                   class="tactical-input-table w-100 text-center border-0 py-2"
                   placeholder="GAL"
                 />

@@ -65,7 +65,7 @@
           <!-- Monolithic Form -->
           <form @submit.prevent="() => {}" class="card bg-dark-custom border-secondary p-4 mb-5">
             
-            <ShiftParameters v-model="form.shift_start" @auto-save="submitShiftLog(false)" />
+            <ShiftParameters v-model="form.shift_start" />
 
             <CargoDeliveries 
               :deliveries="form.deliveries"
@@ -75,17 +75,15 @@
               @remove-delivery="removeDelivery"
               @add-fuel-entry="addFuelEntry"
               @remove-fuel-entry="removeFuelEntry"
-              @auto-save="submitShiftLog(false)"
             />
 
-            <TruckFuelEntry v-model="form.truck_fuel" @update:model-value="submitShiftLog(false)" />
+            <TruckFuelEntry v-model="form.truck_fuel" />
 
             <MissionMetrics 
               :form="form"
               :mileageMode="mileageMode"
               :computedTotalMiles="computedTotalMiles"
-              @update:mileage-mode="val => { mileageMode = val; submitShiftLog(false); }"
-              @auto-save="submitShiftLog(false)"
+              @update:mileage-mode="val => { mileageMode = val; }"
             />
 
             <!-- Submit Status Indicators -->
@@ -97,26 +95,27 @@
             </div>
 
             <!-- Submit action buttons -->
-            <div class="d-flex flex-column gap-4 mt-2">
-              <button 
-                type="button" 
-                @click="submitShiftLog(false)"
-                class="btn btn-outline-primary btn-tactical-lg mono fw-bold w-100"
-                :disabled="submitting"
-              >
-                {{ submitting ? 'SYNCHRONIZING...' : 'SAVE_PROGRESS_ONLY' }}
-              </button>
-
-              <div class="border-top border-secondary opacity-25 my-1"></div>
-
-              <button 
-                type="button" 
-                @click="submitShiftLog(true)"
-                class="btn btn-primary btn-tactical-lg mono fw-bold w-100"
-                :disabled="submitting"
-              >
-                {{ submitting ? 'FINALIZING...' : 'COMMIT_MISSION_TO_ARCHIVES' }}
-              </button>
+            <div class="row g-2 mt-2">
+              <div class="col-6">
+                <button 
+                  type="button" 
+                  @click="submitShiftLog(false)"
+                  class="btn btn-outline-primary btn-sm mono fw-bold w-100 py-3"
+                  :disabled="submitting"
+                >
+                  {{ submitting ? '...' : 'SAVE_PROGRESS' }}
+                </button>
+              </div>
+              <div class="col-6">
+                <button 
+                  type="button" 
+                  @click="submitShiftLog(true)"
+                  class="btn btn-primary btn-sm mono fw-bold w-100 py-3"
+                  :disabled="submitting"
+                >
+                  {{ submitting ? '...' : 'COMMIT_SHIFT' }}
+                </button>
+              </div>
             </div>
           </form>
         </div>
