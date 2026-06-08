@@ -15,39 +15,40 @@ class Migration(migrations.Migration):
         #     model_name="purchaseorder",
         #     name="mission",
         # ),
-        # migrations.CreateModel(
-        #     name="OrderNumber",
-        #     fields=[
-        #         (
-        #             "id",
-        #             models.BigAutoField(
-        #                 auto_created=True,
-        #                 primary_key=True,
-        #                 serialize=False,
-        #                 verbose_name="ID",
-        #             ),
-        #         ),
-        #         (
-        #             "order_number",
-        #             models.CharField(
-        #                 help_text="Overarching Job/Order ID.", max_length=100
-        #             ),
-        #         ),
-        #         (
-        #             "mission",
-        #             models.ForeignKey(
-        #                 help_text="Associated shift mission.",
-        #                 on_delete=django.db.models.deletion.CASCADE,
-        #                 related_name="order_numbers",
-        #                 to="missionlog.mission",
-        #             ),
-        #         ),
-        #     ],
-        #     options={
-        #         "verbose_name": "Order Number",
-        #         "verbose_name_plural": "Order Numbers",
-        #     },
-        # ),
+        migrations.CreateModel(
+            name="OrderNumber",
+            fields=[
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "order_number",
+                    models.CharField(
+                        help_text="Overarching Job/Order ID.", max_length=100
+                    ),
+                ),
+                (
+                    "mission",
+                    models.ForeignKey(
+                        help_text="Associated shift mission.",
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="order_numbers",
+                        to="missionlog.mission",
+                    ),
+                ),
+            ],
+            options={
+                "verbose_name": "Order Number",
+                "verbose_name_plural": "Order Numbers",
+                "unique_together": {("mission", "order_number")},
+            },
+        ),
         migrations.AddField(
             model_name="purchaseorder",
             name="order_parent",

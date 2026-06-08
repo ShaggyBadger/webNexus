@@ -40,6 +40,8 @@ INSTALLED_APPS = [
     "accounts",
     "siteintel",
     "missionlog",
+    "rest_framework",
+    "dms",
 ]
 
 
@@ -87,19 +89,29 @@ WSGI_APPLICATION = "thejoshproject.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.mysql",
-        "NAME": os.environ.get("MYSQL_DB", "joshproject_db"),
-        "USER": os.environ.get("MYSQL_USER", "root"),
-        "PASSWORD": os.environ.get("MYSQL_PASSWORD", ""),
-        "HOST": os.environ.get("MYSQL_HOST", "localhost"),
-        "PORT": os.environ.get("MYSQL_PORT", "3306"),
-        "OPTIONS": {
-            "charset": "utf8mb4",
-        },
+import sys
+
+if "test" in sys.argv:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": ":memory:",
+        }
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.mysql",
+            "NAME": os.environ.get("MYSQL_DB", "joshproject_db"),
+            "USER": os.environ.get("MYSQL_USER", "root"),
+            "PASSWORD": os.environ.get("MYSQL_PASSWORD", ""),
+            "HOST": os.environ.get("MYSQL_HOST", "localhost"),
+            "PORT": os.environ.get("MYSQL_PORT", "3306"),
+            "OPTIONS": {
+                "charset": "utf8mb4",
+            },
+        }
+    }
 
 
 # Password validation
@@ -142,6 +154,11 @@ STATICFILES_DIRS = [
     BASE_DIR / "static_common",
     BASE_DIR / "frontend-missionlog" / "dist",
 ]
+
+# Media files (uploaded documents)
+MEDIA_URL = "media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
 
 # Logging Configuration
 LOGGING = {
@@ -235,7 +252,17 @@ if not DEBUG:
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
 
-    # 4. Proxy Configuration: Trusts the 'X-Forwarded-Proto' header from Nginx.
-    # This is essential when running behind a reverse proxy that handles SSL termination.
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 APP_VERSION = "2.4.2"
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.SessionAuthentication",
+        "rest_framework.authentication.BasicAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
+    "EXCEPTION_HANDLER": "dms.exceptions.dms_exception_handler",
+}
+

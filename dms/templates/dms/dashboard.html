@@ -1,0 +1,816 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}DMS - Tactical Command Console{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* Base Camp / Command Console Aesthetic Overrides */
+    body {
+        background-color: #0f111a;
+        color: #e2e4f0;
+    }
+    .card-tactical {
+        background-color: #161a24;
+        border: 1px solid #283046;
+        border-radius: 4px;
+    }
+    .card-tactical-header {
+        background-color: #1e2433;
+        border-bottom: 1px solid #283046;
+        font-family: 'JetBrains Mono', monospace;
+        color: var(--accent-color, #ffb86c);
+        font-size: 0.85rem;
+        letter-spacing: 1px;
+    }
+    .btn-tactical {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.75rem;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        border-radius: 2px;
+        transition: all 0.2s ease;
+    }
+    .btn-tactical-primary {
+        background-color: transparent;
+        color: #ffb86c;
+        border: 1px solid #ffb86c;
+    }
+    .btn-tactical-primary:hover:not(:disabled) {
+        background-color: #ffb86c;
+        color: #0f111a;
+    }
+    .btn-tactical-secondary {
+        background-color: transparent;
+        color: #a0aec0;
+        border: 1px solid #4a5568;
+    }
+    .btn-tactical-secondary:hover:not(:disabled) {
+        background-color: #4a5568;
+        color: #fff;
+    }
+    .btn-tactical-danger {
+        background-color: transparent;
+        color: #ff5555;
+        border: 1px solid #ff5555;
+    }
+    .btn-tactical-danger:hover:not(:disabled) {
+        background-color: #ff5555;
+        color: #fff;
+    }
+    
+    /* Touch Target & Search Enhancements */
+    .touch-target {
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .form-control-tactical {
+        background-color: #0a0c10;
+        border: 1px solid #283046;
+        color: #e2e4f0;
+        border-radius: 2px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.85rem;
+    }
+    .form-control-tactical:focus {
+        background-color: #0a0c10;
+        border-color: #ffb86c;
+        color: #e2e4f0;
+        box-shadow: 0 0 0 0.15rem rgba(255, 184, 108, 0.25);
+    }
+    .form-select-tactical {
+        background-color: #0a0c10;
+        border: 1px solid #283046;
+        color: #e2e4f0;
+        border-radius: 2px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.85rem;
+    }
+    .form-select-tactical:focus {
+        background-color: #0a0c10;
+        border-color: #ffb86c;
+        color: #e2e4f0;
+        box-shadow: 0 0 0 0.15rem rgba(255, 184, 108, 0.25);
+    }
+
+    /* Drag & Drop Area */
+    .upload-zone {
+        border: 2px dashed #4a5568;
+        background-color: #0a0c10;
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+    .upload-zone.dragover {
+        border-color: #ffb86c;
+        background-color: rgba(255, 184, 108, 0.05);
+    }
+    
+    /* Document Cards & Mobile views */
+    .document-card {
+        transition: border-color 0.2s ease;
+    }
+    .document-card:hover {
+        border-color: #ffb86c;
+    }
+    .meta-tag {
+        font-size: 0.65rem;
+        font-family: 'JetBrains Mono', monospace;
+        padding: 2px 6px;
+        background-color: #1e2433;
+        border: 1px solid #283046;
+        color: #a0aec0;
+        border-radius: 2px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- Header Title -->
+    <div class="d-flex justify-content-between align-items-center mb-4 border-bottom border-secondary pb-3">
+        <div>
+            <h1 class="h3 font-family-monospace text-uppercase tracking-wider mb-0 text-white font-weight-bold">
+                <i class="fa-solid fa-folder-open me-2 text-tactical-warning"></i>DMS // Document Management System
+            </h1>
+            <p class="text-muted-custom small mb-0 font-family-monospace mt-1">OPERATIONAL DATABASE INTERFACE // V{{ APP_VERSION|default:"1.0.0" }}</p>
+        </div>
+        {% if user.is_staff or user.is_superuser %}
+            <button class="btn btn-tactical btn-tactical-primary touch-target" id="btnToggleUpload">
+                <i class="fa-solid fa-plus me-1"></i> Upload File
+            </button>
+        {% endif %}
+    </div>
+
+    <!-- Banner Inline Info (Alert replacements) -->
+    <div id="statusAlert" class="alert d-none font-family-monospace py-2 px-3 mb-4 rounded-0" role="alert">
+        <span id="statusMessage"></span>
+    </div>
+
+    <!-- TWO-PHASE UPLOAD COMPONENT (Hidden by default, for Staff/Admins) -->
+    {% if user.is_staff or user.is_superuser %}
+    <div id="uploadContainer" class="card card-tactical mb-4 d-none">
+        <div class="card-header card-tactical-header d-flex justify-content-between align-items-center">
+            <span>[ PHASE A: RAW FILE INGESTION ]</span>
+            <button type="button" class="btn-close btn-close-white btn-sm" id="btnCloseUploadPanel" aria-label="Close"></button>
+        </div>
+        <div class="card-body">
+            <!-- Phase A Ingestion Area -->
+            <div id="phaseASection">
+                <div id="dropZone" class="upload-zone rounded p-4 text-center">
+                    <i class="fa-solid fa-cloud-arrow-up fa-2x text-muted-custom mb-3"></i>
+                    <p class="mb-2 font-family-monospace text-white small">DRAG & DROP FILE OR CLICK TO INGEST</p>
+                    <p class="text-muted-custom small mb-0">PDF, Excel (XLSX), Tank Charts, CSV (Max 50MB)</p>
+                    <input type="file" id="fileInput" class="d-none">
+                </div>
+                <!-- Upload Progress -->
+                <div id="uploadProgressContainer" class="d-none mt-3">
+                    <div class="d-flex justify-content-between text-muted-custom small font-family-monospace mb-1">
+                        <span>Uploading file...</span>
+                        <span id="uploadPercentage">0%</span>
+                    </div>
+                    <div class="progress rounded-0" style="height: 6px; background-color: #0f111a;">
+                        <div id="uploadProgressBar" class="progress-bar bg-warning" role="progressbar" style="width: 0%;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Phase B Finalize Area -->
+            <div id="phaseBSection" class="d-none mt-2 pt-3 border-top border-secondary">
+                <h6 class="font-family-monospace text-tactical-warning mb-3">[ PHASE B: METADATA & LINKAGE FINALIZATION ]</h6>
+                <form id="finalizeForm">
+                    <input type="hidden" id="tempIdInput">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="docTitle" class="form-label font-family-monospace text-muted-custom small">Document Title *</label>
+                            <input type="text" class="form-control form-control-tactical" id="docTitle" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="docCategory" class="form-label font-family-monospace text-muted-custom small">Category</label>
+                            <select class="form-select form-select-tactical" id="docCategory">
+                                <option value="">-- UNASSIGNED --</option>
+                                {% for category in categories %}
+                                    <option value="{{ category.id }}">{{ category.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-12">
+                            <label for="docDesc" class="form-label font-family-monospace text-muted-custom small">Description / Notes</label>
+                            <textarea class="form-control form-control-tactical" id="docDesc" rows="2" placeholder="Describe scope, revision, or contents..."></textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label font-family-monospace text-muted-custom small">Link to Collections</label>
+                            <div class="border border-secondary p-2 rounded" style="max-height: 100px; overflow-y: auto; background-color: #0a0c10;">
+                                {% for col in collections %}
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="collections" value="{{ col.id }}" id="col_{{ col.id }}">
+                                        <label class="form-check-label font-family-monospace small text-white" for="col_{{ col.id }}">
+                                            {{ col.name }}
+                                        </label>
+                                    </div>
+                                {% empty %}
+                                    <span class="text-muted-custom small font-family-monospace">No collections available</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label font-family-monospace text-muted-custom small">Contextual Linkage (GKey)</label>
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <select class="form-select form-select-tactical" id="linkContentType">
+                                        <option value="">-- NO LINK --</option>
+                                        <option value="location">Location (SiteIntel)</option>
+                                        <option value="store">Store (TankGauge)</option>
+                                    </select>
+                                </div>
+                                <div class="col-6">
+                                    <input type="text" class="form-control form-control-tactical" id="linkObjectId" placeholder="Object ID (e.g. Store #)">
+                                </div>
+                            </div>
+                            <span class="text-muted-custom" style="font-size: 0.65rem;">Associate doc with site or store record.</span>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="docTags" class="form-label font-family-monospace text-muted-custom small">Tags (Comma Separated)</label>
+                            <input type="text" class="form-control form-control-tactical" id="docTags" placeholder="e.g. winter, training, compliance">
+                        </div>
+                        <div class="col-md-6 pt-md-4">
+                            <div class="form-check form-switch mt-2">
+                                <input class="form-check-input" type="checkbox" id="docIsPublic" checked>
+                                <label class="form-check-label font-family-monospace text-white small" for="docIsPublic">Public Visibility (Visible to standard users)</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-end mt-4 gap-2">
+                        <button type="button" class="btn btn-tactical btn-tactical-secondary touch-target" id="btnCancelFinalize">Cancel</button>
+                        <button type="submit" class="btn btn-tactical btn-tactical-primary touch-target" id="btnSubmitFinalize">Commit to DB</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- SEARCH & FILTER CONSOLE -->
+    <div class="card card-tactical mb-4">
+        <div class="card-header card-tactical-header">[ FILTER & QUERY CONTROL BAR ]</div>
+        <div class="card-body">
+            <form method="GET" action="." class="row g-2">
+                <div class="col-md-4">
+                    <div class="input-group">
+                        <span class="input-group-text bg-transparent border-secondary text-muted-custom"><i class="fa-solid fa-magnifying-glass"></i></span>
+                        <input type="text" name="q" value="{{ request.GET.q|default:'' }}" class="form-control form-control-tactical" placeholder="Search title or description...">
+                    </div>
+                </div>
+                <div class="col-6 col-md-2">
+                    <select name="category" class="form-select form-select-tactical">
+                        <option value="">All Categories</option>
+                        {% for cat in categories %}
+                            <option value="{{ cat.id }}" {% if request.GET.category == cat.id|stringformat:"s" %}selected{% endif %}>{{ cat.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-6 col-md-2">
+                    <select name="collection" class="form-select form-select-tactical">
+                        <option value="">All Collections</option>
+                        {% for col in collections %}
+                            <option value="{{ col.id }}" {% if request.GET.collection == col.id %}selected{% endif %}>{{ col.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-6 col-md-2">
+                   <input type="text" name="tag_slug" value="{{ request.GET.tag_slug|default:'' }}" class="form-control form-control-tactical" placeholder="Tag (e.g. propane)">
+                </div>
+                <div class="col-6 col-md-2">
+                   <input type="text" name="state" value="{{ request.GET.state|default:'' }}" class="form-control form-control-tactical" placeholder="State (e.g. NC, VA)">
+                </div>
+
+                <div class="col-6 col-md-2 d-grid">
+                    <button type="submit" class="btn btn-tactical btn-tactical-primary touch-target">Apply Filter</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- DOCUMENT ARCHIVE LISTING -->
+    <div class="card card-tactical">
+        <div class="card-header card-tactical-header d-flex justify-content-between align-items-center">
+            <span>[ SYSTEM RECORDS: {{ documents.count }} REGISTERED DOCUMENTS ]</span>
+            <span class="badge bg-secondary font-family-monospace">{{ request.GET.status|default:"ACTIVE" }}</span>
+        </div>
+        <div class="card-body p-0">
+            {% if documents %}
+                <!-- Responsive mobile-first card list -->
+                <div class="d-md-none">
+                    {% for doc in documents %}
+                        <div class="p-3 border-bottom border-secondary document-card" id="docCard_{{ doc.id }}">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <h5 class="h6 mb-0 text-white font-weight-bold">
+                                    {{ doc.title }}
+                                    {% if not doc.is_public %}
+                                        <i class="fa-solid fa-lock text-muted-custom ms-1" title="Private/Staff-Only"></i>
+                                    {% endif %}
+                                </h5>
+                                <span class="badge bg-dark border border-secondary text-muted-custom small mono">v{{ doc.version }}</span>
+                            </div>
+                            <p class="text-muted-custom small mb-2">{{ doc.description|default:"No description provided" }}</p>
+                            
+                            <div class="d-flex flex-wrap gap-1 mb-3">
+                                {% if doc.category %}
+                                    <span class="meta-tag"><i class="fa-solid fa-tag me-1"></i>{{ doc.category.name }}</span>
+                                {% endif %}
+                                {% for tag in doc.tags.all %}
+                                    <span class="meta-tag bg-dark text-tactical-warning border-tactical-warning"><i class="fa-solid fa-hashtag me-1"></i>{{ tag.name }}</span>
+                                {% endfor %}
+                                <span class="meta-tag"><i class="fa-solid fa-hard-drive me-1"></i>{{ doc.file_size|filesizeformat }}</span>
+                                {% if doc.linked_object %}
+                                    <span class="meta-tag text-tactical-warning">
+                                        <i class="fa-solid fa-link me-1"></i>{{ doc.content_type.model|upper }}: {{ doc.object_id }}
+                                    </span>
+                                {% endif %}
+                            </div>
+
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="text-muted-custom font-family-monospace" style="font-size: 0.65rem;">
+                                    {{ doc.uploaded_at|date:"Y-m-d H:i" }} // {{ doc.uploaded_by.username }}
+                                </span>
+                                <div class="btn-group">
+                                    <a href="{% url 'dms:document_download' doc.id %}" class="btn btn-sm btn-tactical btn-tactical-primary px-3 touch-target">
+                                        <i class="fa-solid fa-download me-1"></i> Get
+                                    </a>
+                                    {% if user.is_staff or user.is_superuser %}
+                                        <button class="btn btn-sm btn-tactical btn-tactical-secondary px-2 btn-edit-meta touch-target" data-id="{{ doc.id }}" data-title="{{ doc.title }}" data-desc="{{ doc.description|default:'' }}" data-category="{{ doc.category.id|default:'' }}" data-is-public="{{ doc.is_public|yesno:'true,false' }}" data-tags="{% for t in doc.tags.all %}{{ t.name }}{% if not forloop.last %}, {% endif %}{% endfor %}">
+                                            <i class="fa-solid fa-pen"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-tactical btn-tactical-danger px-2 btn-delete-doc touch-target" data-id="{{ doc.id }}">
+                                            <i class="fa-solid fa-trash-can"></i>
+                                        </button>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <!-- Inline Edit Block (Hidden by default) -->
+                            <div class="edit-form-block d-none mt-3 p-2 border border-warning rounded" id="editFormBlock_{{ doc.id }}">
+                                <div class="mb-2">
+                                    <label class="form-label font-family-monospace small text-warning">Edit Title</label>
+                                    <input type="text" class="form-control form-control-tactical edit-title-input" value="{{ doc.title }}">
+                                </div>
+                                <div class="mb-2">
+                                   <label class="form-label font-family-monospace small text-warning">Edit Description</label>
+                                   <textarea class="form-control form-control-tactical edit-desc-input" rows="2">{{ doc.description|default:'' }}</textarea>
+                                </div>
+                                <div class="mb-2">
+                                   <label class="form-label font-family-monospace small text-warning">Edit Tags</label>
+                                   <input type="text" class="form-control form-control-tactical edit-tags-input" value="{% for t in doc.tags.all %}{{ t.name }}{% if not forloop.last %}, {% endif %}{% endfor %}">
+                                </div>
+                                <div class="mb-3">
+                                   <div class="form-check form-switch">
+                                       <input class="form-check-input edit-is-public-input" type="checkbox" {% if doc.is_public %}checked{% endif %}>
+                                       <label class="form-check-label font-family-monospace text-warning small">Public Visibility</label>
+                                   </div>
+                                </div>
+
+                                <div class="d-flex justify-content-end gap-1">
+                                    <button class="btn btn-sm btn-tactical btn-tactical-secondary btn-cancel-edit" data-id="{{ doc.id }}">Cancel</button>
+                                    <button class="btn btn-sm btn-tactical btn-tactical-primary btn-save-edit" data-id="{{ doc.id }}">Save Changes</button>
+                                </div>
+                            </div>
+                            <!-- Inline Archive Confirmation (Hidden by default) -->
+                            <div class="delete-confirm-block d-none mt-3 p-3 border border-danger bg-dark rounded" id="deleteBlock_{{ doc.id }}">
+                                <p class="small text-danger mb-2 font-family-monospace"><i class="fa-solid fa-triangle-exclamation"></i> ARREST ACTION: Are you sure you want to soft-delete/archive this document? Metadata will remain, physical file will move to trash.</p>
+                                <div class="d-flex justify-content-end gap-1">
+                                    <button class="btn btn-sm btn-tactical btn-tactical-secondary btn-cancel-delete" data-id="{{ doc.id }}">Cancel</button>
+                                    <button class="btn btn-sm btn-tactical btn-tactical-danger btn-confirm-delete" data-id="{{ doc.id }}">Confirm Soft-Delete</button>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+
+                <!-- Desktop Table Grid layout -->
+                <div class="d-none d-md-block">
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover mb-0 font-family-monospace small align-middle">
+                            <thead>
+                                <tr style="border-bottom: 2px solid #283046;">
+                                    <th scope="col" class="ps-3 py-3">TITLE & DESCRIPTION</th>
+                                    <th scope="col" class="py-3">CATEGORY</th>
+                                    <th scope="col" class="py-3">FILE SIZE</th>
+                                    <th scope="col" class="py-3">UPLOAD DATE</th>
+                                    <th scope="col" class="py-3">LINKAGE</th>
+                                    <th scope="col" class="py-3">DL COUNT</th>
+                                    <th scope="col" class="py-3 pe-3 text-end" style="width: 200px;">OPERATIONS</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for doc in documents %}
+                                    <tr id="docRow_{{ doc.id }}" style="border-bottom: 1px solid #1e2433;">
+                                        <td class="ps-3 py-3">
+                                            <div class="text-white font-weight-bold mb-1">
+                                                {{ doc.title }}
+                                                {% if not doc.is_public %}
+                                                    <i class="fa-solid fa-lock text-muted-custom ms-1" title="Private/Staff-Only"></i>
+                                                {% endif %}
+                                                <span class="text-muted-custom ms-1">(v{{ doc.version }})</span>
+                                            </div>
+                                            <div class="text-muted-custom small mb-1">{{ doc.description|default:"--" }}</div>
+                                            <div class="d-flex flex-wrap gap-1">
+                                                {% for tag in doc.tags.all %}
+                                                    <span class="badge border border-tactical-warning text-tactical-warning mono" style="font-size: 0.6rem;">#{{ tag.name|upper }}</span>
+                                                {% endfor %}
+                                            </div>
+                                        </td>
+                                        <td>
+                                            {% if doc.category %}
+                                                <span class="badge bg-secondary">{{ doc.category.name }}</span>
+                                            {% else %}
+                                                <span class="text-muted-custom">--</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ doc.file_size|filesizeformat }}</td>
+                                        <td>
+                                            <div>{{ doc.uploaded_at|date:"Y-m-d H:i" }}</div>
+                                            <div class="text-muted-custom text-uppercase" style="font-size: 0.65rem;">BY: {{ doc.uploaded_by.username }}</div>
+                                        </td>
+                                        <td>
+                                            {% if doc.linked_object %}
+                                                <span class="text-tactical-warning">{{ doc.content_type.model|upper }}: {{ doc.object_id }}</span>
+                                            {% else %}
+                                                <span class="text-muted-custom">--</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ doc.download_count }}</td>
+                                        <td class="pe-3 text-end">
+                                            <div class="btn-group">
+                                                <a href="{% url 'dms:document_download' doc.id %}" class="btn btn-sm btn-tactical btn-tactical-primary px-3 touch-target">
+                                                    <i class="fa-solid fa-download"></i> Get
+                                                </a>
+                                                {% if user.is_staff or user.is_superuser %}
+                                                    <button class="btn btn-sm btn-tactical btn-tactical-secondary btn-edit-meta touch-target" data-id="{{ doc.id }}" data-title="{{ doc.title }}" data-desc="{{ doc.description|default:'' }}" data-category="{{ doc.category.id|default:'' }}" data-is-public="{{ doc.is_public|yesno:'true,false' }}" data-tags="{% for t in doc.tags.all %}{{ t.name }}{% if not forloop.last %}, {% endif %}{% endfor %}">
+                                                        <i class="fa-solid fa-pen"></i>
+                                                    </button>
+                                                    <button class="btn btn-sm btn-tactical btn-tactical-danger btn-delete-doc touch-target" data-id="{{ doc.id }}">
+                                                        <i class="fa-solid fa-trash-can"></i>
+                                                    </button>
+                                                {% endif %}
+                                            </div>
+                                            <!-- Inline Edit Block -->
+                                            <div class="edit-form-block d-none mt-2 p-2 text-start border border-warning rounded" id="editFormBlockDesktop_{{ doc.id }}">
+                                                <div class="mb-2">
+                                                    <label class="form-label small text-warning font-family-monospace">Edit Title</label>
+                                                    <input type="text" class="form-control form-control-tactical edit-title-input" value="{{ doc.title }}">
+                                                </div>
+                                                <div class="mb-2">
+                                                    <label class="form-label small text-warning font-family-monospace">Edit Description</label>
+                                                    <textarea class="form-control form-control-tactical edit-desc-input" rows="2">{{ doc.description|default:'' }}</textarea>
+                                                </div>
+                                                <div class="mb-2">
+                                                    <label class="form-label font-family-monospace small text-warning">Edit Tags</label>
+                                                    <input type="text" class="form-control form-control-tactical edit-tags-input" value="{% for t in doc.tags.all %}{{ t.name }}{% if not forloop.last %}, {% endif %}{% endfor %}">
+                                                </div>
+                                                <div class="mb-3">
+                                                    <div class="form-check form-switch">
+                                                        <input class="form-check-input edit-is-public-input" type="checkbox" {% if doc.is_public %}checked{% endif %}>
+                                                        <label class="form-check-label font-family-monospace text-warning small">Public Visibility</label>
+                                                    </div>
+                                                </div>
+                                                <div class="d-flex justify-content-end gap-1">
+                                                    <button class="btn btn-sm btn-tactical btn-tactical-secondary btn-cancel-edit" data-id="{{ doc.id }}">Cancel</button>
+                                                    <button class="btn btn-sm btn-tactical btn-tactical-primary btn-save-edit" data-id="{{ doc.id }}">Save Changes</button>
+                                                </div>
+                                            </div>
+                                            <!-- Inline Delete Block -->
+                                            <div class="delete-confirm-block d-none mt-2 p-2 text-start border border-danger rounded bg-dark" id="deleteBlockDesktop_{{ doc.id }}">
+                                                <p class="small text-danger mb-2 font-family-monospace"><i class="fa-solid fa-triangle-exclamation"></i> Are you sure you want to archive/soft-delete this document?</p>
+                                                <div class="d-flex justify-content-end gap-1">
+                                                    <button class="btn btn-sm btn-tactical btn-tactical-secondary btn-cancel-delete" data-id="{{ doc.id }}">Cancel</button>
+                                                    <button class="btn btn-sm btn-tactical btn-tactical-danger btn-confirm-delete" data-id="{{ doc.id }}">Archive Document</button>
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            {% else %}
+                <div class="text-center py-5">
+                    <i class="fa-solid fa-box-open fa-3x text-muted-custom mb-3"></i>
+                    <p class="font-family-monospace text-white">NO DOCUMENTS FOUND MATCHING SEARCH CRITERIA</p>
+                    <p class="text-muted-custom small mb-0">Adjust filters or upload operational reference records above.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        // Toggle Upload Panel
+        const btnToggleUpload = document.getElementById("btnToggleUpload");
+        const uploadContainer = document.getElementById("uploadContainer");
+        const btnCloseUploadPanel = document.getElementById("btnCloseUploadPanel");
+
+        if (btnToggleUpload && uploadContainer) {
+            btnToggleUpload.addEventListener("click", () => {
+                uploadContainer.classList.toggle("d-none");
+                // Reset panel on toggle
+                resetUploadPanel();
+            });
+        }
+
+        if (btnCloseUploadPanel && uploadContainer) {
+            btnCloseUploadPanel.addEventListener("click", () => {
+                uploadContainer.classList.add("d-none");
+            });
+        }
+
+        // Inline alert system helper
+        const showAlert = (message, type = "success") => {
+            const alertBox = document.getElementById("statusAlert");
+            const alertMsg = document.getElementById("statusMessage");
+            if (!alertBox || !alertMsg) return;
+
+            alertBox.className = `alert font-family-monospace py-2 px-3 mb-4 rounded-0 alert-${type === 'error' ? 'danger' : 'success'}`;
+            alertMsg.textContent = message;
+            alertBox.classList.remove("d-none");
+            
+            // Auto-hide alert after 5 seconds
+            setTimeout(() => {
+                alertBox.classList.add("d-none");
+            }, 5000);
+        };
+
+        // File Uploader Elements
+        const dropZone = document.getElementById("dropZone");
+        const fileInput = document.getElementById("fileInput");
+        const uploadProgressContainer = document.getElementById("uploadProgressContainer");
+        const uploadProgressBar = document.getElementById("uploadProgressBar");
+        const uploadPercentage = document.getElementById("uploadPercentage");
+        
+        const phaseASection = document.getElementById("phaseASection");
+        const phaseBSection = document.getElementById("phaseBSection");
+        const finalizeForm = document.getElementById("finalizeForm");
+        const tempIdInput = document.getElementById("tempIdInput");
+        const docTitle = document.getElementById("docTitle");
+
+        const resetUploadPanel = () => {
+            if (fileInput) fileInput.value = "";
+            if (uploadProgressContainer) uploadProgressContainer.classList.add("d-none");
+            if (uploadProgressBar) uploadProgressBar.style.width = "0%";
+            if (uploadPercentage) uploadPercentage.textContent = "0%";
+            if (phaseASection) phaseASection.classList.remove("d-none");
+            if (phaseBSection) phaseBSection.classList.add("d-none");
+            if (finalizeForm) finalizeForm.reset();
+        };
+
+        if (dropZone && fileInput) {
+            // Drag-and-drop triggers
+            dropZone.addEventListener("click", () => fileInput.click());
+            
+            dropZone.addEventListener("dragover", (e) => {
+                e.preventDefault();
+                dropZone.classList.add("dragover");
+            });
+
+            dropZone.addEventListener("dragleave", () => {
+                dropZone.classList.remove("dragover");
+            });
+
+            dropZone.addEventListener("drop", (e) => {
+                e.preventDefault();
+                dropZone.classList.remove("dragover");
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    handleFileUpload(files[0]);
+                }
+            });
+
+            fileInput.addEventListener("change", (e) => {
+                if (e.target.files.length > 0) {
+                    handleFileUpload(e.target.files[0]);
+                }
+            });
+        }
+
+        // Phase A AJAX Upload
+        const handleFileUpload = (file) => {
+            uploadProgressContainer.classList.remove("d-none");
+            
+            const formData = new FormData();
+            formData.append("file", file);
+
+            const xhr = new XMLHttpRequest();
+            xhr.open("POST", "{% url 'dms:api_raw_upload' %}", true);
+            xhr.setRequestHeader("X-CSRFToken", document.querySelector('[name=csrf-token]').content);
+
+            xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable) {
+                    const percentComplete = Math.round((e.loaded / e.total) * 100);
+                    uploadProgressBar.style.width = percentComplete + "%";
+                    uploadPercentage.textContent = percentComplete + "%";
+                }
+            };
+
+            xhr.onload = () => {
+                const response = JSON.parse(xhr.responseText);
+                if (xhr.status === 201 && response.status === "success") {
+                    showAlert("PHASE A: Raw Ingestion Complete. Please fill in Metadata.", "success");
+                    // Store details in Phase B form
+                    tempIdInput.value = response.data.temp_id;
+                    // Prepopulate title with filename minus extension
+                    const filename = response.data.original_name;
+                    docTitle.value = filename.substring(0, filename.lastIndexOf('.')) || filename;
+
+                    // Switch panels
+                    phaseASection.classList.add("d-none");
+                    phaseBSection.classList.remove("d-none");
+                } else {
+                    const errorMsg = response.error ? response.error.message : "Raw ingestion failed.";
+                    showAlert("PHASE A FAILED: " + errorMsg, "error");
+                    resetUploadPanel();
+                }
+            };
+
+            xhr.onerror = () => {
+                showAlert("Network connection error during raw ingestion.", "error");
+                resetUploadPanel();
+            };
+
+            xhr.send(formData);
+        };
+
+        // Phase B Submit Handler
+        if (finalizeForm) {
+            finalizeForm.addEventListener("submit", (e) => {
+                e.preventDefault();
+
+                // Collect collections ManyToMany checked values
+                const selectedCollections = Array.from(document.querySelectorAll('input[name="collections"]:checked'))
+                    .map(cb => cb.value);
+
+                // GKey contents
+                let contentTypeVal = document.getElementById("linkContentType").value;
+                let objectIdVal = document.getElementById("linkObjectId").value;
+                
+                // Translate content type
+                let ctId = null;
+                // Since content types can vary, in production we would resolve content type ID.
+                // For simplicity, we can let our endpoint handle translating model name slugs directly,
+                // or we pass names and resolve on the server side. Let's map model names to standard content type labels.
+
+                const payload = {
+                    temp_id: tempIdInput.value,
+                    title: docTitle.value,
+                    description: document.getElementById("docDesc").value,
+                    category: document.getElementById("docCategory").value || null,
+                    collections: selectedCollections,
+                    content_type: contentTypeVal || null,
+                    object_id: objectIdVal || null,
+                    is_public: document.getElementById("docIsPublic").checked,
+                    tags: document.getElementById("docTags").value.split(",").map(t => t.trim()).filter(t => t !== "")
+                };
+
+                fetch("{% url 'dms:api_finalize_upload' %}", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-CSRFToken": document.querySelector('[name=csrf-token]').content
+                    },
+                    body: JSON.stringify(payload)
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status === "success") {
+                        showAlert("PHASE B SUCCESS: Document fully indexed in Database. Reloading...", "success");
+                        setTimeout(() => window.location.reload(), 1500);
+                    } else {
+                        showAlert("PHASE B FAILED: " + data.error.message, "error");
+                    }
+                })
+                .catch(err => {
+                    showAlert("Network error during DB committing.", "error");
+                });
+            });
+
+            document.getElementById("btnCancelFinalize").addEventListener("click", () => {
+                resetUploadPanel();
+            });
+        }
+
+        // Inline metadata edit actions
+        document.querySelectorAll(".btn-edit-meta").forEach(button => {
+            button.addEventListener("click", (e) => {
+                const docId = button.getAttribute("data-id");
+                
+                // Toggle display of edit block for both desktop & mobile views
+                const blockMobile = document.getElementById(`editFormBlock_${docId}`);
+                const blockDesktop = document.getElementById(`editFormBlockDesktop_${docId}`);
+                
+                if (blockMobile) blockMobile.classList.toggle("d-none");
+                if (blockDesktop) blockDesktop.classList.toggle("d-none");
+            });
+        });
+
+        document.querySelectorAll(".btn-cancel-edit").forEach(button => {
+            button.addEventListener("click", () => {
+                const docId = button.getAttribute("data-id");
+                const blockMobile = document.getElementById(`editFormBlock_${docId}`);
+                const blockDesktop = document.getElementById(`editFormBlockDesktop_${docId}`);
+                
+                if (blockMobile) blockMobile.classList.add("d-none");
+                if (blockDesktop) blockDesktop.classList.add("d-none");
+            });
+        });
+
+        document.querySelectorAll(".btn-save-edit").forEach(button => {
+            button.addEventListener("click", () => {
+                const docId = button.getAttribute("data-id");
+                
+                // Extract active edit block's inputs
+                const activeBlock = document.querySelector(`#editFormBlock_${docId}:not(.d-none)`) || 
+                                    document.querySelector(`#editFormBlockDesktop_${docId}:not(.d-none)`);
+                if (!activeBlock) return;
+
+                const newTitle = activeBlock.querySelector(".edit-title-input").value;
+                const newDesc = activeBlock.querySelector(".edit-desc-input").value;
+                const newTags = activeBlock.querySelector(".edit-tags-input").value.split(",").map(t => t.trim()).filter(t => t !== "");
+                const newIsPublic = activeBlock.querySelector(".edit-is-public-input").checked;
+
+                fetch(`/dms/api/dms/v1/documents/${docId}/`, {
+                    method: "PATCH",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-CSRFToken": document.querySelector('[name=csrf-token]').content
+                    },
+                    body: JSON.stringify({
+                        title: newTitle,
+                        description: newDesc,
+                        tags: newTags,
+                        is_public: newIsPublic
+                    })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status === "success") {
+                        showAlert("Document details successfully updated.", "success");
+                        setTimeout(() => window.location.reload(), 1000);
+                    } else {
+                        showAlert("Update failed: " + data.error.message, "error");
+                    }
+                })
+                .catch(() => showAlert("Network error occurred during updates.", "error"));
+            });
+        });
+
+        // Inline Soft-Delete / Archiving
+        document.querySelectorAll(".btn-delete-doc").forEach(button => {
+            button.addEventListener("click", () => {
+                const docId = button.getAttribute("data-id");
+                const deleteBlock = document.getElementById(`deleteBlock_${docId}`);
+                const deleteBlockDesktop = document.getElementById(`deleteBlockDesktop_${docId}`);
+                
+                if (deleteBlock) deleteBlock.classList.toggle("d-none");
+                if (deleteBlockDesktop) deleteBlockDesktop.classList.toggle("d-none");
+            });
+        });
+
+        document.querySelectorAll(".btn-cancel-delete").forEach(button => {
+            button.addEventListener("click", () => {
+                const docId = button.getAttribute("data-id");
+                const deleteBlock = document.getElementById(`deleteBlock_${docId}`);
+                const deleteBlockDesktop = document.getElementById(`deleteBlockDesktop_${docId}`);
+                
+                if (deleteBlock) deleteBlock.classList.add("d-none");
+                if (deleteBlockDesktop) deleteBlockDesktop.classList.add("d-none");
+            });
+        });
+
+        document.querySelectorAll(".btn-confirm-delete").forEach(button => {
+            button.addEventListener("click", () => {
+                const docId = button.getAttribute("data-id");
+                
+                fetch(`/dms/api/dms/v1/documents/${docId}/`, {
+                    method: "DELETE",
+                    headers: {
+                        "X-CSRFToken": document.querySelector('[name=csrf-token]').content
+                    }
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status === "success") {
+                        showAlert("Document successfully moved to trash and archived.", "success");
+                        setTimeout(() => window.location.reload(), 1000);
+                    } else {
+                        showAlert("Archive action failed: " + data.error.message, "error");
+                    }
+                })
+                .catch(() => showAlert("Network error during deletion request.", "error"));
+            });
+        });
+    });
+</script>
+{% endblock %}

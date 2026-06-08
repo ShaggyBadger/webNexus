@@ -26,5 +26,7 @@ urlpatterns = [
     path("accounts/", include("accounts.urls")),
     path("siteintel/", include("siteintel.urls")),
     path("missionlog/", include("missionlog.urls")),
+    path("dms/", include("dms.urls")),
     path("system/health/", health_check, name="health_check"),
 ]
+
