@@ -21,6 +21,7 @@
 - [x] Implemented Public Visibility (`is_public`) for documents, allowing restricted access for standard users.
 - [x] Implemented a flexible Tagging system (`Tag` model) with auto-resolution from strings/slugs.
 - [x] Updated UI (Dashboard) to support tag filtering, public status indicators, and tag management.
+- [x] Integrated DMS access link into the homepage command grid and global navigation bar.
 
 ## Architectural Decisions
 - Modular service-based architecture chosen to isolate raw ingestion from metadata commits.

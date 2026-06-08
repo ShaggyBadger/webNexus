@@ -6,6 +6,8 @@
         <nav class="d-flex align-items-center command-nav">
             <span class="command-bracket">[</span>
             {% if user.is_authenticated %}
+                <a href="{% url 'dms:dashboard' %}" class="command-link-compact">DMS</a>
+                <span class="command-separator">/</span>
                 <a href="{% url 'accounts:profile' %}" class="command-link-compact">PROFILE</a>
                 <span class="command-separator">/</span>
                 <a href="{% url 'accounts:logout' %}" class="command-link-compact">LOGOUT</a>
