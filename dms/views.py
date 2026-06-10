@@ -327,13 +327,25 @@ class FinalizeUploadView(APIView, StandardAPIResponseMixin):
                     tag_ids.append(tag_obj.id)
 
         content_type_id = None
+        resolved_object_id = object_id
+
         if content_type_val:
             from django.contrib.contenttypes.models import ContentType
             try:
                 if content_type_val == "location":
                     content_type_id = ContentType.objects.get(app_label="siteintel", model="location").id
+                    # Note: For locations, we currently assume the ID is the PK (often ULID or Int).
                 elif content_type_val == "store":
-                    content_type_id = ContentType.objects.get(app_label="tankgauge", model="store").id
+                    ct = ContentType.objects.get(app_label="tankgauge", model="store")
+                    content_type_id = ct.id
+                    # Resolve store_num to PK
+                    if object_id and (isinstance(object_id, int) or object_id.isdigit()):
+                        from tankgauge.models.store_models import Store
+                        store = Store.objects.filter(store_num=int(object_id)).first()
+                        if store:
+                            resolved_object_id = str(store.id)
+                        else:
+                            return self.error_response(f"Store #{object_id} not found in database.", status_code=status.HTTP_404_NOT_FOUND)
             except ContentType.DoesNotExist:
                 return self.error_response(f"Invalid content type: {content_type_val}", status_code=status.HTTP_400_BAD_REQUEST)
 
@@ -351,7 +363,7 @@ class FinalizeUploadView(APIView, StandardAPIResponseMixin):
                 category_id=category_id,
                 collection_ids=collection_ids,
                 content_type_id=content_type_id,
-                object_id=object_id,
+                object_id=resolved_object_id,
                 is_public=is_public,
                 tag_ids=tag_ids,
             )

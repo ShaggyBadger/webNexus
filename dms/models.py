@@ -158,6 +158,14 @@ class Document(models.Model):
     )
     content_object = GenericForeignKey("content_type", "object_id")
 
+    @property
+    def linked_object(self):
+        """
+        Alias for content_object to maintain consistency with serializers
+        and template expectations.
+        """
+        return self.content_object
+
     class Meta:
         verbose_name = "Document"
         verbose_name_plural = "Documents"

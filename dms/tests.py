@@ -17,6 +17,7 @@ from dms.services.download_service import DocumentDownloadService
 from dms.services.search_service import DocumentSearchService
 from dms.management.commands.purge_deleted_documents import Command as PurgeCommand
 from siteintel.models import Location, LocationType
+from tankgauge.models.store_models import Store
 
 
 # Set up a temporary media directory for testing file storage
@@ -344,3 +345,41 @@ class DMSTestCase(APITestCase):
         self.assertTrue(doc.is_public)
         self.assertEqual(doc.tags.count(), 2)
         self.assertTrue(doc.tags.filter(name="NewTag").exists())
+
+    def test_finalize_upload_with_store_linkage(self):
+        """
+        Verify that Phase B upload correctly resolves a Store Number string 
+        to the actual Store primary key in the database.
+        """
+        self.client.force_login(self.staff_user)
+
+        # 1. Create a dummy Store
+        store = Store.objects.create(store_num=999, store_name="Test Store 999")
+
+        # 2. Phase A Upload
+        response = self.client.post(reverse("dms:api_raw_upload"), {"file": self.test_file})
+        temp_id = response.data["data"]["temp_id"]
+
+        # 3. Phase B Upload with Store linkage via store_num
+        payload = {
+            "temp_id": temp_id,
+            "title": "Store 999 Ops Manual",
+            "content_type": "store",
+            "object_id": "999"  # The human readable store_num
+        }
+        response = self.client.post(reverse("dms:api_finalize_upload"), payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        
+        doc = Document.objects.get(id=response.data["data"]["id"])
+        
+        # Verify linkage is resolved to the Store object
+        self.assertEqual(doc.content_type.model, "store")
+        self.assertEqual(doc.object_id, str(store.id))
+        self.assertEqual(doc.content_object, store)
+        
+        # Verify the property we added works
+        self.assertEqual(doc.linked_object, store)
+        
+        # Verify the serializer includes it
+        self.assertIsNotNone(response.data["data"]["linked_object"])
+        self.assertEqual(response.data["data"]["linked_object"]["name"], str(store))

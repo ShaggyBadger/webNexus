@@ -325,7 +325,7 @@
                                 <span class="meta-tag"><i class="fa-solid fa-hard-drive me-1"></i>{{ doc.file_size|filesizeformat }}</span>
                                 {% if doc.linked_object %}
                                     <span class="meta-tag text-tactical-warning">
-                                        <i class="fa-solid fa-link me-1"></i>{{ doc.content_type.model|upper }}: {{ doc.object_id }}
+                                        <i class="fa-solid fa-link me-1"></i>{{ doc.linked_object }}
                                     </span>
                                 {% endif %}
                             </div>
@@ -433,7 +433,7 @@
                                         </td>
                                         <td>
                                             {% if doc.linked_object %}
-                                                <span class="text-tactical-warning">{{ doc.content_type.model|upper }}: {{ doc.object_id }}</span>
+                                                <span class="text-tactical-warning">{{ doc.linked_object }}</span>
                                             {% else %}
                                                 <span class="text-muted-custom">--</span>
                                             {% endif %}
