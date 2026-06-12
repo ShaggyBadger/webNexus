@@ -116,6 +116,11 @@
 
     <!-- Intel Vault / DMS Module -->
     {% include 'homepage/components/app_dms.html' %}
+
+    <!-- ATG Telemetry Module -->
+    {% if user.is_authenticated %}
+      {% include 'homepage/components/app_atg.html' %}
+    {% endif %}
   </div>
 </div>
 {% endblock %} {% block extra_scripts %}

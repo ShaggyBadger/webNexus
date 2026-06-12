@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}TICKET {{ ticket.id|truncatechars:8 }} | {{ SITE_NAME }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    .evidence-img {
+        width: 100%;
+        border: 1px solid var(--navbar-border);
+        cursor: pointer;
+    }
+    .tactical-label {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.65rem;
+        color: var(--muted-text-color);
+        text-transform: uppercase;
+        margin-bottom: 0.1rem;
+    }
+    .tactical-value {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.9rem;
+        color: var(--text-color);
+        margin-bottom: 0.75rem;
+    }
+    .reading-table {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.8rem;
+    }
+    .reading-table th {
+        color: var(--muted-text-color);
+        font-weight: normal;
+        border-bottom: 1px solid var(--navbar-border);
+        padding: 0.5rem;
+    }
+    .reading-table td {
+        padding: 0.75rem 0.5rem;
+        border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .fuel-tag {
+        font-size: 0.7rem;
+        padding: 2px 6px;
+        border: 1px solid currentColor;
+        font-weight: bold;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="mb-4">
+        <a href="{% url 'atg:veeder_list' %}" class="btn btn-outline-secondary btn-sm mono mb-3">
+            [ <i class="fa-solid fa-arrow-left me-1"></i> BACK_TO_ARCHIVE ]
+        </a>
+        <h2 class="mono text-primary">[ TICKET_DETAIL: {{ ticket.id|truncatechars:12 }} ]</h2>
+    </div>
+
+    <div class="row g-4">
+        <!-- LEFT: EVIDENCE (IMAGE) -->
+        <div class="col-lg-5">
+            <div class="tactical-card">
+                <div class="tactical-header">PRIMARY_EVIDENCE</div>
+                <div class="card-body p-2">
+                    <a href="{{ ticket.image.url }}" target="_blank">
+                        <img src="{{ ticket.image.url }}" class="evidence-img" alt="Ticket Photo">
+                    </a>
+                    <small class="text-muted-custom mono d-block mt-2 text-center">CLICK_TO_ENLARGE_ORIGINAL</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT: STRUCTURED DATA -->
+        <div class="col-lg-7">
+            <div class="tactical-card mb-4">
+                <div class="tactical-header">SITE_IDENTIFICATION</div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-6">
+                            <div class="tactical-label">STORE_NUMBER</div>
+                            <div class="tactical-value text-primary fw-bold">#{{ ticket.store.store_num }}</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="tactical-label">SITE_NAME</div>
+                            <div class="tactical-value">{{ ticket.store.store_name }}</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="tactical-label">TICKET_TIMESTAMP</div>
+                            <div class="tactical-value">{{ ticket.ticket_timestamp|date:"Y-m-d H:i"|default:"NOT_RECORDED" }}</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="tactical-label">UPLOADED_AT</div>
+                            <div class="tactical-value">{{ ticket.uploaded_at|date:"Y-m-d H:i" }}</div>
+                        </div>
+                        <div class="col-12">
+                            <div class="tactical-label">UPLOADED_BY</div>
+                            <div class="tactical-value">{{ ticket.uploaded_by.username }}</div>
+                        </div>
+                        {% if ticket.notes %}
+                        <div class="col-12">
+                            <div class="tactical-label">FIELD_NOTES</div>
+                            <div class="tactical-value small">{{ ticket.notes }}</div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="tactical-card">
+                <div class="tactical-header">EXTRACTED_TANK_DATA</div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="reading-table w-100">
+                            <thead>
+                                <tr>
+                                    <th>TANK</th>
+                                    <th>PRODUCT</th>
+                                    <th class="text-end">VOLUME</th>
+                                    <th class="text-end">ULLAGE</th>
+                                    <th class="text-end">HEIGHT</th>
+                                    <th class="text-center">VLD</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for reading in readings %}
+                                <tr>
+                                    <td class="text-primary fw-bold">{{ reading.tank_index }}</td>
+                                    <td>
+                                        <span class="fuel-tag" style="color: {{ reading.fuel_type.color_hex|default:'#8da35d' }};">
+                                            {{ reading.fuel_type.name|upper }}
+                                        </span>
+                                    </td>
+                                    <td class="text-end">{{ reading.volume }} G</td>
+                                    <td class="text-end">{{ reading.ullage }} G</td>
+                                    <td class="text-end">{{ reading.height }}"</td>
+                                    <td class="text-center">
+                                        {% if reading.is_user_corrected %}
+                                            <i class="fa-solid fa-circle-check text-tactical-success" title="USER_VERIFIED"></i>
+                                        {% else %}
+                                            <i class="fa-solid fa-robot text-muted-custom" title="RAW_OCR"></i>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
