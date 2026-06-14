@@ -2,7 +2,15 @@ import logging
 from django.shortcuts import render, redirect
 from ..forms import DeliveryEstimationForm, TankDataForm
 from ..models import TankChart
+from atg.models import VeederReading
 from ..logic.tank_lookup import get_store_and_preset_status, get_all_tank_mappings
+from ..logic.calculations import (
+    determine_operating_mode,
+    MODE_OFFICIAL,
+    MODE_MATHEMATICAL,
+    MODE_UNAVAILABLE,
+)
+
 
 # Initialize logger for this module
 logger = logging.getLogger("tankgauge")
@@ -69,14 +77,62 @@ def delivery_submit(request):
                 try:
                     mappings = get_all_tank_mappings(store, fuel)
 
+                    if not mappings and not is_preset:
+                        # TACTICAL_RECOVERY: If no explicit mapping exists, check if we have
+                        # historical Veeder readings that could serve as a 'Virtual Mapping'.
+                        virtual_readings = (
+                            VeederReading.objects.filter(
+                                ticket__store=store, fuel_type__name__iexact=fuel
+                            )
+                            .values("tank_index", "fuel_type__name")
+                            .distinct()
+                        )
+
+                        logger.info(
+                            f"DEBUG_VIRTUAL_SCAN: Store={store.store_num}, Fuel={fuel}, Found={virtual_readings.count()}"
+                        )
+
+                        if virtual_readings.exists():
+                            logger.info(
+                                f"VIRTUAL_MAPPING_ACQUIRED: Store {store.store_num} Fuel {fuel}"
+                            )
+                            for vr in virtual_readings:
+                                # We treat this as a virtual mapping that defaults to Experimental Mode
+                                # Since we don't have a TankType, we'll need to source capacity
+                                # from the service during calculation.
+                                tanks_found.append(
+                                    {
+                                        "fuel_type": fuel.upper(),
+                                        "tank_index": vr["tank_index"],
+                                        "tank_model": "UNMAPPED_HARDWARE (VIRTUAL)",
+                                        "capacity": "PENDING_ESTIMATION",
+                                        "max_depth": "??",
+                                        "ninety_percent": "??",
+                                        "form": TankDataForm(
+                                            auto_id=f"virtual_{store.id}_{fuel}_{vr['tank_index']}_%s",
+                                            prefix=f"virtual_{store.id}_{fuel}_{vr['tank_index']}",
+                                        ),
+                                        "is_preset": False,
+                                        "mapping_id": None,  # Signal it's virtual
+                                        "mode": MODE_MATHEMATICAL,
+                                        "has_data": True,
+                                        "confidence": 0.5,  # Initial penalty for virtuality
+                                        "is_virtual": True,
+                                        "store_id": store.id,
+                                    }
+                                )
+                            continue  # Skip the normal missing mapping error
+
                     if mappings:
                         num_mappings = len(mappings)
                         for idx, mapping in enumerate(mappings):
                             if mapping.tank_type:
-                                has_chart = TankChart.objects.filter(
-                                    tank_type=mapping.tank_type
-                                ).exists()
+                                # Determine Operating Mode (Official vs Experimental vs Unavailable)
+                                mode, source_meta = determine_operating_mode(mapping)
+
+                                has_data = mode != MODE_UNAVAILABLE
                                 capacity = mapping.tank_type.capacity or 0
+
                                 tanks_found.append(
                                     {
                                         "fuel_type": fuel.upper(),
@@ -95,9 +151,17 @@ def delivery_submit(request):
                                         "mapping_id": (
                                             mapping.id if not is_preset else None
                                         ),
-                                        "has_chart": has_chart,
+                                        "mode": mode,
+                                        "has_data": has_data,
+                                        "confidence": (
+                                            source_meta.get("confidence")
+                                            if source_meta
+                                            else 1.0
+                                        ),
                                         "error": (
-                                            None if has_chart else "MISSING_CHART_DATA"
+                                            None
+                                            if has_data
+                                            else "NO_CHART_OR_VEEDER_DATA"
                                         ),
                                     }
                                 )

@@ -113,6 +113,7 @@ def calculate_tank_api(request):
         return JsonResponse({"error": "Invalid numerical input"}, status=400)
 
     # TANK_RESOLUTION: Determine which physical tank chart to use.
+    virtual_meta = None
     try:
         if tank_id and tank_id.isdigit():
             mapping = (
@@ -123,6 +124,16 @@ def calculate_tank_api(request):
         else:
             store, _ = get_store_and_preset_status(store_id)
             mapping = get_tank_mapping(store, fuel_type)
+
+            if not mapping and store:
+                # VIRTUAL_RESOLVER: No explicit mapping, check if it's a virtual card from the frontend
+                tank_index = request.POST.get("tank_index")
+                if tank_index:
+                    virtual_meta = {
+                        "store_id": store.id,
+                        "fuel_type": fuel_type,
+                        "tank_index": int(tank_index),
+                    }
     except Exception as e:
         logger.error(
             f"DATABASE_ERROR_AJAX_CALC: Store {store_id}, Fuel {fuel_type}",
@@ -130,18 +141,16 @@ def calculate_tank_api(request):
         )
         return JsonResponse({"error": "Database connection error"}, status=500)
 
-    if not mapping or not mapping.tank_type:
+    if not mapping and not virtual_meta:
         logger.warning(
             f"CALC_MISSING_MAPPING: No hardware definition for Store {store_id} {fuel_type}"
         )
         return JsonResponse({"error": "Tank mapping or type not found"}, status=404)
 
-    tank_type = mapping.tank_type
-
     # COMPUTATION_PHASE: Execute the core math
     try:
         result = perform_tank_calc(
-            tank_type, fuel_type, current_inches, delivery_gallons
+            mapping, current_inches, delivery_gallons, virtual_meta=virtual_meta
         )
         logger.info(
             f"CALC_SUCCESS: Store {store_id} {fuel_type} -> Final Volume {result['final_gallons']}G"

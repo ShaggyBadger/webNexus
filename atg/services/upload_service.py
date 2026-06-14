@@ -19,6 +19,8 @@ class VeederUploadService:
         """
         Ingests a new ticket and creates its associated readings in an atomic transaction.
         """
+        from ..serializers.reading_serializers import VeederReadingSerializer
+
         try:
             with transaction.atomic():
                 # 1. Create the Ticket (The Evidence)
@@ -35,28 +37,42 @@ class VeederUploadService:
                 )
 
                 # 2. Process Readings (The Dataset)
-                created_readings = []
                 if readings_data:
-                    for r_data in readings_data:
-                        # Extract metrics, ensuring required fields are present
-                        # (Validation already handled by Serializer, but we double-check here for safety)
-                        reading = VeederReading.objects.create(
-                            ticket=ticket,
-                            tank_index=r_data.get("tank_index", 0),
-                            fuel_type_id=r_data.get("fuel_type"),
-                            volume=r_data.get("volume"),
-                            ullage=r_data.get("ullage"),
-                            height=r_data.get("height"),
-                            temp=r_data.get("temp"),
-                            water=r_data.get("water"),
-                            raw_line_text=r_data.get("raw_line_text"),
-                            confidence_score=r_data.get("confidence_score", 1.0),
-                            is_user_corrected=r_data.get("is_user_corrected", False),
+                    # Validate readings using the Serializer for consistency
+                    serializer = VeederReadingSerializer(data=readings_data, many=True)
+                    if not serializer.is_valid():
+                        logger.error(
+                            f"ATG_INGEST_VALIDATION_FAILED: {serializer.errors}"
                         )
-                        created_readings.append(reading)
+                        raise ValueError(f"Invalid readings data: {serializer.errors}")
+
+                    # Bulk create readings associated with the ticket
+                    readings_to_create = []
+                    for validated_reading in serializer.validated_data:
+                        readings_to_create.append(
+                            VeederReading(
+                                ticket=ticket,
+                                tank_index=validated_reading.get("tank_index", 0),
+                                fuel_type=validated_reading.get("fuel_type"),
+                                volume=validated_reading.get("volume"),
+                                ullage=validated_reading.get("ullage"),
+                                height=validated_reading.get("height"),
+                                temp=validated_reading.get("temp"),
+                                water=validated_reading.get("water"),
+                                raw_line_text=validated_reading.get("raw_line_text"),
+                                confidence_score=validated_reading.get(
+                                    "confidence_score", 1.0
+                                ),
+                                is_user_corrected=validated_reading.get(
+                                    "is_user_corrected", False
+                                ),
+                            )
+                        )
+
+                    VeederReading.objects.bulk_create(readings_to_create)
 
                 logger.info(
-                    f"ATG_INGEST_COMPLETE: Ticket {ticket.id} with {len(created_readings)} readings."
+                    f"ATG_INGEST_COMPLETE: Ticket {ticket.id} processed successfully."
                 )
                 return ticket
 

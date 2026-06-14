@@ -2,10 +2,14 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv()  # Load environment variables from .env
-
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# TACTICAL_ENVIRONMENT_LOADING:
+# We explicitly point to the .env file and use override=True to ensure
+# that settings in the .env file take precedence over shell environment variables,
+# preventing "stale" shell exports from breaking local development.
+load_dotenv(BASE_DIR / ".env", override=True)
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
@@ -15,7 +19,28 @@ SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY")
 ATG_REMOTE_OCR_KEY = os.environ.get("ATG_REMOTE_OCR_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get("DJANGO_DEBUG", "False") == "True"
+# TACTICAL_BOOLEAN_PARSING:
+# Convert the environment string to a robust boolean.
+# Supports 'True', 'true', '1', 't', 'y', 'yes'.
+DEBUG = os.environ.get("DJANGO_DEBUG", "False").lower() in (
+    "true",
+    "1",
+    "t",
+    "y",
+    "yes",
+)
+
+# TACTICAL_DEBUG_RESET:
+# If we are in DEBUG mode, we explicitly disable security redirects
+# and reset HSTS headers to 0. This helps clear "sticky" HTTPS redirects
+# cached by browsers during previous production-mode testing.
+if DEBUG:
+    SECURE_SSL_REDIRECT = False
+    SECURE_HSTS_SECONDS = 0
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = False
+    SECURE_HSTS_PRELOAD = False
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
 
 ALLOWED_HOSTS = [
     "thejoshproject.xyz",

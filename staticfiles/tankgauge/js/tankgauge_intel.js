@@ -102,6 +102,7 @@ const TankGaugeIntel = {
             formData.append("store_id", this.storeId);
             formData.append("fuel_type", fuelType);
             formData.append("tank_id", tankId);
+            formData.append("tank_index", card.dataset.tankIndex || "");
             formData.append("current_inches", currentInches);
             formData.append("delivery_gallons", deliveryGallons);
 

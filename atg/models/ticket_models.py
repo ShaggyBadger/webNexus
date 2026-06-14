@@ -83,4 +83,5 @@ class VeederTicket(models.Model):
         ordering = ["-uploaded_at"]
 
     def __str__(self):
-        return f"Ticket {self.id} - Store {self.store.store_num}"
+        store_lbl = self.store.store_num if self.store else "UNKNOWN"
+        return f"Ticket {self.id} - Store {store_lbl}"

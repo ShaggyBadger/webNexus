@@ -14,5 +14,5 @@ class VeederReadingAdmin(admin.ModelAdmin):
         "is_user_corrected",
     )
     list_filter = ("fuel_type", "is_user_corrected")
-    search_fields = ("ticket__id", "ticket__store__store_num", "raw_line_text")
+    search_fields = ("ticket__id", "raw_line_text")
     readonly_fields = ("id",)

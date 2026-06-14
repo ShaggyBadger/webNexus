@@ -9,11 +9,11 @@ class DeliveryEstimationForm(forms.Form):
     """
 
     FUEL_CHOICES = [
-        ("regular", "Regular"),
-        ("plus", "Plus"),
-        ("premium", "Premium"),
-        ("kerosene", "Kerosene"),
-        ("diesel", "Diesel"),
+        ("Regular", "Regular"),
+        ("Plus", "Plus"),
+        ("Premium", "Premium"),
+        ("Kerosene", "Kerosene"),
+        ("Diesel", "Diesel"),
     ]
 
     store_number = forms.CharField(

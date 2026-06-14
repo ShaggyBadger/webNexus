@@ -1,6 +1,6 @@
 import json
 from rest_framework.views import APIView
-from rest_framework import viewsets, permissions, status
+from rest_framework import viewsets, permissions, status, serializers
 from rest_framework.response import Response
 from ..models import VeederTicket, VeederReading
 from ..serializers import VeederTicketSerializer, VeederReadingSerializer
@@ -35,14 +35,18 @@ class VeederTicketViewSet(viewsets.ModelViewSet):
 
         # We handle the creation manually via service to maintain strict atomicity
         # across the ticket and its multiple readings.
-        ticket = VeederUploadService.process_ticket_submission(
-            user=self.request.user,
-            store=serializer.validated_data.get("store"),
-            image=serializer.validated_data.get("image"),
-            ticket_timestamp=serializer.validated_data.get("ticket_timestamp"),
-            notes=serializer.validated_data.get("notes"),
-            readings_data=readings_data,
-        )
+        try:
+            ticket = VeederUploadService.process_ticket_submission(
+                user=self.request.user,
+                store=serializer.validated_data.get("store"),
+                image=serializer.validated_data.get("image"),
+                ticket_timestamp=serializer.validated_data.get("ticket_timestamp"),
+                notes=serializer.validated_data.get("notes"),
+                readings_data=readings_data,
+            )
+        except Exception as e:
+            # Catching at view level to return 400 instead of 500
+            raise serializers.ValidationError({"error": str(e)})
 
         # Update the serializer instance so the response contains the new ID
         serializer.instance = ticket
