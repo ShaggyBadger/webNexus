@@ -30,7 +30,9 @@ urlpatterns = [
         CollectionListView.as_view(),
         name="api_collections",
     ),
-    path("api/dms/v1/documents/", DocumentListCreateView.as_view(), name="api_documents"),
+    path(
+        "api/dms/v1/documents/", DocumentListCreateView.as_view(), name="api_documents"
+    ),
     path(
         "api/dms/v1/documents/<str:ulid>/",
         DocumentDetailView.as_view(),

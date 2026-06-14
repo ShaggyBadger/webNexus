@@ -36,7 +36,10 @@ class DMSTestCase(APITestCase):
             username="admin", email="admin@test.com", password="adminpassword"
         )
         self.staff_user = User.objects.create_user(
-            username="staff", email="staff@test.com", password="staffpassword", is_staff=True
+            username="staff",
+            email="staff@test.com",
+            password="staffpassword",
+            is_staff=True,
         )
         self.standard_user = User.objects.create_user(
             username="user", email="user@test.com", password="userpassword"
@@ -44,7 +47,10 @@ class DMSTestCase(APITestCase):
 
         # Create Category
         self.category_safety = Category.objects.create(
-            name="Safety Guidelines", slug="safety-guidelines", active=True, sort_order=1
+            name="Safety Guidelines",
+            slug="safety-guidelines",
+            active=True,
+            sort_order=1,
         )
         self.category_inactive = Category.objects.create(
             name="Old Forms", slug="old-forms", active=False, sort_order=10
@@ -52,15 +58,21 @@ class DMSTestCase(APITestCase):
 
         # Create Collection
         self.collection_public = Collection.objects.create(
-            name="Public Safety Pack", description="Public facing guidelines", is_public=True
+            name="Public Safety Pack",
+            description="Public facing guidelines",
+            is_public=True,
         )
         self.collection_private = Collection.objects.create(
-            name="Confidential Operations", description="Internal operations", is_public=False
+            name="Confidential Operations",
+            description="Internal operations",
+            is_public=False,
         )
 
         # Content file content
         self.file_content = b"%PDF-1.4 sample pdf file content"
-        self.test_file = SimpleUploadedFile("test_guide.pdf", self.file_content, content_type="application/pdf")
+        self.test_file = SimpleUploadedFile(
+            "test_guide.pdf", self.file_content, content_type="application/pdf"
+        )
 
     def tearDown(self):
         # Clean up temporary media directory
@@ -74,7 +86,9 @@ class DMSTestCase(APITestCase):
 
     def test_upload_service_two_phase_flow(self):
         # 1. Phase A: Raw Ingestion
-        raw_result = DocumentUploadService.handle_raw_upload(self.test_file, self.staff_user)
+        raw_result = DocumentUploadService.handle_raw_upload(
+            self.test_file, self.staff_user
+        )
         self.assertIn("temp_id", raw_result)
         self.assertEqual(raw_result["original_name"], "test_guide.pdf")
         self.assertEqual(raw_result["mime_type"], "application/pdf")
@@ -105,7 +119,9 @@ class DMSTestCase(APITestCase):
 
     def test_download_service(self):
         # First ingest and finalize document
-        raw_result = DocumentUploadService.handle_raw_upload(self.test_file, self.staff_user)
+        raw_result = DocumentUploadService.handle_raw_upload(
+            self.test_file, self.staff_user
+        )
         doc = DocumentUploadService.finalize_upload(
             temp_id=raw_result["temp_id"],
             user=self.staff_user,
@@ -115,10 +131,10 @@ class DMSTestCase(APITestCase):
 
         # Perform download
         file_obj, filename, mime_type = DocumentDownloadService.prepare_download(doc.id)
-        
+
         self.assertEqual(filename, "test_guide.pdf")
         self.assertEqual(mime_type, "application/pdf")
-        
+
         # Verify download count incremented
         doc.refresh_from_db()
         self.assertEqual(doc.download_count, 1)
@@ -126,7 +142,9 @@ class DMSTestCase(APITestCase):
     def test_search_and_filter_service(self):
         # Ingest and finalize two documents
         raw_1 = DocumentUploadService.handle_raw_upload(
-            SimpleUploadedFile("safety.pdf", self.file_content, content_type="application/pdf"),
+            SimpleUploadedFile(
+                "safety.pdf", self.file_content, content_type="application/pdf"
+            ),
             self.staff_user,
         )
         doc_safety = DocumentUploadService.finalize_upload(
@@ -138,7 +156,9 @@ class DMSTestCase(APITestCase):
         )
 
         raw_2 = DocumentUploadService.handle_raw_upload(
-            SimpleUploadedFile("compliance.pdf", self.file_content, content_type="application/pdf"),
+            SimpleUploadedFile(
+                "compliance.pdf", self.file_content, content_type="application/pdf"
+            ),
             self.staff_user,
         )
         doc_compliance = DocumentUploadService.finalize_upload(
@@ -150,8 +170,10 @@ class DMSTestCase(APITestCase):
 
         # Link doc_compliance to a Location in "NC"
         loc_type = LocationType.objects.create(name="Yard")
-        nc_location = Location.objects.create(name="Raleigh Yard", location_type=loc_type, state="NC")
-        
+        nc_location = Location.objects.create(
+            name="Raleigh Yard", location_type=loc_type, state="NC"
+        )
+
         doc_compliance.content_type = ContentType.objects.get_for_model(Location)
         doc_compliance.object_id = str(nc_location.id)
         doc_compliance.save()
@@ -162,7 +184,9 @@ class DMSTestCase(APITestCase):
         self.assertNotIn(doc_safety, results)
 
         # Test Category filtering
-        results = DocumentSearchService.search_documents(category_id=self.category_safety.id)
+        results = DocumentSearchService.search_documents(
+            category_id=self.category_safety.id
+        )
         self.assertIn(doc_safety, results)
         self.assertNotIn(doc_compliance, results)
 
@@ -176,10 +200,12 @@ class DMSTestCase(APITestCase):
         self.client.force_login(self.staff_user)
 
         # 2. Phase A Request
-        response = self.client.post(reverse("dms:api_raw_upload"), {"file": self.test_file})
+        response = self.client.post(
+            reverse("dms:api_raw_upload"), {"file": self.test_file}
+        )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data["status"], "success")
-        
+
         temp_id = response.data["data"]["temp_id"]
 
         # 3. Phase B Request
@@ -201,11 +227,16 @@ class DMSTestCase(APITestCase):
         download_url = reverse("dms:document_download", args=[doc_id])
         response = self.client.get(download_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.headers["Content-Disposition"], 'attachment; filename="test_guide.pdf"')
+        self.assertEqual(
+            response.headers["Content-Disposition"],
+            'attachment; filename="test_guide.pdf"',
+        )
 
     def test_api_metadata_update_permissions(self):
         # Ingest and finalize doc
-        raw_res = DocumentUploadService.handle_raw_upload(self.test_file, self.staff_user)
+        raw_res = DocumentUploadService.handle_raw_upload(
+            self.test_file, self.staff_user
+        )
         doc = DocumentUploadService.finalize_upload(
             temp_id=raw_res["temp_id"], user=self.staff_user, title="Original Title"
         )
@@ -214,12 +245,16 @@ class DMSTestCase(APITestCase):
 
         # Standard user PATCH -> Expect 403 Forbidden
         self.client.force_login(self.standard_user)
-        response = self.client.patch(detail_url, {"title": "Hacked Title"}, format="json")
+        response = self.client.patch(
+            detail_url, {"title": "Hacked Title"}, format="json"
+        )
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
         # Staff user PATCH -> Expect 200 OK
         self.client.force_login(self.staff_user)
-        response = self.client.patch(detail_url, {"title": "Updated Title"}, format="json")
+        response = self.client.patch(
+            detail_url, {"title": "Updated Title"}, format="json"
+        )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         doc.refresh_from_db()
         self.assertEqual(doc.title, "Updated Title")
@@ -228,7 +263,9 @@ class DMSTestCase(APITestCase):
 
     def test_soft_delete_flow(self):
         # Ingest and finalize doc
-        raw_res = DocumentUploadService.handle_raw_upload(self.test_file, self.staff_user)
+        raw_res = DocumentUploadService.handle_raw_upload(
+            self.test_file, self.staff_user
+        )
         doc = DocumentUploadService.finalize_upload(
             temp_id=raw_res["temp_id"], user=self.staff_user, title="To Be Soft Deleted"
         )
@@ -246,9 +283,11 @@ class DMSTestCase(APITestCase):
 
     def test_finalize_upload_with_tags_and_visibility(self):
         self.client.force_login(self.staff_user)
-        
+
         # Phase A
-        response = self.client.post(reverse("dms:api_raw_upload"), {"file": self.test_file})
+        response = self.client.post(
+            reverse("dms:api_raw_upload"), {"file": self.test_file}
+        )
         temp_id = response.data["data"]["temp_id"]
 
         # Phase B with tags (strings and IDs) and public visibility
@@ -257,11 +296,13 @@ class DMSTestCase(APITestCase):
             "temp_id": temp_id,
             "title": "Public Propane Guide",
             "is_public": True,
-            "tags": [tag1.id, "Winter", "Safety"]
+            "tags": [tag1.id, "Winter", "Safety"],
         }
-        response = self.client.post(reverse("dms:api_finalize_upload"), payload, format="json")
+        response = self.client.post(
+            reverse("dms:api_finalize_upload"), payload, format="json"
+        )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        
+
         doc = Document.objects.get(id=response.data["data"]["id"])
         self.assertTrue(doc.is_public)
         self.assertEqual(doc.tags.count(), 3)
@@ -273,12 +314,18 @@ class DMSTestCase(APITestCase):
         # Create one public and one private document
         raw_1 = DocumentUploadService.handle_raw_upload(self.test_file, self.staff_user)
         doc_public = DocumentUploadService.finalize_upload(
-            temp_id=raw_1["temp_id"], user=self.staff_user, title="Public Doc", is_public=True
+            temp_id=raw_1["temp_id"],
+            user=self.staff_user,
+            title="Public Doc",
+            is_public=True,
         )
 
         raw_2 = DocumentUploadService.handle_raw_upload(self.test_file, self.staff_user)
         doc_private = DocumentUploadService.finalize_upload(
-            temp_id=raw_2["temp_id"], user=self.staff_user, title="Private Doc", is_public=False
+            temp_id=raw_2["temp_id"],
+            user=self.staff_user,
+            title="Private Doc",
+            is_public=False,
         )
 
         # 1. Standard user list view -> should only see public doc
@@ -290,7 +337,9 @@ class DMSTestCase(APITestCase):
         self.assertNotIn(doc_private.id, ids)
 
         # 2. Standard user detail view of private doc -> should 404
-        response = self.client.get(reverse("dms:api_document_detail", args=[doc_private.id]))
+        response = self.client.get(
+            reverse("dms:api_document_detail", args=[doc_private.id])
+        )
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
         # 3. Staff user list view -> should see both
@@ -302,10 +351,13 @@ class DMSTestCase(APITestCase):
 
     def test_tag_search(self):
         tag_winter = Tag.objects.create(name="Winter", slug="winter")
-        
+
         raw_1 = DocumentUploadService.handle_raw_upload(self.test_file, self.staff_user)
         doc_winter = DocumentUploadService.finalize_upload(
-            temp_id=raw_1["temp_id"], user=self.staff_user, title="Winter Guide", tag_ids=[tag_winter.id]
+            temp_id=raw_1["temp_id"],
+            user=self.staff_user,
+            title="Winter Guide",
+            tag_ids=[tag_winter.id],
         )
 
         raw_2 = DocumentUploadService.handle_raw_upload(self.test_file, self.staff_user)
@@ -328,18 +380,23 @@ class DMSTestCase(APITestCase):
     def test_patch_tags_and_visibility(self):
         raw = DocumentUploadService.handle_raw_upload(self.test_file, self.staff_user)
         doc = DocumentUploadService.finalize_upload(
-            temp_id=raw["temp_id"], user=self.staff_user, title="Initial Title", is_public=False
+            temp_id=raw["temp_id"],
+            user=self.staff_user,
+            title="Initial Title",
+            is_public=False,
         )
 
         self.client.force_login(self.staff_user)
         payload = {
             "title": "Updated Title",
             "is_public": True,
-            "tags": ["NewTag", "AnotherTag"]
+            "tags": ["NewTag", "AnotherTag"],
         }
-        response = self.client.patch(reverse("dms:api_document_detail", args=[doc.id]), payload, format="json")
+        response = self.client.patch(
+            reverse("dms:api_document_detail", args=[doc.id]), payload, format="json"
+        )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        
+
         doc.refresh_from_db()
         self.assertEqual(doc.title, "Updated Title")
         self.assertTrue(doc.is_public)
@@ -348,7 +405,7 @@ class DMSTestCase(APITestCase):
 
     def test_finalize_upload_with_store_linkage(self):
         """
-        Verify that Phase B upload correctly resolves a Store Number string 
+        Verify that Phase B upload correctly resolves a Store Number string
         to the actual Store primary key in the database.
         """
         self.client.force_login(self.staff_user)
@@ -357,7 +414,9 @@ class DMSTestCase(APITestCase):
         store = Store.objects.create(store_num=999, store_name="Test Store 999")
 
         # 2. Phase A Upload
-        response = self.client.post(reverse("dms:api_raw_upload"), {"file": self.test_file})
+        response = self.client.post(
+            reverse("dms:api_raw_upload"), {"file": self.test_file}
+        )
         temp_id = response.data["data"]["temp_id"]
 
         # 3. Phase B Upload with Store linkage via store_num
@@ -365,21 +424,23 @@ class DMSTestCase(APITestCase):
             "temp_id": temp_id,
             "title": "Store 999 Ops Manual",
             "content_type": "store",
-            "object_id": "999"  # The human readable store_num
+            "object_id": "999",  # The human readable store_num
         }
-        response = self.client.post(reverse("dms:api_finalize_upload"), payload, format="json")
+        response = self.client.post(
+            reverse("dms:api_finalize_upload"), payload, format="json"
+        )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        
+
         doc = Document.objects.get(id=response.data["data"]["id"])
-        
+
         # Verify linkage is resolved to the Store object
         self.assertEqual(doc.content_type.model, "store")
         self.assertEqual(doc.object_id, str(store.id))
         self.assertEqual(doc.content_object, store)
-        
+
         # Verify the property we added works
         self.assertEqual(doc.linked_object, store)
-        
+
         # Verify the serializer includes it
         self.assertIsNotNone(response.data["data"]["linked_object"])
         self.assertEqual(response.data["data"]["linked_object"]["name"], str(store))

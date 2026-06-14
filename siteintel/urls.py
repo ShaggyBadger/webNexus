@@ -50,8 +50,16 @@ urlpatterns = [
     path("api/rack-status/", views.rack_status_api, name="api_rack_status"),
     path("api/rack-checkin/", views.rack_checkin_api, name="api_rack_checkin"),
     # Tactical Oversight Console
-    path("admin/oversight/", views.TacticalOversightView.as_view(), name="admin_oversight"),
-    path("api/tactical-telemetry/", views.tactical_telemetry_api, name="api_tactical_telemetry"),
+    path(
+        "admin/oversight/",
+        views.TacticalOversightView.as_view(),
+        name="admin_oversight",
+    ),
+    path(
+        "api/tactical-telemetry/",
+        views.tactical_telemetry_api,
+        name="api_tactical_telemetry",
+    ),
     path(
         "api/site/<int:location_id>/hand-map/save/",
         views.hand_drawn_map_save_api,

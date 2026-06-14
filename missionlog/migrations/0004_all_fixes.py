@@ -15,7 +15,6 @@ class Migration(migrations.Migration):
             name="purchaseorder",
             unique_together={("order_parent", "po_number")},
         ),
-
         migrations.RemoveField(
             model_name="purchaseorder",
             name="mission",

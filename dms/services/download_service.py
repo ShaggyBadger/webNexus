@@ -18,7 +18,9 @@ class DocumentDownloadService:
         """
         with transaction.atomic():
             try:
-                document = Document.objects.select_for_update().get(id=document_id, status="ACTIVE")
+                document = Document.objects.select_for_update().get(
+                    id=document_id, status="ACTIVE"
+                )
             except Document.DoesNotExist:
                 raise ValueError("Document not found or is inactive.")
 
@@ -28,13 +30,13 @@ class DocumentDownloadService:
 
         # Retrieve file from storage
         if not default_storage.exists(document.file_path):
-            # TODO: Enhance integrity failure handling. 
-            # Instead of just a 404, consider logging a system alert, 
+            # TODO: Enhance integrity failure handling.
+            # Instead of just a 404, consider logging a system alert,
             # flagging the DB record as 'MISSING', or notifying administrators.
             raise FileNotFoundError("Document file does not exist in storage.")
 
         file_obj = default_storage.open(document.file_path, "rb")
-        
+
         # We determine download filename: prefer original filename if it has extension, or construct from title
         download_name = document.original_filename
         if not download_name:

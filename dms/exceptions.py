@@ -12,7 +12,7 @@ def dms_exception_handler(exc, context):
     if response is not None:
         err_details = response.data
         message = "An error occurred."
-        
+
         if isinstance(err_details, dict):
             if "detail" in err_details:
                 message = err_details.pop("detail")
@@ -37,7 +37,11 @@ def dms_exception_handler(exc, context):
             "error": {
                 "code": getattr(exc, "default_code", "api_error"),
                 "message": str(message),
-                "details": err_details if isinstance(err_details, dict) else {"non_field_errors": err_details},
+                "details": (
+                    err_details
+                    if isinstance(err_details, dict)
+                    else {"non_field_errors": err_details}
+                ),
             },
         }
     return response

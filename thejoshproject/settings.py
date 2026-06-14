@@ -267,4 +267,3 @@ REST_FRAMEWORK = {
     ],
     "EXCEPTION_HANDLER": "dms.exceptions.dms_exception_handler",
 }
-

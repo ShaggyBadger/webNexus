@@ -43,12 +43,14 @@ class DocumentUploadService:
 
         # 2. Inspect MIME via python-magic
         detected_mime = magic.from_buffer(header_data, mime=True)
-        
+
         # 3. Calculate SHA256 checksum
         sha256_hash = cls.calculate_sha256(uploaded_file)
 
         # 4. Check for duplicates in permanent documents
-        is_duplicate = Document.objects.filter(sha256=sha256_hash, status="ACTIVE").exists()
+        is_duplicate = Document.objects.filter(
+            sha256=sha256_hash, status="ACTIVE"
+        ).exists()
 
         # 5. Generate Temporary ULID
         temp_ulid = ulid.ulid()
@@ -60,7 +62,9 @@ class DocumentUploadService:
         saved_path = default_storage.save(temp_relative_path, uploaded_file)
 
         # 7. Create TemporaryUpload record
-        expires_at = timezone.now() + timedelta(hours=2)  # Temporary files expire in 2 hours
+        expires_at = timezone.now() + timedelta(
+            hours=2
+        )  # Temporary files expire in 2 hours
         temp_upload = TemporaryUpload.objects.create(
             id=temp_ulid,
             file=saved_path,

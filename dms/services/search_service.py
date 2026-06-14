@@ -20,8 +20,8 @@ class DocumentSearchService:
         collection_id: str = None,
         status: str = None,
         uploaded_by_id: int = None,
-        upload_date_start = None,
-        upload_date_end = None,
+        upload_date_start=None,
+        upload_date_end=None,
         state: str = None,
         tag_id: int = None,
         tag_slug: str = None,
@@ -40,9 +40,9 @@ class DocumentSearchService:
         # 1. Search Query (Title, Description, or Tag Name)
         if search_query:
             queryset = queryset.filter(
-                Q(title__icontains=search_query) | 
-                Q(description__icontains=search_query) |
-                Q(tags__name__icontains=search_query)
+                Q(title__icontains=search_query)
+                | Q(description__icontains=search_query)
+                | Q(tags__name__icontains=search_query)
             )
 
         # 2. Category Filter
@@ -82,10 +82,14 @@ class DocumentSearchService:
 
             # Find matching Location IDs and Store IDs in this state
             matching_location_ids = list(
-                Location.objects.filter(state__iexact=state_upper).values_list("id", flat=True)
+                Location.objects.filter(state__iexact=state_upper).values_list(
+                    "id", flat=True
+                )
             )
             matching_store_ids = list(
-                Store.objects.filter(state__iexact=state_upper).values_list("id", flat=True)
+                Store.objects.filter(state__iexact=state_upper).values_list(
+                    "id", flat=True
+                )
             )
 
             # Map them to content types
@@ -93,8 +97,14 @@ class DocumentSearchService:
             store_ct = ContentType.objects.get_for_model(Store)
 
             # Filter documents whose GenericForeignKey points to one of these locations or stores
-            location_q = Q(content_type=location_ct, object_id__in=[str(lid) for lid in matching_location_ids])
-            store_q = Q(content_type=store_ct, object_id__in=[str(sid) for sid in matching_store_ids])
+            location_q = Q(
+                content_type=location_ct,
+                object_id__in=[str(lid) for lid in matching_location_ids],
+            )
+            store_q = Q(
+                content_type=store_ct,
+                object_id__in=[str(sid) for sid in matching_store_ids],
+            )
 
             queryset = queryset.filter(location_q | store_q)
 

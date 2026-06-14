@@ -49,7 +49,10 @@ class DocumentAdmin(admin.ModelAdmin):
     )
     filter_horizontal = ("tags",)
     fieldsets = (
-        ("Core Identity", {"fields": ("id", "title", "description", "status", "version")}),
+        (
+            "Core Identity",
+            {"fields": ("id", "title", "description", "status", "version")},
+        ),
         ("Classification", {"fields": ("category", "tags", "is_public")}),
         (
             "File Metadata",
@@ -92,5 +95,12 @@ class CollectionAdmin(admin.ModelAdmin):
 @admin.register(TemporaryUpload)
 class TemporaryUploadAdmin(admin.ModelAdmin):
     list_display = ("id", "original_filename", "uploaded_by", "expires_at")
-    readonly_fields = ("id", "file", "original_filename", "uploaded_by", "expires_at", "sha256")
+    readonly_fields = (
+        "id",
+        "file",
+        "original_filename",
+        "uploaded_by",
+        "expires_at",
+        "sha256",
+    )
     search_fields = ("id", "original_filename")

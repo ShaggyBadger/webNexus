@@ -29,7 +29,9 @@ class StandardAPIResponseMixin:
     Mixin to standardize API responses in DMS.
     """
 
-    def success_response(self, data, meta=None, status_code=status.HTTP_200_OK) -> Response:
+    def success_response(
+        self, data, meta=None, status_code=status.HTTP_200_OK
+    ) -> Response:
         meta_data = {
             "version": "1.0",
             "timestamp": timezone.now().isoformat(),
@@ -47,7 +49,11 @@ class StandardAPIResponseMixin:
         )
 
     def error_response(
-        self, message, code="api_error", details=None, status_code=status.HTTP_400_BAD_REQUEST
+        self,
+        message,
+        code="api_error",
+        details=None,
+        status_code=status.HTTP_400_BAD_REQUEST,
     ) -> Response:
         return Response(
             {
@@ -73,7 +79,9 @@ class IsStaffOrAdminPermission(permissions.BasePermission):
     """
 
     def has_permission(self, request, view) -> bool:
-        return bool(request.user and (request.user.is_staff or request.user.is_superuser))
+        return bool(
+            request.user and (request.user.is_staff or request.user.is_superuser)
+        )
 
 
 class CategoryListView(APIView, StandardAPIResponseMixin):
@@ -103,7 +111,7 @@ class CollectionListView(APIView, StandardAPIResponseMixin):
         # If standard user, filter collections to only public ones
         if not (request.user.is_staff or request.user.is_superuser):
             collections = collections.filter(is_public=True)
-        
+
         serializer = CollectionSerializer(collections, many=True)
         return self.success_response(serializer.data)
 
@@ -136,7 +144,9 @@ class DocumentListCreateView(APIView, StandardAPIResponseMixin):
         category_id = request.query_params.get("category")
         category_slug = request.query_params.get("category_slug")
         collection_id = request.query_params.get("collection")
-        status_filter = request.query_params.get("status", "ACTIVE")  # Default to ACTIVE documents
+        status_filter = request.query_params.get(
+            "status", "ACTIVE"
+        )  # Default to ACTIVE documents
         uploaded_by_id = request.query_params.get("uploaded_by")
         upload_date_start = request.query_params.get("upload_date_start")
         upload_date_end = request.query_params.get("upload_date_end")
@@ -150,7 +160,7 @@ class DocumentListCreateView(APIView, StandardAPIResponseMixin):
             status_filter = "ACTIVE"
 
         queryset = Document.objects.all()
-        
+
         # Filter queryset based on service layer
         queryset = DocumentSearchService.search_documents(
             queryset=queryset,
@@ -210,20 +220,25 @@ class DocumentDetailView(APIView, StandardAPIResponseMixin):
 
     def patch(self, request, ulid: str) -> Response:
         document = self.get_object(ulid)
-        
+
         # Parse and resolve tags if provided as tag names or slugs
         data = request.data.copy()
         tags_input = data.get("tags")
         if tags_input is not None:
             tag_ids = []
             from django.utils.text import slugify
+
             for tag_item in tags_input:
-                if isinstance(tag_item, int) or (isinstance(tag_item, str) and tag_item.isdigit()):
+                if isinstance(tag_item, int) or (
+                    isinstance(tag_item, str) and tag_item.isdigit()
+                ):
                     tag_ids.append(int(tag_item))
                 elif isinstance(tag_item, str) and tag_item.strip():
                     name = tag_item.strip()
                     slug = slugify(name)
-                    tag_obj, _ = Tag.objects.get_or_create(slug=slug, defaults={"name": name})
+                    tag_obj, _ = Tag.objects.get_or_create(
+                        slug=slug, defaults={"name": name}
+                    )
                     tag_ids.append(tag_obj.id)
             data["tags"] = tag_ids
 
@@ -244,7 +259,9 @@ class DocumentDetailView(APIView, StandardAPIResponseMixin):
         """
         document = self.get_object(ulid)
         if document.status == "ARCHIVED":
-            return self.error_response("Document is already archived.", status_code=status.HTTP_400_BAD_REQUEST)
+            return self.error_response(
+                "Document is already archived.", status_code=status.HTTP_400_BAD_REQUEST
+            )
 
         original_file_path = document.file_path
         filename = os.path.basename(original_file_path)
@@ -258,6 +275,7 @@ class DocumentDetailView(APIView, StandardAPIResponseMixin):
                     content = f.read()
                 # Save to trash
                 from django.core.files.base import ContentFile
+
                 default_storage.save(trash_relative_path, ContentFile(content))
                 # Delete original
                 default_storage.delete(original_file_path)
@@ -267,7 +285,9 @@ class DocumentDetailView(APIView, StandardAPIResponseMixin):
             document.file_path = trash_relative_path
             document.save(update_fields=["status", "file_path"])
 
-        return self.success_response({"message": "Document successfully soft-deleted/archived."})
+        return self.success_response(
+            {"message": "Document successfully soft-deleted/archived."}
+        )
 
 
 class RawUploadView(APIView, StandardAPIResponseMixin):
@@ -281,10 +301,15 @@ class RawUploadView(APIView, StandardAPIResponseMixin):
     def post(self, request) -> Response:
         uploaded_file = request.FILES.get("file")
         if not uploaded_file:
-            return self.error_response("No file provided in the request.", status_code=status.HTTP_400_BAD_REQUEST)
+            return self.error_response(
+                "No file provided in the request.",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
 
         try:
-            result = DocumentUploadService.handle_raw_upload(uploaded_file, request.user)
+            result = DocumentUploadService.handle_raw_upload(
+                uploaded_file, request.user
+            )
             return self.success_response(result, status_code=status.HTTP_201_CREATED)
         except Exception as e:
             return self.error_response(str(e), status_code=status.HTTP_400_BAD_REQUEST)
@@ -317,13 +342,18 @@ class FinalizeUploadView(APIView, StandardAPIResponseMixin):
         tag_ids = []
         if tags_input:
             from django.utils.text import slugify
+
             for tag_item in tags_input:
-                if isinstance(tag_item, int) or (isinstance(tag_item, str) and tag_item.isdigit()):
+                if isinstance(tag_item, int) or (
+                    isinstance(tag_item, str) and tag_item.isdigit()
+                ):
                     tag_ids.append(int(tag_item))
                 elif isinstance(tag_item, str) and tag_item.strip():
                     name = tag_item.strip()
                     slug = slugify(name)
-                    tag_obj, _ = Tag.objects.get_or_create(slug=slug, defaults={"name": name})
+                    tag_obj, _ = Tag.objects.get_or_create(
+                        slug=slug, defaults={"name": name}
+                    )
                     tag_ids.append(tag_obj.id)
 
         content_type_id = None
@@ -331,27 +361,40 @@ class FinalizeUploadView(APIView, StandardAPIResponseMixin):
 
         if content_type_val:
             from django.contrib.contenttypes.models import ContentType
+
             try:
                 if content_type_val == "location":
-                    content_type_id = ContentType.objects.get(app_label="siteintel", model="location").id
+                    content_type_id = ContentType.objects.get(
+                        app_label="siteintel", model="location"
+                    ).id
                     # Note: For locations, we currently assume the ID is the PK (often ULID or Int).
                 elif content_type_val == "store":
                     ct = ContentType.objects.get(app_label="tankgauge", model="store")
                     content_type_id = ct.id
                     # Resolve store_num to PK
-                    if object_id and (isinstance(object_id, int) or object_id.isdigit()):
+                    if object_id and (
+                        isinstance(object_id, int) or object_id.isdigit()
+                    ):
                         from tankgauge.models.store_models import Store
+
                         store = Store.objects.filter(store_num=int(object_id)).first()
                         if store:
                             resolved_object_id = str(store.id)
                         else:
-                            return self.error_response(f"Store #{object_id} not found in database.", status_code=status.HTTP_404_NOT_FOUND)
+                            return self.error_response(
+                                f"Store #{object_id} not found in database.",
+                                status_code=status.HTTP_404_NOT_FOUND,
+                            )
             except ContentType.DoesNotExist:
-                return self.error_response(f"Invalid content type: {content_type_val}", status_code=status.HTTP_400_BAD_REQUEST)
+                return self.error_response(
+                    f"Invalid content type: {content_type_val}",
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                )
 
         if not temp_id or not title:
             return self.error_response(
-                "temp_id and title are required fields.", status_code=status.HTTP_400_BAD_REQUEST
+                "temp_id and title are required fields.",
+                status_code=status.HTTP_400_BAD_REQUEST,
             )
 
         try:
@@ -368,11 +411,15 @@ class FinalizeUploadView(APIView, StandardAPIResponseMixin):
                 tag_ids=tag_ids,
             )
             serializer = DocumentSerializer(document)
-            return self.success_response(serializer.data, status_code=status.HTTP_201_CREATED)
+            return self.success_response(
+                serializer.data, status_code=status.HTTP_201_CREATED
+            )
         except ValueError as ve:
             return self.error_response(str(ve), status_code=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            return self.error_response(str(e), status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return self.error_response(
+                str(e), status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 class DocumentDownloadView(APIView):
@@ -385,14 +432,16 @@ class DocumentDownloadView(APIView):
 
     def get(self, request, ulid: str) -> FileResponse:
         try:
-            file_obj, filename, mime_type = DocumentDownloadService.prepare_download(ulid)
+            file_obj, filename, mime_type = DocumentDownloadService.prepare_download(
+                ulid
+            )
             response = FileResponse(file_obj, content_type=mime_type)
             response["Content-Disposition"] = f'attachment; filename="{filename}"'
             return response
         except ValueError as ve:
             raise Http404(str(ve))
         except FileNotFoundError as fnfe:
-            # TODO: Future enhancement - replace generic 404 with a custom "Missing File" 
+            # TODO: Future enhancement - replace generic 404 with a custom "Missing File"
             # error page or administrative notification workflow.
             raise Http404(str(fnfe))
 
@@ -425,7 +474,9 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         status_filter = self.request.GET.get("status", "ACTIVE")
 
         # Standard users only see ACTIVE and PUBLIC
-        is_public_only = not (self.request.user.is_staff or self.request.user.is_superuser)
+        is_public_only = not (
+            self.request.user.is_staff or self.request.user.is_superuser
+        )
         if is_public_only:
             status_filter = "ACTIVE"
 
@@ -442,4 +493,3 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 
         context["documents"] = queryset
         return context
-

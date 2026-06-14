@@ -123,14 +123,22 @@ class DocumentUpdateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Document
-        fields = ["title", "description", "status", "category", "collections", "is_public", "tags"]
+        fields = [
+            "title",
+            "description",
+            "status",
+            "category",
+            "collections",
+            "is_public",
+            "tags",
+        ]
 
     def update(self, instance: Document, validated_data: dict) -> Document:
         collections = validated_data.pop("collections", None)
         tags = validated_data.pop("tags", None)
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
-        
+
         # Increment version when metadata is updated
         instance.version += 1
         instance.save()

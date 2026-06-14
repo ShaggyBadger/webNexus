@@ -30,4 +30,3 @@ urlpatterns = [
     path("atg/", include("atg.urls")),
     path("system/health/", health_check, name="health_check"),
 ]
-

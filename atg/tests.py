@@ -145,7 +145,6 @@ class VeederAPITestCase(APITestCase):
         self.assertIsNone(ticket.store)
         self.assertFalse(bool(ticket.image))
 
-
     def test_ticket_list_and_retrieve(self):
         ticket = VeederTicket.objects.create(
             store=self.store, image=self.image, uploaded_by=self.user

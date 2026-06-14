@@ -70,9 +70,13 @@ class RackOpsUnitTests(SimpleTestCase):
             # Case 1: Within range (roughly 100 meters away)
             record_checkin(user, rack, lat=45.0001, lon=-93.0)
             args, kwargs = mock_create.call_args
-            self.assertTrue(kwargs["is_verified"], "Check-in should be verified within 500m")
+            self.assertTrue(
+                kwargs["is_verified"], "Check-in should be verified within 500m"
+            )
 
             # Case 2: Out of range (roughly 2 miles away)
             record_checkin(user, rack, lat=45.03, lon=-93.0)
             args, kwargs = mock_create.call_args
-            self.assertFalse(kwargs["is_verified"], "Check-in should NOT be verified outside 500m")
+            self.assertFalse(
+                kwargs["is_verified"], "Check-in should NOT be verified outside 500m"
+            )

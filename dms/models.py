@@ -18,15 +18,9 @@ class Category(models.Model):
     Controlled vocabulary for document types (e.g., "Tank Chart", "Safety").
     """
 
-    name = models.CharField(
-        max_length=100, unique=True, help_text="Category name"
-    )
-    slug = models.SlugField(
-        max_length=100, unique=True, help_text="Slug for API URLs"
-    )
-    active = models.BooleanField(
-        default=True, help_text="Is this category active?"
-    )
+    name = models.CharField(max_length=100, unique=True, help_text="Category name")
+    slug = models.SlugField(max_length=100, unique=True, help_text="Slug for API URLs")
+    active = models.BooleanField(default=True, help_text="Is this category active?")
     sort_order = models.IntegerField(
         default=0, help_text="Order in lists (lower numbers first)"
     )
@@ -46,12 +40,8 @@ class Tag(models.Model):
     Provides flexible search and organization for documents.
     """
 
-    name = models.CharField(
-        max_length=50, unique=True, help_text="Tag name"
-    )
-    slug = models.SlugField(
-        max_length=50, unique=True, help_text="Tag slug"
-    )
+    name = models.CharField(max_length=50, unique=True, help_text="Tag name")
+    slug = models.SlugField(max_length=50, unique=True, help_text="Tag slug")
 
     class Meta:
         verbose_name = "Tag"
@@ -92,15 +82,15 @@ class Document(models.Model):
     stored_filename = models.CharField(
         max_length=255, help_text="Filename stored in filesystem (ULID + ext)"
     )
-    file_path = models.CharField(
-        max_length=500, help_text="Relative storage file path"
-    )
+    file_path = models.CharField(max_length=500, help_text="Relative storage file path")
     mime_type = models.CharField(
         max_length=100, help_text="MIME type verified via magic bytes"
     )
     file_size = models.BigIntegerField(help_text="File size in bytes")
     sha256 = models.CharField(
-        max_length=64, db_index=True, help_text="SHA256 checksum for duplicate detection"
+        max_length=64,
+        db_index=True,
+        help_text="SHA256 checksum for duplicate detection",
     )
     uploaded_by = models.ForeignKey(
         User,
@@ -236,9 +226,7 @@ class TemporaryUpload(models.Model):
     expires_at = models.DateTimeField(
         help_text="Expiry timestamp after which file is purged"
     )
-    sha256 = models.CharField(
-        max_length=64, help_text="SHA256 checksum of raw file"
-    )
+    sha256 = models.CharField(max_length=64, help_text="SHA256 checksum of raw file")
 
     class Meta:
         verbose_name = "Temporary Upload"
