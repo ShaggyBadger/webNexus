@@ -128,12 +128,16 @@ def calculate_tank_api(request):
             if not mapping and store:
                 # VIRTUAL_RESOLVER: No explicit mapping, check if it's a virtual card from the frontend
                 tank_index = request.POST.get("tank_index")
-                if tank_index:
+                logger.info(
+                    f"VIRTUAL_RESOLVER_DEBUG: StoreID={store.id}, Fuel={fuel_type}, TankIndex={tank_index}, POST_DATA={request.POST.dict()}"
+                )
+                if tank_index and tank_index.isdigit():
                     virtual_meta = {
                         "store_id": store.id,
                         "fuel_type": fuel_type,
                         "tank_index": int(tank_index),
                     }
+
     except Exception as e:
         logger.error(
             f"DATABASE_ERROR_AJAX_CALC: Store {store_id}, Fuel {fuel_type}",

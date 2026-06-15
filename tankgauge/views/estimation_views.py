@@ -1,7 +1,7 @@
 import logging
 from django.shortcuts import render, redirect
 from ..forms import DeliveryEstimationForm, TankDataForm
-from ..models import TankChart
+from ..models import TankChart, TankEstimation
 from atg.models import VeederReading
 from ..logic.tank_lookup import get_store_and_preset_status, get_all_tank_mappings
 from ..logic.calculations import (
@@ -97,6 +97,34 @@ def delivery_submit(request):
                                 f"VIRTUAL_MAPPING_ACQUIRED: Store {store.store_num} Fuel {fuel}"
                             )
                             for vr in virtual_readings:
+                                # Look for an existing estimation for this virtual tank
+                                estimation = TankEstimation.objects.filter(
+                                    tank_mapping__store=store,
+                                    tank_mapping__fuel_type=fuel,
+                                    tank_mapping__tank_index=vr["tank_index"],
+                                    is_active=True,
+                                ).first()
+
+                                # Default UI values
+                                est_data = {
+                                    "radius": None,
+                                    "length": None,
+                                    "confidence": 0.5,
+                                    "is_active": False,
+                                    "capacity": None,
+                                }
+                                if estimation:
+                                    est_data.update(
+                                        {
+                                            "radius": estimation.radius,
+                                            "length": estimation.length,
+                                            "confidence": estimation.confidence,
+                                            "is_active": True,
+                                            "capacity": estimation.diagnostics.get(
+                                                "capacity"
+                                            ),
+                                        }
+                                    )
                                 # We treat this as a virtual mapping that defaults to Experimental Mode
                                 # Since we don't have a TankType, we'll need to source capacity
                                 # from the service during calculation.
@@ -105,9 +133,7 @@ def delivery_submit(request):
                                         "fuel_type": fuel.upper(),
                                         "tank_index": vr["tank_index"],
                                         "tank_model": "UNMAPPED_HARDWARE (VIRTUAL)",
-                                        "capacity": "PENDING_ESTIMATION",
-                                        "max_depth": "??",
-                                        "ninety_percent": "??",
+                                        "est_data": est_data,
                                         "form": TankDataForm(
                                             auto_id=f"virtual_{store.id}_{fuel}_{vr['tank_index']}_%s",
                                             prefix=f"virtual_{store.id}_{fuel}_{vr['tank_index']}",
@@ -116,11 +142,12 @@ def delivery_submit(request):
                                         "mapping_id": None,  # Signal it's virtual
                                         "mode": MODE_MATHEMATICAL,
                                         "has_data": True,
-                                        "confidence": 0.5,  # Initial penalty for virtuality
+                                        "is_missing": False,
                                         "is_virtual": True,
                                         "store_id": store.id,
                                     }
                                 )
+
                             continue  # Skip the normal missing mapping error
 
                     if mappings:
@@ -217,6 +244,9 @@ def delivery_submit(request):
                     request, "tankgauge/delivery_results_preset.html", context
                 )
             else:
+                logger.info(
+                    f"DEBUG_TEMPLATE_CONTEXT: Rendering with {len(tanks_found)} tanks found. Tank fuels: {[t['fuel_type'] for t in tanks_found]}"
+                )
                 context = {"store": store, "tanks": tanks_found, "is_preset": False}
                 return render(request, "tankgauge/delivery_results_db.html", context)
         else:

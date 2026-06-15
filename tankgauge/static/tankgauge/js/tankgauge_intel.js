@@ -52,14 +52,18 @@ const TankGaugeIntel = {
         const card = btn.closest(".tactical-card");
         this.clearErrors(card);
 
+        console.log("Card Dataset:", card.dataset); // DEBUGGING
+
         const fuelType = card.dataset.fuelType;
         const tankId = card.dataset.tankId;
+        const tankIndex = card.dataset.tankIndex;
+        console.log("DEBUG: Fuel:", fuelType, "TankId:", tankId, "TankIndex:", tankIndex); // DEBUGGING
         const deliveryInput = card.querySelector('input[name*="delivery_gallons"]');
         const inchesInput = card.querySelector('input[name*="current_inches"]');
         
         const deliveryValue = deliveryInput.value.trim();
         const inchesValue = inchesInput.value.trim();
-        const maxDepth = parseFloat(card.dataset.maxDepth);
+        const maxDepth = parseFloat(card.dataset.maxDepth) || 96; // Fallback for virtual
 
         let hasError = false;
 
@@ -102,7 +106,7 @@ const TankGaugeIntel = {
             formData.append("store_id", this.storeId);
             formData.append("fuel_type", fuelType);
             formData.append("tank_id", tankId);
-            formData.append("tank_index", card.dataset.tankIndex || "");
+            formData.append("tank_index", tankIndex);
             formData.append("current_inches", currentInches);
             formData.append("delivery_gallons", deliveryGallons);
 

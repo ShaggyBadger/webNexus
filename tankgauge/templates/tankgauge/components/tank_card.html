@@ -1,3 +1,4 @@
+{% load custom_filters %}
 {% if tank.is_missing or not tank.has_data %}
 <div class="tactical-card mb-5" style="border-style: dashed; opacity: 0.8">
   <div class="specs-list border-0 mb-0">
@@ -67,15 +68,15 @@
     </div>
     <div class="spec-line">
       <span class="specs-label">MAX_CAPACITY:</span>
-      <span class="specs-value">{% if tank.is_virtual %}PENDING_ESTIMATION{% else %}{{ tank.capacity }} GAL{% endif %}</span>
+      <span class="specs-value">{% if tank.is_virtual %}{% if tank.est_data.is_active %}{{ tank.est_data.capacity }} GAL{% else %}PENDING{% endif %}{% else %}{{ tank.capacity }} GAL{% endif %}</span>
     </div>
     <div class="spec-line">
       <span class="specs-label">MAX_DEPTH:</span>
-      <span class="specs-value">{% if tank.is_virtual %}??{% else %}{{ tank.max_depth }}"{% endif %}</span>
+      <span class="specs-value">{% if tank.is_virtual %}{% if tank.est_data.is_active %}{{ tank.est_data.radius|multiply:2 }}"{% else %}??{% endif %}{% else %}{{ tank.max_depth }}"{% endif %}</span>
     </div>
     <div class="spec-line">
       <span class="specs-label">90_LIMIT:</span>
-      <span class="specs-value text-info">{% if tank.is_virtual %}??{% else %}{{ tank.ninety_percent }} GAL{% endif %}</span>
+      <span class="specs-value text-info">{% if tank.is_virtual %}{% if tank.est_data.is_active %}{{ tank.est_data.capacity|multiply:0.9|floatformat:0 }} GAL{% else %}??{% endif %}{% else %}{{ tank.ninety_percent }} GAL{% endif %}</span>
     </div>
   </div>
 

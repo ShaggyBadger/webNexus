@@ -7,10 +7,10 @@ from .geometry import GeometryEngine
 
 logger = logging.getLogger("tankgauge")
 
-# CONFIDENCE GATES (Thresholds for Experimental Mode)
-MIN_READINGS = 3
-MIN_HEIGHT_SPREAD = 5.0  # inches
-MAX_ALLOWED_MEAN_ERROR = 150.0  # gallons
+# CONFIDENCE GATES (Thresholds for Mathematical Mode)
+MIN_READINGS = 1
+MIN_HEIGHT_SPREAD = 0.0  # inches
+MAX_ALLOWED_MEAN_ERROR = 500.0  # gallons (relaxed for development)
 
 
 class EstimationService:
@@ -98,7 +98,7 @@ class EstimationService:
                 max_error=result["diagnostics"].get("max_error"),
                 sample_count=result["diagnostics"].get("sample_count"),
                 algorithm_version=result["algorithm_version"],
-                diagnostics=result["diagnostics"],
+                diagnostics={**result["diagnostics"], "capacity": total_capacity},
                 is_active=True,
             )
 

@@ -33,8 +33,10 @@ def get_tank_mapping(store, fuel_type):
     if not store or not fuel_type:
         return None
 
+    # Use explicit case-insensitive lookup if necessary, though .lower() should work
+    search_fuel = fuel_type.lower().strip()
     mapping = (
-        StoreTankMapping.objects.filter(store=store, fuel_type=fuel_type.lower())
+        StoreTankMapping.objects.filter(store=store, fuel_type=search_fuel)
         .select_related("tank_type")
         .first()
     )
@@ -44,8 +46,8 @@ def get_tank_mapping(store, fuel_type):
             f"MAPPING_FOUND: Store #{store.store_num} {fuel_type} -> Tank {mapping.tank_index}"
         )
     else:
-        logger.info(
-            f"MAPPING_MISSING: No tank defined for Store #{store.store_num} {fuel_type}"
+        logger.warning(
+            f"MAPPING_MISSING: No tank defined for Store #{store.store_num} {fuel_type} (searched for: {search_fuel})"
         )
 
     return mapping

@@ -33,3 +33,14 @@ def replace_underscore(value):
     if not isinstance(value, str):
         return value
     return value.replace("_", " ")
+
+
+@register.filter(name="multiply")
+def multiply(value, arg):
+    """
+    Multiplies the value by the argument.
+    """
+    try:
+        return float(value) * float(arg)
+    except (ValueError, TypeError):
+        return value
