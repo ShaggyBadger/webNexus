@@ -121,7 +121,14 @@ const TankGaugeIntel = {
             });
 
             if (response.ok) {
-                const data = await response.json();
+                const raw = await response.json();
+                const data = this.normalizeApiPayload(raw);
+
+                if (data.status === "UNAVAILABLE") {
+                    alert(data.message || "MODE_UNAVAILABLE: NO CHART OR SUFFICIENT VEEDER DATA");
+                    return;
+                }
+
                 this.updateResultsUI(card, data, fuelType);
             } else {
                 const errText = await response.text();
@@ -129,13 +136,18 @@ const TankGaugeIntel = {
                 let errorMessage = "UNKNOWN_API_ERROR";
                 try {
                     const errJson = JSON.parse(errText);
-                    errorMessage = errJson.error || errorMessage;
+                    if (typeof errJson.error === "string") {
+                        errorMessage = errJson.error;
+                    } else if (errJson.error?.message) {
+                        errorMessage = errJson.error.message;
+                    }
                 } catch(e) {}
                 alert("CALCULATION_ERROR: " + errorMessage);
             }
         } catch (e) {
             console.error("Fetch Exception:", e);
-            alert("SYSTEM_CRITICAL_ERROR: API_COMMUNICATION_FAILED (Check Console)");
+            const msg = e?.message || "API_COMMUNICATION_FAILED";
+            alert("CALCULATION_ERROR: " + msg);
         } finally {
             btn.innerText = originalText;
             btn.disabled = false;
@@ -174,17 +186,22 @@ const TankGaugeIntel = {
         if (!resultsArea) return;
 
         const tankId = card.dataset.tankId;
-        const avail90Val = Math.max(0, data.avail_90);
+        const initialGallons = Number(data.initial_gallons || 0);
+        const avail90Val = Math.max(0, Number(data.avail_90 || 0));
+        const deliveryGallons = Number(data.delivery_gallons || 0);
+        const finalGallons = Number(data.final_gallons || 0);
+        const finalInches = Number(data.final_inches || 0);
+        const initialInches = Number(data.initial_inches || 0);
         
         const avail90El = resultsArea.querySelector(".res-avail-90");
         const avail90Line = resultsArea.querySelector(".res-avail-90-line");
         const avail90Label = resultsArea.querySelector(".specs-label-avail");
         
         const initialInchesEl = resultsArea.querySelector(".res-initial-inches");
-        if (initialInchesEl) initialInchesEl.innerText = data.initial_inches;
+        if (initialInchesEl) initialInchesEl.innerText = initialInches;
 
         const initialVolEl = resultsArea.querySelector(".res-initial-vol");
-        if (initialVolEl) initialVolEl.innerText = data.initial_gallons.toLocaleString();
+        if (initialVolEl) initialVolEl.innerText = initialGallons.toLocaleString();
 
         if (avail90El) avail90El.innerText = avail90Val.toLocaleString();
         
@@ -205,13 +222,34 @@ const TankGaugeIntel = {
         }
 
         const bolGallonsEl = resultsArea.querySelector(".res-bol-gallons");
-        if (bolGallonsEl) bolGallonsEl.innerText = data.delivery_gallons.toLocaleString();
+        if (bolGallonsEl) bolGallonsEl.innerText = deliveryGallons.toLocaleString();
 
         const finalVolEl = resultsArea.querySelector(".res-final-vol");
-        if (finalVolEl) finalVolEl.innerText = data.final_gallons.toLocaleString();
+        if (finalVolEl) finalVolEl.innerText = finalGallons.toLocaleString();
 
         const finalDepthEl = resultsArea.querySelector(".res-final-depth");
-        if (finalDepthEl) finalDepthEl.innerText = data.final_inches;
+        if (finalDepthEl) finalDepthEl.innerText = finalInches;
+
+        const maxCapacityEl = card.querySelector(".spec-max-capacity");
+        if (maxCapacityEl && data.max_capacity !== undefined) {
+            maxCapacityEl.innerText = Number(data.max_capacity).toLocaleString() + " GAL";
+        }
+
+        const maxDepthEl = card.querySelector(".spec-max-depth");
+        if (maxDepthEl && data.max_depth !== undefined) {
+            maxDepthEl.innerText = Number(data.max_depth).toFixed(2) + '"';
+            card.dataset.maxDepth = Number(data.max_depth).toString();
+        }
+
+        const ninetyLimitEl = card.querySelector(".spec-ninety-limit");
+        if (ninetyLimitEl && data.ninety_limit !== undefined) {
+            ninetyLimitEl.innerText = Number(data.ninety_limit).toLocaleString() + " GAL";
+        }
+
+        const maxDepthLabel = card.querySelector(".max-depth-label");
+        if (maxDepthLabel && data.max_depth !== undefined) {
+            maxDepthLabel.innerText = Number(data.max_depth).toFixed(2);
+        }
         
         // Track results for Mission Summary
         const trackKey = tankId || fuelType;
@@ -231,6 +269,19 @@ const TankGaugeIntel = {
         }, 10);
 
         this.updateMissionSummary();
+    },
+
+    normalizeApiPayload(raw) {
+        if (raw && typeof raw === "object") {
+            if (raw.status === "error") {
+                const msg = raw.error?.message || raw.error || "UNKNOWN_API_ERROR";
+                throw new Error(msg);
+            }
+            if (raw.status === "success" && raw.data && typeof raw.data === "object") {
+                return raw.data;
+            }
+        }
+        return raw;
     },
 
     /**

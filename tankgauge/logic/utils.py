@@ -19,3 +19,12 @@ def haversine(lat1, lon1, lat2, lon2):
     c = 2 * math.asin(math.sqrt(a))
     r = 3956  # Radius of earth in miles
     return c * r
+
+
+def canonicalize_fuel(fuel_type: str) -> str:
+    """
+    Standardizes fuel type strings for database queries and logic.
+    """
+    if not fuel_type:
+        return ""
+    return fuel_type.strip().lower()

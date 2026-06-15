@@ -1,9 +1,10 @@
 import logging
 from django.shortcuts import render, redirect
 from ..forms import DeliveryEstimationForm, TankDataForm
-from ..models import TankChart, TankEstimation
+from ..models import TankChart, TankEstimation, VirtualTankEstimation
 from atg.models import VeederReading
 from ..logic.tank_lookup import get_store_and_preset_status, get_all_tank_mappings
+from ..logic.utils import canonicalize_fuel
 from ..logic.calculations import (
     determine_operating_mode,
     MODE_OFFICIAL,
@@ -75,6 +76,7 @@ def delivery_submit(request):
             tanks_found = []
             for fuel in selected_fuels:
                 try:
+                    fuel_key = canonicalize_fuel(fuel)
                     mappings = get_all_tank_mappings(store, fuel)
 
                     if not mappings and not is_preset:
@@ -82,7 +84,8 @@ def delivery_submit(request):
                         # historical Veeder readings that could serve as a 'Virtual Mapping'.
                         virtual_readings = (
                             VeederReading.objects.filter(
-                                ticket__store=store, fuel_type__name__iexact=fuel
+                                ticket__store=store,
+                                fuel_type__name__iexact=canonicalize_fuel(fuel),
                             )
                             .values("tank_index", "fuel_type__name")
                             .distinct()
@@ -98,10 +101,10 @@ def delivery_submit(request):
                             )
                             for vr in virtual_readings:
                                 # Look for an existing estimation for this virtual tank
-                                estimation = TankEstimation.objects.filter(
-                                    tank_mapping__store=store,
-                                    tank_mapping__fuel_type=fuel,
-                                    tank_mapping__tank_index=vr["tank_index"],
+                                estimation = VirtualTankEstimation.objects.filter(
+                                    store=store,
+                                    fuel_type=fuel_key,
+                                    tank_index=vr["tank_index"],
                                     is_active=True,
                                 ).first()
 
@@ -120,11 +123,14 @@ def delivery_submit(request):
                                             "length": estimation.length,
                                             "confidence": estimation.confidence,
                                             "is_active": True,
-                                            "capacity": estimation.diagnostics.get(
-                                                "capacity"
+                                            "capacity": (
+                                                (estimation.diagnostics or {}).get(
+                                                    "capacity"
+                                                )
                                             ),
                                         }
                                     )
+
                                 # We treat this as a virtual mapping that defaults to Experimental Mode
                                 # Since we don't have a TankType, we'll need to source capacity
                                 # from the service during calculation.
@@ -145,6 +151,11 @@ def delivery_submit(request):
                                         "is_missing": False,
                                         "is_virtual": True,
                                         "store_id": store.id,
+                                        "max_depth": (
+                                            round(est_data["radius"] * 2, 2)
+                                            if est_data["radius"]
+                                            else 96
+                                        ),
                                     }
                                 )
 

@@ -68,15 +68,15 @@
     </div>
     <div class="spec-line">
       <span class="specs-label">MAX_CAPACITY:</span>
-      <span class="specs-value">{% if tank.is_virtual %}{% if tank.est_data.is_active %}{{ tank.est_data.capacity }} GAL{% else %}PENDING{% endif %}{% else %}{{ tank.capacity }} GAL{% endif %}</span>
+      <span class="specs-value spec-max-capacity">{% if tank.is_virtual %}{% if tank.est_data.is_active %}{{ tank.est_data.capacity }} GAL{% else %}PENDING{% endif %}{% else %}{{ tank.capacity }} GAL{% endif %}</span>
     </div>
     <div class="spec-line">
       <span class="specs-label">MAX_DEPTH:</span>
-      <span class="specs-value">{% if tank.is_virtual %}{% if tank.est_data.is_active %}{{ tank.est_data.radius|multiply:2 }}"{% else %}??{% endif %}{% else %}{{ tank.max_depth }}"{% endif %}</span>
+      <span class="specs-value spec-max-depth">{% if tank.is_virtual %}{% if tank.est_data.is_active %}{{ tank.est_data.radius|multiply:2 }}"{% else %}??{% endif %}{% else %}{{ tank.max_depth }}"{% endif %}</span>
     </div>
     <div class="spec-line">
       <span class="specs-label">90_LIMIT:</span>
-      <span class="specs-value text-info">{% if tank.is_virtual %}{% if tank.est_data.is_active %}{{ tank.est_data.capacity|multiply:0.9|floatformat:0 }} GAL{% else %}??{% endif %}{% else %}{{ tank.ninety_percent }} GAL{% endif %}</span>
+      <span class="specs-value text-info spec-ninety-limit">{% if tank.is_virtual %}{% if tank.est_data.is_active %}{{ tank.est_data.capacity|multiply:0.9|floatformat:0 }} GAL{% else %}??{% endif %}{% else %}{{ tank.ninety_percent }} GAL{% endif %}</span>
     </div>
   </div>
 
@@ -91,7 +91,7 @@
       <div class="error-feedback mono small" style="display: none;"></div>
     </div>
     <div class="col-md-6" style="margin-top: 1rem !important">
-      <label class="label-tactical">{{ tank.form.current_inches.label }} (MAX {{ tank.max_depth }})</label>
+      <label class="label-tactical">{{ tank.form.current_inches.label }} (MAX <span class="max-depth-label">{{ tank.max_depth }}</span>)</label>
       <input type="text" name="{{ tank.form.current_inches.html_name }}"
              class="form-control form-control-lg mono tankgauge-form-control"
              placeholder="e.g. 29" inputmode="decimal"

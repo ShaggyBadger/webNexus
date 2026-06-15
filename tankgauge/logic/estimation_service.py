@@ -1,9 +1,10 @@
 import logging
 from typing import Optional, List, Tuple
 from django.db import transaction
-from tankgauge.models import StoreTankMapping, TankEstimation
+from tankgauge.models import StoreTankMapping, TankEstimation, VirtualTankEstimation
 from atg.models import VeederReading
 from .geometry import GeometryEngine
+from .utils import canonicalize_fuel
 
 logger = logging.getLogger("tankgauge")
 
@@ -38,7 +39,7 @@ class EstimationService:
         readings = VeederReading.objects.filter(
             ticket__store=tank_mapping.store,
             tank_index=tank_mapping.tank_index,
-            fuel_type__name=tank_mapping.fuel_type,  # Assuming name matches
+            fuel_type__name__iexact=canonicalize_fuel(tank_mapping.fuel_type),
         ).select_related("ticket")
 
         if not readings.exists():
@@ -106,6 +107,105 @@ class EstimationService:
             f"ESTIMATION_COMPLETE: Created TankEstimation {estimation.id} (Confidence: {estimation.confidence})"
         )
         return estimation
+
+    def run_virtual_estimation(
+        self,
+        store,
+        fuel_type,
+        tank_index,
+        total_capacity,
+        observations,
+        latest_uploaded_at=None,
+    ) -> Optional[VirtualTankEstimation]:
+        """
+        Executes estimation for a virtual tank and persists the result.
+        Returns the existing active estimation if available, otherwise recalculates.
+        """
+        fuel_key = canonicalize_fuel(fuel_type)
+        signature = self._build_virtual_signature(
+            observations, total_capacity, latest_uploaded_at
+        )
+
+        # 1. Check for existing active estimation
+        existing = VirtualTankEstimation.objects.filter(
+            store=store, fuel_type=fuel_key, tank_index=tank_index, is_active=True
+        ).first()
+
+        if existing and self._virtual_signature_matches(existing, signature):
+            return existing
+
+        # 2. EVALUATE CONFIDENCE GATES
+        if not self._passes_confidence_gates(observations):
+            logger.warning(
+                f"ESTIMATION_FAILED: Virtual Tank (Store {store.store_num}, Tank {tank_index}) failed confidence gates."
+            )
+            return None
+
+        # 3. EXECUTE PURE MATH ENGINE
+        result = self.engine.calculate_best_fit(total_capacity, observations)
+
+        if result.get("status") != "SUCCESS":
+            logger.error(
+                f"ESTIMATION_FAILED: GeometryEngine failed: {result.get('message')}"
+            )
+            return None
+
+        # 4. PERSIST IMMUTABLE RESULT
+        with transaction.atomic():
+            VirtualTankEstimation.objects.filter(
+                store=store,
+                fuel_type=fuel_key,
+                tank_index=tank_index,
+                is_active=True,
+            ).update(is_active=False)
+
+            # Create new versioned estimate
+            estimation = VirtualTankEstimation.objects.create(
+                store=store,
+                fuel_type=fuel_key,
+                tank_index=tank_index,
+                radius=result["radius"],
+                length=result["length"],
+                confidence=result["confidence"],
+                mean_error=result["diagnostics"].get("mean_error"),
+                max_error=result["diagnostics"].get("max_error"),
+                sample_count=result["diagnostics"].get("sample_count"),
+                algorithm_version=result["algorithm_version"],
+                diagnostics={
+                    **result["diagnostics"],
+                    "capacity": total_capacity,
+                    **signature,
+                },
+                is_active=True,
+            )
+
+        logger.info(
+            f"ESTIMATION_COMPLETE: Created VirtualTankEstimation {estimation.id} (Confidence: {estimation.confidence})"
+        )
+        return estimation
+
+    def _build_virtual_signature(
+        self,
+        observations: List[Tuple[float, float]],
+        total_capacity: float,
+        latest_uploaded_at,
+    ) -> dict:
+        timestamp = latest_uploaded_at.isoformat() if latest_uploaded_at else None
+        return {
+            "reading_count": len(observations),
+            "capacity": float(total_capacity),
+            "latest_uploaded_at": timestamp,
+        }
+
+    def _virtual_signature_matches(
+        self, estimation: VirtualTankEstimation, signature: dict
+    ) -> bool:
+        diagnostics = estimation.diagnostics or {}
+        return (
+            diagnostics.get("reading_count") == signature["reading_count"]
+            and diagnostics.get("capacity") == signature["capacity"]
+            and diagnostics.get("latest_uploaded_at") == signature["latest_uploaded_at"]
+        )
 
     def _passes_confidence_gates(self, observations: List[Tuple[float, float]]) -> bool:
         """Checks if the data quantity and quality meet the minimum thresholds."""

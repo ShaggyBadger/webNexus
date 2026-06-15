@@ -3,7 +3,7 @@ from .views import (
     closest_store_api,
     delivery_form,
     delivery_submit,
-    calculate_tank_api,
+    CalculateTankAPIView,
 )
 
 app_name = "tankgauge"
@@ -14,5 +14,7 @@ urlpatterns = [
     # Page views
     path("delivery/", delivery_form, name="delivery_form"),
     path("delivery/submit/", delivery_submit, name="delivery_submit"),
-    path("api/calculate-tank/", calculate_tank_api, name="calculate_tank_api"),
+    path(
+        "api/calculate-tank/", CalculateTankAPIView.as_view(), name="calculate_tank_api"
+    ),
 ]

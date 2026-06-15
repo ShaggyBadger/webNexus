@@ -18,8 +18,14 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from .views import health_check
+from tankgauge.admin_views import trigger_sync_tank_estimates
 
 urlpatterns = [
+    path(
+        "admin/tankgauge/sync-estimates/",
+        trigger_sync_tank_estimates,
+        name="admin_sync_tank_estimates",
+    ),
     path("admin/", admin.site.urls),
     path("", include("homepage.urls")),
     path("tankgauge/", include("tankgauge.urls")),

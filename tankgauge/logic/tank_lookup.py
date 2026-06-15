@@ -1,6 +1,7 @@
 import logging
 from tankgauge.models import Store, StoreTankMapping
 from .store_lookup import get_store_by_any_id
+from .utils import canonicalize_fuel
 
 # Tactical Logger
 logger = logging.getLogger("tankgauge")
@@ -27,20 +28,17 @@ def get_store_and_preset_status(store_id):
 
 def get_tank_mapping(store, fuel_type):
     """
-    TACTICAL INTEL:
     Retrieves the primary hardware mapping (Tank Index and Tank Type) for a specific product.
     """
     if not store or not fuel_type:
         return None
 
-    # Use explicit case-insensitive lookup if necessary, though .lower() should work
-    search_fuel = fuel_type.lower().strip()
+    search_fuel = canonicalize_fuel(fuel_type)
     mapping = (
         StoreTankMapping.objects.filter(store=store, fuel_type=search_fuel)
         .select_related("tank_type")
         .first()
     )
-
     if mapping:
         logger.debug(
             f"MAPPING_FOUND: Store #{store.store_num} {fuel_type} -> Tank {mapping.tank_index}"
@@ -61,8 +59,9 @@ def get_all_tank_mappings(store, fuel_type):
     if not store or not fuel_type:
         return []
 
+    search_fuel = canonicalize_fuel(fuel_type)
     mappings = (
-        StoreTankMapping.objects.filter(store=store, fuel_type=fuel_type.lower())
+        StoreTankMapping.objects.filter(store=store, fuel_type=search_fuel)
         .select_related("tank_type")
         .all()
     )

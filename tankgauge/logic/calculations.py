@@ -2,14 +2,13 @@ import math
 import logging
 from tankgauge.models import Store, StoreTankMapping, TankChart, TankEstimation
 from .geometry import GeometryEngine
-from .estimation_service import EstimationService
+from .estimation_service import EstimationService, MIN_HEIGHT_SPREAD, MIN_READINGS
 
 # Tactical Logger
 logger = logging.getLogger("tankgauge")
 
 # Constants for Operating Modes
 MODE_OFFICIAL = "OFFICIAL"
-MODE_EXPERIMENTAL = "EXPERIMENTAL"
 MODE_MATHEMATICAL = "MATHEMATICAL"
 MODE_UNAVAILABLE = "UNAVAILABLE"
 
@@ -51,9 +50,14 @@ def perform_tank_calc(
         )
 
     if mode == MODE_UNAVAILABLE:
+        unavailable_msg = (
+            "No tank chart or sufficient Veeder data exists for this tank."
+        )
+        if source_meta and source_meta.get("message"):
+            unavailable_msg = source_meta["message"]
         return {
             "status": "UNAVAILABLE",
-            "message": "No tank chart or sufficient Veeder data exists for this tank.",
+            "message": unavailable_msg,
             "mode": mode,
         }
 
@@ -74,6 +78,12 @@ def perform_tank_calc(
     ninety_percent_limit = capacity * 0.9
     avail_90 = max(0, ninety_percent_limit - initial_gallons)
 
+    max_depth = 0.0
+    if mode == MODE_MATHEMATICAL and source_meta and source_meta.get("estimation"):
+        max_depth = float(source_meta["estimation"].radius) * 2.0
+    elif tank_mapping and tank_mapping.tank_type:
+        max_depth = float(tank_mapping.tank_type.max_depth or 0)
+
     # NO_FIT_WARNING: Triggered if the final volume exceeds the 90% safety threshold.
     no_fit_warning = final_gallons > ninety_percent_limit
 
@@ -89,6 +99,9 @@ def perform_tank_calc(
         "avail_90": int(avail_90),
         "final_gallons": int(final_gallons),
         "final_inches": final_inches,
+        "max_capacity": int(capacity),
+        "max_depth": round(max_depth, 2),
+        "ninety_limit": int(ninety_percent_limit),
         "no_fit_warning": no_fit_warning,
     }
 
@@ -111,8 +124,8 @@ def determine_operating_mode(tank_mapping):
         tank_mapping=tank_mapping, is_active=True
     ).first()
     if estimation:
-        return MODE_EXPERIMENTAL, {
-            "name": "EXPERIMENTAL_ESTIMATE",
+        return MODE_MATHEMATICAL, {
+            "name": "MATHEMATICAL_ESTIMATE",
             "confidence": estimation.confidence,
             "estimation": estimation,
             "capacity": tank_mapping.tank_type.capacity or 0,
@@ -122,8 +135,8 @@ def determine_operating_mode(tank_mapping):
     service = EstimationService()
     estimation = service.run_estimation_for_tank(tank_mapping)
     if estimation:
-        return MODE_EXPERIMENTAL, {
-            "name": "EXPERIMENTAL_ESTIMATE",
+        return MODE_MATHEMATICAL, {
+            "name": "MATHEMATICAL_ESTIMATE",
             "confidence": estimation.confidence,
             "estimation": estimation,
             "capacity": tank_mapping.tank_type.capacity or 0,
@@ -147,34 +160,50 @@ def determine_virtual_operating_mode(store_id, fuel_type, tank_index):
     )
 
     if not readings.exists():
-        return MODE_UNAVAILABLE, None
-
-    # 2. Run Engine (On-the-fly)
-    observations = [(float(r.height), float(r.volume)) for r in readings]
-    latest = readings.order_by("-ticket__uploaded_at").first()
-    capacity = float(latest.volume + latest.ullage)
-
-    engine = GeometryEngine()
-    result = engine.calculate_best_fit(capacity, observations)
-
-    if result.get("status") == "SUCCESS":
-        # Create a transient estimation-like object for the logic to consume
-        class TransientEstimation:
-            def __init__(self, r, l, conf):
-                self.radius = r
-                self.length = l
-                self.confidence = conf
-
-        return MODE_MATHEMATICAL, {
-            "name": "VIRTUAL_MATHEMATICAL_ESTIMATE (ON_THE_FLY)",
-            "confidence": result["confidence"],
-            "estimation": TransientEstimation(
-                result["radius"], result["length"], result["confidence"]
-            ),
-            "capacity": capacity,
+        return MODE_UNAVAILABLE, {
+            "message": "No Veeder readings found for this tank/fuel combination.",
         }
 
-    return MODE_UNAVAILABLE, None
+    # 2. Resolve/recompute persisted estimate from current evidence
+    observations = [(float(r.height), float(r.volume)) for r in readings]
+    count = len(observations)
+    spread = max(o[0] for o in observations) - min(o[0] for o in observations)
+
+    if count < MIN_READINGS:
+        return MODE_UNAVAILABLE, {
+            "message": f"Insufficient Veeder data for Mathematical Mode: {count} reading(s) found, {MIN_READINGS} required.",
+        }
+
+    if spread < MIN_HEIGHT_SPREAD:
+        return MODE_UNAVAILABLE, {
+            "message": f"Insufficient height spread for Mathematical Mode: {spread:.2f}in found, {MIN_HEIGHT_SPREAD:.2f}in required.",
+        }
+
+    latest = readings.order_by("-ticket__uploaded_at").first()
+    total_capacity = float(latest.volume + latest.ullage)
+
+    service = EstimationService()
+    # Attempt to persist/get latest valid estimation
+    estimation = service.run_virtual_estimation(
+        latest.ticket.store,
+        fuel_type,
+        tank_index,
+        total_capacity,
+        observations,
+        latest_uploaded_at=latest.ticket.uploaded_at,
+    )
+
+    if estimation:
+        return MODE_MATHEMATICAL, {
+            "name": "MATHEMATICAL_ESTIMATE",
+            "confidence": estimation.confidence,
+            "estimation": estimation,
+            "capacity": total_capacity,
+        }
+
+    return MODE_UNAVAILABLE, {
+        "message": "Mathematical estimation failed for available Veeder data.",
+    }
 
 
 def get_volume_from_depth(tank_mapping, depth, mode, source_meta):

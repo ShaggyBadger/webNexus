@@ -19,5 +19,26 @@
                 </tr>
             </table>
         </div>
+
+        <div class="module" style="margin-top: 16px;">
+            <table style="width: 100%;">
+                <caption>
+                    <span class="section" style="background: #282a36; color: #ffb86c; border: 1px solid #44475a;">
+                        TANK ESTIMATION SYNC
+                    </span>
+                </caption>
+                <tr>
+                    <td style="padding: 15px; background: #1e1f29; color: #f8f8f2;">
+                        <p class="small" style="margin-bottom: 10px;">
+                            Run background batch intelligence now to refresh mapped and virtual tank estimate cache.
+                        </p>
+                        <form method="post" action="{% url 'admin_sync_tank_estimates' %}">
+                            {% csrf_token %}
+                            <button type="submit" class="button default">RUN TANK ESTIMATE SYNC</button>
+                        </form>
+                    </td>
+                </tr>
+            </table>
+        </div>
     </div>
 {% endblock %}
