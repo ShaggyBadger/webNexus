@@ -398,6 +398,11 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        if (image && image.size > (10 * 1024 * 1024)) {
+            showStatus("FILE_TOO_LARGE: MAX 10MB IMAGE SIZE", "error");
+            return;
+        }
+
         const readings = [];
         let valid = true;
         rows.forEach(row => {
@@ -458,7 +463,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: formData
             });
 
-            const result = await response.json();
+            const rawText = await response.text();
+            let result = {};
+            if (rawText) {
+                try {
+                    result = JSON.parse(rawText);
+                } catch (parseErr) {
+                    result = { error: { message: rawText } };
+                }
+            }
+
             if (response.ok) {
                 showStatus("MISSION_COMPLETE: DATA PACKAGE INGESTED SUCCESSFULLY", "success");
                 setTimeout(() => {
@@ -471,14 +485,23 @@ document.addEventListener('DOMContentLoaded', () => {
                     errMsg = result.error.message;
                 } else if (result.error && result.error.details) {
                     errMsg = JSON.stringify(result.error.details);
+                } else if (result.error) {
+                    errMsg = typeof result.error === 'string' ? result.error : JSON.stringify(result.error);
+                } else if (rawText) {
+                    errMsg = rawText;
                 }
+
+                if (response.status === 413) {
+                    errMsg = "UPLOAD_REJECTED: IMAGE TOO LARGE (SERVER LIMIT)";
+                }
+
                 showStatus(`TRANSMISSION_FAILED: ${errMsg}`, "error");
                 submitBtn.disabled = false;
                 submitBtn.innerText = "[ RETRY_TRANSMISSION ]";
             }
         } catch (err) {
             console.error(err);
-            showStatus("CRITICAL_ERROR: SYSTEM UNRESPONSIVE", "error");
+            showStatus(`CRITICAL_ERROR: ${err?.message || 'NETWORK_FAILURE'}`, "error");
             submitBtn.disabled = false;
             submitBtn.innerText = "[ RETRY_TRANSMISSION ]";
         }
