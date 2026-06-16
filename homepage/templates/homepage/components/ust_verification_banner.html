@@ -1,0 +1,25 @@
+{% load static %}
+<!-- UST Verification Banner (Hidden by default, triggered via JS GPS Pulse) -->
+<div id="ust-verification-banner" class="container-fluid px-3 mb-4 d-none">
+    <div id="ust-banner-card" class="tactical-card border-left-3" style="border-left-width: 6px !important;">
+        <div class="d-flex justify-content-between align-items-center">
+            <div style="min-width: 0;">
+                <div class="mono small text-muted-custom mb-1">
+                    📍 PROXIMITY_ALERT // TARGET: <span id="ust-target-name" class="text-white">---</span>
+                </div>
+                <h4 id="ust-status-text" class="mb-0 fw-bold mono">UST PERMIT STATUS</h4>
+                <div id="ust-expiry-info" class="mono smaller text-muted-custom">---</div>
+            </div>
+            <div class="d-flex gap-2">
+                <button id="ust-confirm-btn" class="btn btn-tactical btn-primary btn-sm mono">
+                    [ CONFIRM VALID ]
+                </button>
+                <button id="ust-update-btn" class="btn btn-tactical btn-outline-warning btn-sm mono">
+                    [ UPDATE ]
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% include 'siteintel/components/ust_modals.html' %}

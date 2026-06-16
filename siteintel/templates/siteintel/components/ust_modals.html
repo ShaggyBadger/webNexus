@@ -1,0 +1,59 @@
+<!-- UST Confirmation Modal -->
+<div class="modal fade" id="ustConfirmModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark border-secondary">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title mono text-primary">CONFIRM PERMIT VALIDITY</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body mono">
+                <p>Did you physically verify the posted UST permit at this location?</p>
+                <div class="alert alert-dark border-secondary smaller">
+                    TARGET: <span id="modal-target-name" class="text-primary">---</span><br>
+                    EXPIRATION: <span id="modal-target-expiry" class="text-primary">---</span>
+                </div>
+                <textarea id="ust-confirm-notes" class="form-control bg-dark text-white border-secondary mono small" placeholder="Optional tactical notes..." rows="2"></textarea>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button type="button" class="btn btn-outline-secondary mono" data-bs-dismiss="modal">[ CANCEL ]</button>
+                <button type="button" id="ust-modal-confirm-submit" class="btn btn-primary mono">[ YES, IT'S VALID ]</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- UST Update Modal -->
+<div class="modal fade" id="ustUpdateModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark border-secondary">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title mono text-warning">UPDATE PERMIT DATA</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="ust-update-form" class="mono small">
+                    <div class="mb-3">
+                        <label class="form-label text-muted-custom">PERMIT_NUMBER</label>
+                        <input type="text" name="permit_number" class="form-control bg-dark text-white border-secondary">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-muted-custom">EXPIRATION_DATE *</label>
+                        <input type="date" name="expiration_date" class="form-control bg-dark text-white border-secondary" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-muted-custom">ISSUE_DATE</label>
+                        <input type="date" name="issue_date" class="form-control bg-dark text-white border-secondary">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-muted-custom">UPDATE_NOTES</label>
+                        <textarea name="verification_notes" class="form-control bg-dark text-white border-secondary" rows="2" placeholder="Why is this being updated? (e.g., New tag issued)"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button type="button" class="btn btn-outline-secondary mono" data-bs-dismiss="modal">[ CANCEL ]</button>
+                <button type="button" id="ust-modal-update-submit" class="btn btn-warning mono">[ COMMIT CHANGES ]</button>
+            </div>
+        </div>
+    </div>
+</div>

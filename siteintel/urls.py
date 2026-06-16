@@ -65,4 +65,20 @@ urlpatterns = [
         views.hand_drawn_map_save_api,
         name="api_hand_map_save",
     ),
+    # UST Permit Verification System (DRF)
+    path(
+        "api/stores/<int:store_id>/ust-permit/",
+        views.USTPermitDetailView.as_view(),
+        name="api_ust_permit",
+    ),
+    path(
+        "api/stores/<int:store_id>/ust-verifications/",
+        views.USTVerificationListView.as_view(),
+        name="api_ust_verifications",
+    ),
+    path(
+        "api/stores/nearby/",
+        views.NearbyStoreListView.as_view(),
+        name="api_stores_nearby",
+    ),
 ]

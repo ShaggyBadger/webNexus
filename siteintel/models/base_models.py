@@ -100,6 +100,13 @@ class Location(models.Model):
         default=dict, blank=True, help_text="Structured site quirks and manifold data"
     )
 
+    timezone = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True,
+        help_text="Automatically determined from coordinates (e.g., 'America/New_York')",
+    )
+
     # Intel & Metadata
     notes = models.TextField(
         blank=True, null=True, help_text="General field observations"

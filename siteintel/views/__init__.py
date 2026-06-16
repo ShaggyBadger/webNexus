@@ -5,3 +5,4 @@ from .intel_views import *
 from .dashboard_views import *
 from .mgmt_views import *
 from .map_views import *
+from .ust_views import *

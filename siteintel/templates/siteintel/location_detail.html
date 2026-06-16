@@ -166,6 +166,40 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- UST COMPLIANCE DATA -->
+                    <div class="col-12 col-md-6">
+                        <div class="mono text-muted-custom smaller mb-2" style="font-size: 0.6rem; letter-spacing: 1px;">// UST_COMPLIANCE</div>
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <div class="intel-label">Permit Status</div>
+                                <div class="intel-value">
+                                    <div class="d-flex align-items-center gap-2 mb-1">
+                                        <span class="mono fw-bold" style="color: var(--status-{% if ust_status == 'GREEN' %}green{% elif ust_status == 'ORANGE' %}amber{% else %}red{% endif %}); font-size: 0.8rem;">
+                                            <i class="fas {% if ust_status == 'GREEN' %}fa-circle-check{% elif ust_status == 'ORANGE' %}fa-triangle-exclamation{% else %}fa-circle-exclamation{% endif %} me-1"></i>
+                                            {{ ust_status }}
+                                        </span>
+                                    </div>
+                                    
+                                    {% if ust_permit %}
+                                        <div class="mono text-muted-custom" style="font-size: 0.65rem; border-left: 2px solid var(--status-{% if ust_status == 'GREEN' %}green{% elif ust_status == 'ORANGE' %}amber{% else %}red{% endif %}); padding-left: 8px;">
+                                            EXP_DATE: <span class="text-white">{{ ust_permit.expiration_date }}</span><br>
+                                            PERMIT_ID: <span class="text-white">{{ ust_permit.permit_number|default:"UNSPECIFIED" }}</span>
+                                        </div>
+                                    {% else %}
+                                        <div class="mono text-tactical-danger" style="font-size: 0.65rem; background: rgba(255, 85, 85, 0.05); padding: 4px 8px; border: 1px dashed var(--status-red);">
+                                            <i class="fas fa-triangle-exclamation fa-fade me-1"></i> [ MISSING_AUTHORITATIVE_DATA ]
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-12 mt-2">
+                                <button class="btn btn-outline-warning btn-sm mono py-0" style="font-size: 0.6rem; letter-spacing: 1px;" onclick="USTVerification.showUpdateModal({{ store.id }})">
+                                    [ SYNC_COMPLIANCE_DATA ]
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                     {% endif %}
 
                     <!-- FUEL RACK SPECIFIC DATA -->
@@ -396,9 +430,12 @@
         </div>
     </div>
 </div>
+
+{% include 'siteintel/components/ust_modals.html' %}
 {% endblock %}
 
 {% block extra_scripts %}
+<script src="{% static 'js/siteintel/ust_verification.js' %}"></script>
 <script type="module" src="{% static 'js/siteintel/intel_main.js' %}"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {

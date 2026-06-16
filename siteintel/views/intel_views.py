@@ -95,6 +95,17 @@ class LocationDetailView(DetailView):
         context["personal_hand_map"] = personal_hand_map
         context["default_hand_map"] = default_hand_map
 
+        # UST PERMIT STATUS (Operational Sync)
+        from ..logic import ust_service
+        from ..models import USTPermit
+        context["ust_permit"] = None
+        context["ust_status"] = "RED"
+        if context["store"]:
+            active_permit = USTPermit.objects.filter(store=context["store"], is_active=True).first()
+            if active_permit:
+                context["ust_permit"] = active_permit
+                context["ust_status"] = ust_service.calculate_permit_status(active_permit)
+
         # Hybrid Metadata Layer: Order by Global Definitions, then Custom
         # This ensures that standard fields (e.g., Manifolds) appear in a fixed,
         # prioritized order while still allowing site-specific quirks to follow.
