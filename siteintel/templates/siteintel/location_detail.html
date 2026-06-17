@@ -183,7 +183,7 @@
                                     
                                     {% if ust_permit %}
                                         <div class="mono text-muted-custom" style="font-size: 0.65rem; border-left: 2px solid var(--status-{% if ust_status == 'GREEN' %}green{% elif ust_status == 'ORANGE' %}amber{% else %}red{% endif %}); padding-left: 8px;">
-                                            EXP_DATE: <span class="text-white">{{ ust_permit.expiration_date }}</span><br>
+                                            EXP_DATE: <span class="text-white">{{ ust_permit.expiration_date|date:"m/Y" }}</span><br>
                                             PERMIT_ID: <span class="text-white">{{ ust_permit.permit_number|default:"UNSPECIFIED" }}</span>
                                         </div>
                                     {% else %}
@@ -193,7 +193,10 @@
                                     {% endif %}
                                 </div>
                             </div>
-                            <div class="col-12 mt-2">
+                            <div class="col-12 mt-2 d-flex gap-2">
+                                <button class="btn btn-primary btn-sm mono py-0" style="font-size: 0.6rem; letter-spacing: 1px;" onclick="USTVerification.showConfirmModal({{ store.id }})">
+                                    [ CONFIRM_ON_SITE ]
+                                </button>
                                 <button class="btn btn-outline-warning btn-sm mono py-0" style="font-size: 0.6rem; letter-spacing: 1px;" onclick="USTVerification.showUpdateModal({{ store.id }})">
                                     [ SYNC_COMPLIANCE_DATA ]
                                 </button>

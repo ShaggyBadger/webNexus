@@ -76,9 +76,5 @@ urlpatterns = [
         views.USTVerificationListView.as_view(),
         name="api_ust_verifications",
     ),
-    path(
-        "api/stores/nearby/",
-        views.NearbyStoreListView.as_view(),
-        name="api_stores_nearby",
-    ),
+
 ]

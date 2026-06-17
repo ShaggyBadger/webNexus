@@ -127,20 +127,3 @@ class USTBackendTests(TestCase):
         self.assertEqual(USTPermit.objects.filter(is_active=True).first().permit_number, 'MOD-789')
         self.assertEqual(USTVerification.objects.count(), 2)
 
-    def test_proximity_api(self):
-        """Test the nearby store lookup."""
-        # Site is at 40.7128, -74.0060
-        response = self.client.get('/siteintel/api/stores/nearby/', {
-            'lat': 40.7129,
-            'lng': -74.0061
-        })
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
-        self.assertEqual(response.data[0]['store_num'], 1234)
-        
-        # Far away
-        response = self.client.get('/siteintel/api/stores/nearby/', {
-            'lat': 34.0522,
-            'lng': -118.2437 # LA
-        })
-        self.assertEqual(len(response.data), 0)
