@@ -167,9 +167,19 @@ def delivery_submit(request):
                             if mapping.tank_type:
                                 # Determine Operating Mode (Official vs Experimental vs Unavailable)
                                 mode, source_meta = determine_operating_mode(mapping)
-
+                                
                                 has_data = mode != MODE_UNAVAILABLE
                                 capacity = mapping.tank_type.capacity or 0
+
+                                # Check for source availability for the toggle
+                                has_official = TankChart.objects.filter(
+                                    tank_type=mapping.tank_type, is_official=True
+                                ).exists()
+                                has_generated = TankChart.objects.filter(
+                                    store=mapping.store,
+                                    tank_index=mapping.tank_index,
+                                    is_official=False,
+                                ).exists()
 
                                 tanks_found.append(
                                     {
@@ -191,6 +201,9 @@ def delivery_submit(request):
                                         ),
                                         "mode": mode,
                                         "has_data": has_data,
+                                        "has_official": has_official,
+                                        "has_generated": has_generated,
+                                        "data_source": source_meta.get("name") if source_meta else "OFFICIAL_CHART",
                                         "confidence": (
                                             source_meta.get("confidence")
                                             if source_meta

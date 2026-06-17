@@ -1,9 +1,26 @@
 from rest_framework import serializers
 from siteintel.models import USTPermit, USTVerification
-from siteintel.logic.ust_service import calculate_permit_status
+from siteintel.logic.ust_service import calculate_permit_status, normalize_expiration_date
+
+class FlexibleDateField(serializers.DateField):
+    """
+    Custom field to handle YYYY-MM format from HTML5 month inputs,
+    normalizing them to the end of the month.
+    """
+    def to_internal_value(self, value):
+        if not value:
+            return None
+        
+        # Try our service normalization first (handles YYYY-MM and YYYY-MM-DD)
+        normalized = normalize_expiration_date(value)
+        if normalized:
+            return normalized
+            
+        return super().to_internal_value(value)
 
 class USTPermitSerializer(serializers.ModelSerializer):
     status = serializers.SerializerMethodField()
+    expiration_date = FlexibleDateField()
     
     class Meta:
         model = USTPermit

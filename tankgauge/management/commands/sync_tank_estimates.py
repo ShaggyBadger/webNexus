@@ -4,6 +4,7 @@ from atg.models import VeederReading
 from tankgauge.logic.estimation_service import EstimationService
 from tankgauge.logic.utils import canonicalize_fuel
 from tankgauge.models import Store, StoreTankMapping
+from atg.services.auto_mapper import AutoMapperService
 
 
 class Command(BaseCommand):
@@ -78,10 +79,15 @@ class Command(BaseCommand):
             for group in virtual_groups:
                 store_id = group["ticket__store_id"]
                 tank_index = group["tank_index"]
-                fuel_key = canonicalize_fuel(group["fuel_type__name"])
+                fuel_name = group["fuel_type__name"]
+                fuel_key = canonicalize_fuel(fuel_name)
 
                 if not store_id or tank_index is None or not fuel_key:
                     continue
+
+                # AUTO_MAPPER: Attempt to bridge missing mappings
+                store = Store.objects.get(pk=store_id)
+                AutoMapperService.ensure_mapping(store, fuel_name, tank_index)
 
                 is_mapped = StoreTankMapping.objects.filter(
                     store_id=store_id,

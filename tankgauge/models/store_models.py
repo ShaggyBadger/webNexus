@@ -60,5 +60,13 @@ class StoreTankMapping(models.Model):
         help_text="The physical tank number (1, 2, 3...) from on-site ATG.",
     )
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["store", "fuel_type", "tank_index"],
+                name="uniq_store_fuel_tank_index",
+            )
+        ]
+
     def __str__(self):
         return f"{self.store} - {self.tank_type} ({self.fuel_type})"

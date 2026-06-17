@@ -29,8 +29,25 @@ class TankChart(models.Model):
     """
 
     tank_type = models.ForeignKey(
-        TankType, on_delete=models.CASCADE, related_name="charts"
+        TankType,
+        on_delete=models.CASCADE,
+        related_name="charts",
+        null=True,
+        blank=True,
     )
+    store = models.ForeignKey(
+        "tankgauge.Store",
+        on_delete=models.CASCADE,
+        related_name="custom_charts",
+        null=True,
+        blank=True,
+    )
+    tank_index = models.IntegerField(null=True, blank=True)
+    is_official = models.BooleanField(
+        default=True,
+        help_text="True if this is a manufacturer-provided chart. False if generated from telemetry.",
+    )
+
     inches = models.IntegerField()
     gallons = models.IntegerField()
     tank_name = models.CharField(max_length=255)

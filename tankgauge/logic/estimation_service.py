@@ -1,7 +1,8 @@
+import math
 import logging
 from typing import Optional, List, Tuple
 from django.db import transaction
-from tankgauge.models import StoreTankMapping, TankEstimation, VirtualTankEstimation
+from tankgauge.models import StoreTankMapping, TankEstimation, VirtualTankEstimation, TankChart
 from atg.models import VeederReading
 from .geometry import GeometryEngine
 from .utils import canonicalize_fuel
@@ -11,6 +12,7 @@ logger = logging.getLogger("tankgauge")
 # CONFIDENCE GATES (Thresholds for Mathematical Mode)
 MIN_READINGS = 1
 MIN_HEIGHT_SPREAD = 0.0  # inches
+
 MAX_ALLOWED_MEAN_ERROR = 500.0  # gallons (relaxed for development)
 
 
@@ -103,6 +105,14 @@ class EstimationService:
                 is_active=True,
             )
 
+            # 7. GENERATE TANK CHART (Materialized cache)
+            self.generate_tank_chart_from_estimation(
+                estimation, 
+                tank_mapping.store, 
+                tank_mapping.fuel_type, 
+                tank_mapping.tank_index
+            )
+
         logger.info(
             f"ESTIMATION_COMPLETE: Created TankEstimation {estimation.id} (Confidence: {estimation.confidence})"
         )
@@ -179,6 +189,14 @@ class EstimationService:
                 is_active=True,
             )
 
+            # 5. GENERATE TANK CHART (Materialized cache)
+            self.generate_tank_chart_from_estimation(
+                estimation,
+                store,
+                fuel_key,
+                tank_index
+            )
+
         logger.info(
             f"ESTIMATION_COMPLETE: Created VirtualTankEstimation {estimation.id} (Confidence: {estimation.confidence})"
         )
@@ -223,3 +241,52 @@ class EstimationService:
             return False
 
         return True
+
+    def generate_tank_chart_from_estimation(
+        self, estimation_obj, store, fuel_type, tank_index
+    ):
+        """
+        Materializes a mathematical estimation into a series of TankChart entries.
+        Generates 1-inch increments from 0 to the calculated max depth.
+        """
+        # 1. Determine Tank Name Pattern (f"{store.store_num}_{fuel_type}_T{tank_index}")
+        # fuel_type may need canonicalization if not already
+        from .utils import canonicalize_fuel
+        fuel_key = canonicalize_fuel(fuel_type).upper()
+        tank_name = f"{store.store_num}_{fuel_key}_T{tank_index}"
+        
+        # 2. Determine Max Depth (2 * Radius)
+        max_depth = float(estimation_obj.radius) * 2.0
+        
+        # 3. Use Atomic Transaction for cleanup and replacement
+        with transaction.atomic():
+            # Remove existing generated chart for this specific tank
+            TankChart.objects.filter(
+                store=store,
+                tank_index=tank_index,
+                is_official=False
+            ).delete()
+            
+            # 4. Generate 1-inch increments
+            chart_entries = []
+            # We use ceil + 1 to ensure we cover the full depth
+            for inch in range(int(math.ceil(max_depth)) + 1):
+                volume = self.engine.volume_from_depth(
+                    float(estimation_obj.radius),
+                    float(estimation_obj.length),
+                    float(inch)
+                )
+                chart_entries.append(TankChart(
+                    store=store,
+                    tank_index=tank_index,
+                    is_official=False,
+                    inches=inch,
+                    gallons=int(round(volume)),
+                    tank_name=tank_name,
+                    misc_info=f"Generated from Estimation {estimation_obj.id} (v{estimation_obj.algorithm_version})"
+                ))
+            
+            # 5. Bulk Create for efficiency
+            TankChart.objects.bulk_create(chart_entries)
+            
+        logger.info(f"CHART_GENERATED: Created {len(chart_entries)} entries for {tank_name}")

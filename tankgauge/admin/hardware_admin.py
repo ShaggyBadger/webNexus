@@ -10,5 +10,6 @@ class TankTypeAdmin(admin.ModelAdmin):
 
 @admin.register(TankChart)
 class TankChartAdmin(admin.ModelAdmin):
-    list_display = ("tank_name", "inches", "gallons")
-    search_fields = ("tank_name",)
+    list_display = ("tank_name", "store", "tank_index", "is_official", "inches", "gallons")
+    list_filter = ("is_official", "tank_name")
+    search_fields = ("tank_name", "store__store_num")

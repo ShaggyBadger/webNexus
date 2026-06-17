@@ -7,11 +7,15 @@ from .views import (
     fuel_views,
     store_views,
     post_trip_views,
+    report_views,
 )
 
 app_name = "missionlog"
 
 urlpatterns = [
+    # Reporting API
+    path("api/reports/<int:mission_id>/", report_views.report_api, name="report_api"),
+    path("reports/<int:mission_id>/", report_views.report_view, name="report_view"),
     # Mission Lifecycle API Endpoints
     path(
         "api/missions/",

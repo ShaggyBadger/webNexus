@@ -1,5 +1,8 @@
 import io
 import json
+from types import SimpleNamespace
+from unittest.mock import patch
+
 from django.test import TestCase, override_settings
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -7,7 +10,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from tankgauge.models import Store
+from tankgauge.models import Store, StoreTankMapping, TankType
 from missionlog.models import FuelType
 from .models import VeederTicket, VeederReading
 from .services import VeederUploadService
@@ -74,6 +77,92 @@ class VeederUploadServiceTestCase(TestCase):
         self.assertEqual(reading.water, 0.5)
         self.assertEqual(reading.confidence_score, 0.95)
         self.assertFalse(reading.is_user_corrected)
+
+    def test_process_ticket_submission_auto_mapper_failure_does_not_rollback(self):
+        readings_data = [
+            {
+                "tank_index": 1,
+                "fuel_type": self.fuel_type.id,
+                "volume": 5000,
+                "ullage": 1200,
+                "height": 92.5,
+                "temp": 68.4,
+                "water": 0.5,
+                "raw_line_text": "1 Regular 5000 1200 92.5",
+            }
+        ]
+
+        with patch(
+            "atg.services.upload_service.AutoMapperService.ensure_mapping",
+            side_effect=RuntimeError("simulated mapping error"),
+        ):
+            with self.captureOnCommitCallbacks(execute=True):
+                ticket = VeederUploadService.process_ticket_submission(
+                    user=self.user,
+                    store=self.store,
+                    image=self.image,
+                    notes="Mapper failure should not rollback",
+                    readings_data=readings_data,
+                )
+
+        self.assertIsNotNone(ticket.id)
+        self.assertEqual(ticket.readings.count(), 1)
+
+    def test_process_ticket_submission_creates_auto_mapping_for_unmapped_tank(self):
+        readings_data = [
+            {
+                "tank_index": 2,
+                "fuel_type": self.fuel_type.id,
+                "volume": 4200,
+                "ullage": 5800,
+                "height": 40.0,
+            },
+            {
+                "tank_index": 2,
+                "fuel_type": self.fuel_type.id,
+                "volume": 5000,
+                "ullage": 5000,
+                "height": 52.0,
+            },
+            {
+                "tank_index": 2,
+                "fuel_type": self.fuel_type.id,
+                "volume": 6200,
+                "ullage": 3800,
+                "height": 68.0,
+            },
+        ]
+
+        fake_estimation = SimpleNamespace(id=999, radius=60.0)
+        with patch(
+            "atg.services.auto_mapper.EstimationService.run_virtual_estimation",
+            return_value=fake_estimation,
+        ):
+            with self.captureOnCommitCallbacks(execute=True):
+                VeederUploadService.process_ticket_submission(
+                    user=self.user,
+                    store=self.store,
+                    image=self.image,
+                    notes="Auto-map integration",
+                    readings_data=readings_data,
+                )
+
+        self.assertTrue(
+            StoreTankMapping.objects.filter(
+                store=self.store,
+                fuel_type="regular",
+                tank_index=2,
+            ).exists()
+        )
+        mapping = StoreTankMapping.objects.get(
+            store=self.store,
+            fuel_type="regular",
+            tank_index=2,
+        )
+        self.assertTrue(mapping.tank_type.name.startswith("AUTO_101_T2_REGULAR"))
+        self.assertTrue(
+            TankType.objects.filter(name=mapping.tank_type.name).exists(),
+        )
 
 
 class VeederAPITestCase(APITestCase):

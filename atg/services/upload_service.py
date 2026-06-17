@@ -1,6 +1,7 @@
 import logging
 from django.db import transaction
 from ..models import VeederTicket, VeederReading
+from .auto_mapper import AutoMapperService
 
 logger = logging.getLogger("webnexus")
 
@@ -70,6 +71,42 @@ class VeederUploadService:
                         )
 
                     VeederReading.objects.bulk_create(readings_to_create)
+                    
+                    # 3. Auto-Map Tanks (after successful commit)
+                    mapping_targets = {
+                        (
+                            validated_reading.get("tank_index", 0),
+                            validated_reading.get("fuel_type").name,
+                        )
+                        for validated_reading in serializer.validated_data
+                        if validated_reading.get("fuel_type") is not None
+                    }
+
+                    def run_auto_mapping() -> None:
+                        if store is None:
+                            logger.info(
+                                "AUTO_MAPPER: Skipping post-ingest auto-map for Ticket %s because store is missing.",
+                                ticket.id,
+                            )
+                            return
+
+                        for tank_index, fuel_name in sorted(mapping_targets):
+                            try:
+                                AutoMapperService.ensure_mapping(
+                                    store,
+                                    fuel_name,
+                                    tank_index,
+                                )
+                            except Exception:
+                                logger.exception(
+                                    "AUTO_MAPPER: Failed for Ticket %s Store %s Tank %s Fuel %s",
+                                    ticket.id,
+                                    store.store_num,
+                                    tank_index,
+                                    fuel_name,
+                                )
+
+                    transaction.on_commit(run_auto_mapping)
 
                 logger.info(
                     f"ATG_INGEST_COMPLETE: Ticket {ticket.id} processed successfully."
@@ -80,4 +117,4 @@ class VeederUploadService:
             logger.error(
                 f"ATG_INGEST_FAILED: Critical failure during ticket ingest: {str(e)}"
             )
-            raise e
+            raise

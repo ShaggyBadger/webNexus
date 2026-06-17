@@ -30,21 +30,50 @@
   </div>
 </div>
 {% else %}
+<style>
+    .source-toggle-container {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 0.7rem;
+    }
+    .switch {
+        position: relative;
+        display: inline-block;
+        width: 34px;
+        height: 18px;
+    }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+        position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+        background-color: #44475a; transition: .4s; border-radius: 18px;
+    }
+    .slider:before {
+        position: absolute; content: ""; height: 14px; width: 14px; left: 2px; bottom: 2px;
+        background-color: white; transition: .4s; border-radius: 50%;
+    }
+    input:checked + .slider { background-color: var(--primary-color); }
+    input:checked + .slider:before { transform: translateX(16px); }
+</style>
 <div class="tactical-card mb-5 {% if mode == 'preset' %}preset-results{% endif %}"
      data-tank-id="{{ tank.mapping_id|default:'' }}"
      data-fuel-type="{{ tank.fuel_type }}"
      data-tank-index="{{ tank.tank_index|default:'' }}"
-     data-max-depth="{{ tank.max_depth }}">
+     data-max-depth="{{ tank.max_depth }}"
+     data-store-id="{{ tank.store_id }}">
   
   <!-- Operating Mode Indicator -->
   <div class="d-flex justify-content-between align-items-center mb-3 mono small">
     <div class="d-flex align-items-center">
         {% if tank.mode == 'OFFICIAL' %}
-            <span class="text-success"><i class="fas fa-check-circle me-1"></i> MODE: OFFICIAL</span>
+            <span class="text-success" id="source-indicator"><i class="fas fa-check-circle me-1"></i> MODE: {{ tank.mode }} ({{ tank.data_source }})</span>
         {% elif tank.mode == 'MATHEMATICAL' %}
-            <span class="text-warning"><i class="fas fa-square-root-variable me-1"></i> MODE: MATHEMATICAL</span>
+            <span class="text-warning" id="source-indicator"><i class="fas fa-square-root-variable me-1"></i> MODE: {{ tank.mode }}</span>
         {% endif %}
     </div>
+    
+    <!-- Source Toggle Placeholder removed -->
+    
     <div class="text-muted-custom">
         CONFIDENCE: <span class="{% if tank.confidence > 0.8 %}text-success{% elif tank.confidence > 0.5 %}text-warning{% else %}text-danger{% endif %}">{{ tank.confidence|floatformat:2 }}</span>
     </div>

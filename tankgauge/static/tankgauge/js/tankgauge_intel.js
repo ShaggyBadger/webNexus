@@ -43,6 +43,14 @@ const TankGaugeIntel = {
         calcButtons.forEach(btn => {
             btn.addEventListener("click", () => this.executeCalculation(btn));
         });
+
+        const toggleSwitches = document.querySelectorAll(".source-toggle");
+        toggleSwitches.forEach(toggle => {
+            toggle.addEventListener("change", (e) => {
+                const btn = e.target.closest(".tactical-card").querySelector(".btn-ajax-calculate");
+                this.executeCalculation(btn);
+            });
+        });
     },
 
     /**
@@ -52,18 +60,19 @@ const TankGaugeIntel = {
         const card = btn.closest(".tactical-card");
         this.clearErrors(card);
 
-        console.log("Card Dataset:", card.dataset); // DEBUGGING
-
         const fuelType = card.dataset.fuelType;
         const tankId = card.dataset.tankId;
         const tankIndex = card.dataset.tankIndex;
-        console.log("DEBUG: Fuel:", fuelType, "TankId:", tankId, "TankIndex:", tankIndex); // DEBUGGING
         const deliveryInput = card.querySelector('input[name*="delivery_gallons"]');
         const inchesInput = card.querySelector('input[name*="current_inches"]');
         
         const deliveryValue = deliveryInput.value.trim();
         const inchesValue = inchesInput.value.trim();
         const maxDepth = parseFloat(card.dataset.maxDepth) || 96; // Fallback for virtual
+
+        // Toggle handling
+        const toggle = card.querySelector(".source-toggle");
+        const forceSource = toggle ? (toggle.checked ? "GENERATED" : "OFFICIAL") : null;
 
         let hasError = false;
 
@@ -109,6 +118,9 @@ const TankGaugeIntel = {
             formData.append("tank_index", tankIndex);
             formData.append("current_inches", currentInches);
             formData.append("delivery_gallons", deliveryGallons);
+            if (forceSource) {
+                formData.append("force_source", forceSource);
+            }
 
             const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
 
@@ -126,6 +138,9 @@ const TankGaugeIntel = {
 
                 if (data.status === "UNAVAILABLE") {
                     alert(data.message || "MODE_UNAVAILABLE: NO CHART OR SUFFICIENT VEEDER DATA");
+                    // Reset UI indicators if unavailable
+                    const sourceIndicator = card.querySelector("#source-indicator");
+                    if (sourceIndicator) sourceIndicator.innerText = "MODE: UNAVAILABLE";
                     return;
                 }
 
@@ -185,6 +200,13 @@ const TankGaugeIntel = {
         const resultsArea = card.querySelector(".ajax-results");
         if (!resultsArea) return;
 
+        // Update Mode Indicator
+        const sourceIndicator = card.querySelector("#source-indicator");
+        if (sourceIndicator) {
+            const icon = data.mode === 'OFFICIAL' ? '<i class="fas fa-check-circle me-1"></i>' : '<i class="fas fa-square-root-variable me-1"></i>';
+            sourceIndicator.innerHTML = `${icon} MODE: ${data.mode} (${data.data_source})`;
+        }
+        
         const tankId = card.dataset.tankId;
         const initialGallons = Number(data.initial_gallons || 0);
         const avail90Val = Math.max(0, Number(data.avail_90 || 0));

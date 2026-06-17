@@ -160,21 +160,24 @@ class CalculateTankAPIView(APIView):
 
         if not mapping and not virtual_meta:
             logger.warning(
-                f"CALC_MISSING_MAPPING: No hardware definition for Store {store_id} {fuel_type}"
+                f"CALC_MISSING_MAPPING: No hardware definition for Store {store_id} {fuel_type} (TankIndex: {tank_index})"
             )
             return Response(
-                {"error": "Tank mapping or type not found"},
+                {"error": f"No tank mapping or type found for Store {store_id}, {fuel_type} (TankIndex: {tank_index}). Please define this tank in Admin -> Store Tank Mappings."},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
         # COMPUTATION_PHASE: Execute the core math
         try:
             result = perform_tank_calc(
-                mapping, current_inches, delivery_gallons, virtual_meta=virtual_meta
+                mapping,
+                current_inches,
+                delivery_gallons,
+                virtual_meta=virtual_meta,
             )
             final_gallons = result.get("final_gallons")
             logger.info(
-                f"CALC_SUCCESS: Store {store_id} {fuel_type} -> Final Volume {final_gallons if final_gallons is not None else 'UNAVAILABLE'}"
+                f"CALC_SUCCESS: Store {store_id} {fuel_type} -> Final Volume {final_gallons if final_gallons is not None else 'UNAVAILABLE'} (Source={result.get('data_source')})"
             )
 
             response_serializer = CalcResponseSerializer(data=result)

@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Tactical Report | Mission {{ mission_id }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    .tactical-report-container {
+        padding: 20px;
+        color: var(--text-color);
+    }
+    .tactical-card {
+        background-color: var(--navbar-bg);
+        border: 1px solid var(--navbar-border);
+        padding: 15px;
+        margin-bottom: 20px;
+    }
+    .metric-value {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 1.5rem;
+        color: var(--primary-color);
+    }
+    .metric-label {
+        font-size: 0.8rem;
+        color: var(--muted-text-color);
+        text-transform: uppercase;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container tactical-report-container">
+    <h2 class="text-primary mb-4">Mission Report #{{ mission_id }}</h2>
+    
+    <div id="report-content">
+        <!-- JS will populate this from the API -->
+        <p>Loading Intelligence...</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    fetch('/missionlog/api/reports/{{ mission_id }}/')
+        .then(response => response.json())
+        .then(data => {
+            const container = document.getElementById('report-content');
+            container.innerHTML = `
+                <div class="tactical-card">
+                    <h4>Fuel Intelligence</h4>
+                    <div class="metric-label">Gross Gallons</div>
+                    <div class="metric-value">${data.metrics.fuel.total_gross_gallons.value}</div>
+                    <div class="metric-label">MPG</div>
+                    <div class="metric-value">${data.metrics.efficiency.mpg.value}</div>
+                </div>
+            `;
+        });
+</script>
+{% endblock %}

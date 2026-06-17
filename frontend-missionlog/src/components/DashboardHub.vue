@@ -35,8 +35,15 @@
           <i class="fas fa-history me-3"></i> EDIT_PREVIOUS_SHIFTS
         </button>
         
-        <button class="btn btn-outline-secondary btn-tactical-lg mono fw-bold py-3 text-center disabled" style="opacity: 0.4;">
-          <i class="fas fa-file-invoice me-3"></i> GENERATE_REPORT [LOCKED]
+        <a 
+          v-if="activeMission"
+          :href="'/missionlog/reports/' + activeMission.id + '/'" 
+          class="btn btn-outline-primary btn-tactical-lg mono fw-bold py-3 text-center"
+        >
+          <i class="fas fa-file-invoice me-3"></i> GENERATE_REPORT
+        </a>
+        <button v-else class="btn btn-outline-secondary btn-tactical-lg mono fw-bold py-3 text-center disabled" style="opacity: 0.4;">
+          <i class="fas fa-file-invoice me-3"></i> GENERATE_REPORT [NO_ACTIVE_MISSION]
         </button>
       </div>
     </div>
