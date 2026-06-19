@@ -5,6 +5,7 @@
 
 const TankGaugeIntel = {
     calcUrl: '',
+    statusUrl: '',
     storeId: '',
     isPreset: false,
     calculatedTanks: {}, // Store results for mission summary
@@ -15,6 +16,7 @@ const TankGaugeIntel = {
      */
     init(config) {
         this.calcUrl = config.calcUrl || '';
+        this.statusUrl = config.statusUrl || '';
         this.storeId = config.storeId || '';
         this.isPreset = config.isPreset || false;
         this.calculatedTanks = {};
@@ -42,6 +44,11 @@ const TankGaugeIntel = {
         const calcButtons = document.querySelectorAll(".btn-ajax-calculate");
         calcButtons.forEach(btn => {
             btn.addEventListener("click", () => this.executeCalculation(btn));
+
+            const card = btn.closest(".tactical-card");
+            if (card) {
+                this.refreshEstimationHealth(card);
+            }
         });
 
         const toggleSwitches = document.querySelectorAll(".source-toggle");
@@ -145,6 +152,7 @@ const TankGaugeIntel = {
                 }
 
                 this.updateResultsUI(card, data, fuelType);
+                await this.refreshEstimationHealth(card);
             } else {
                 const errText = await response.text();
                 console.error("API Error Response:", response.status, errText);
@@ -304,6 +312,89 @@ const TankGaugeIntel = {
             }
         }
         return raw;
+    },
+
+    async refreshEstimationHealth(card) {
+        if (!this.statusUrl || !card) {
+            return;
+        }
+
+        const panel = card.querySelector(".estimation-health-panel");
+        if (!panel) {
+            return;
+        }
+
+        const params = new URLSearchParams();
+        const tankId = card.dataset.tankId;
+        const tankIndex = card.dataset.tankIndex;
+        const fuelType = card.dataset.fuelType;
+
+        if (tankId) {
+            params.append("tank_id", tankId);
+        } else {
+            params.append("store_id", this.storeId);
+            params.append("fuel_type", fuelType);
+            if (tankIndex) {
+                params.append("tank_index", tankIndex);
+            }
+        }
+
+        try {
+            const response = await fetch(`${this.statusUrl}?${params.toString()}`);
+            if (!response.ok) {
+                return;
+            }
+
+            const raw = await response.json();
+            const data = this.normalizeApiPayload(raw);
+            this.renderEstimationHealth(panel, data);
+        } catch (error) {
+            console.warn("ESTIMATION_HEALTH_REFRESH_FAILED", error);
+        }
+    },
+
+    renderEstimationHealth(panel, data) {
+        const readingCountEl = panel.querySelector(".health-reading-count");
+        const sampleCountEl = panel.querySelector(".health-sample-count");
+        const confidenceEl = panel.querySelector(".health-confidence");
+        const meanErrorEl = panel.querySelector(".health-mean-error");
+        const errorDeltaEl = panel.querySelector(".health-error-delta");
+        const trendEl = panel.querySelector(".health-trend");
+        const updatedEl = panel.querySelector(".health-updated");
+
+        const readingCount = Number(data.reading_count || 0);
+        const sampleCount = Number(data.sample_count || 0);
+        const confidence = Number(data.confidence || 0);
+        const meanError = data.mean_error_gallons;
+        const errorDelta = data.mean_error_delta_gallons;
+        const trend = (data.trend || "insufficient_history").toUpperCase();
+
+        if (readingCountEl) {
+            readingCountEl.innerText = readingCount.toString();
+        }
+        if (sampleCountEl) {
+            sampleCountEl.innerText = sampleCount.toString();
+        }
+        if (confidenceEl) {
+            confidenceEl.innerText = confidence.toFixed(2);
+        }
+        if (meanErrorEl) {
+            meanErrorEl.innerText = meanError === null || meanError === undefined ? "--" : `${Number(meanError).toFixed(2)}G`;
+        }
+        if (errorDeltaEl) {
+            if (errorDelta === null || errorDelta === undefined) {
+                errorDeltaEl.innerText = "--";
+            } else {
+                const sign = Number(errorDelta) > 0 ? "+" : "";
+                errorDeltaEl.innerText = `${sign}${Number(errorDelta).toFixed(2)}G`;
+            }
+        }
+        if (trendEl) {
+            trendEl.innerText = trend;
+        }
+        if (updatedEl) {
+            updatedEl.innerText = `LAST_ESTIMATE: ${data.last_estimated_at || "--"}`;
+        }
     },
 
     /**

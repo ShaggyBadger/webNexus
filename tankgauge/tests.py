@@ -21,6 +21,7 @@ from tankgauge.logic.tank_lookup import (
 from tankgauge.models import (
     Store,
     StoreTankMapping,
+    TankEstimation,
     TankType,
     VirtualTankEstimation,
 )
@@ -269,6 +270,69 @@ class EstimationAndApiTests(APITestCase):
         response = self.client.post(url, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["status"], "UNAVAILABLE")
+
+    def test_estimation_health_api_for_mapped_tank(self):
+        TankEstimation.objects.create(
+            tank_mapping=self.mapping,
+            radius=40.0,
+            length=180.0,
+            confidence=0.77,
+            mean_error=42.5,
+            max_error=88.0,
+            sample_count=3,
+            algorithm_version="v1",
+            is_active=True,
+        )
+
+        url = reverse("tankgauge:estimation_health_api")
+        response = self.client.get(url, {"tank_id": str(self.mapping.id)})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["status"], "success")
+        self.assertEqual(response.data["identity"]["source"], "mapped")
+        self.assertEqual(response.data["sample_count"], 3)
+        self.assertEqual(response.data["reading_count"], 3)
+
+    def test_estimation_health_api_for_virtual_identity(self):
+        VirtualTankEstimation.objects.create(
+            store=self.store,
+            fuel_type="diesel",
+            tank_index=7,
+            radius=40.0,
+            length=180.0,
+            confidence=0.66,
+            mean_error=55.0,
+            max_error=110.0,
+            sample_count=5,
+            algorithm_version="v1",
+            is_active=True,
+        )
+
+        virtual_ticket = VeederTicket.objects.create(store=self.store)
+        VeederReading.objects.create(
+            ticket=virtual_ticket,
+            tank_index=7,
+            fuel_type=self.fuel_type,
+            height=22.0,
+            volume=2100,
+            ullage=7900,
+        )
+
+        url = reverse("tankgauge:estimation_health_api")
+        response = self.client.get(
+            url,
+            {
+                "store_id": str(self.store.store_num),
+                "fuel_type": "diesel",
+                "tank_index": 7,
+            },
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["status"], "success")
+        self.assertEqual(response.data["identity"]["source"], "virtual")
+        self.assertEqual(response.data["sample_count"], 5)
+        self.assertEqual(response.data["reading_count"], 1)
 
     def test_api_validation_returns_string_error(self):
         user = User.objects.create_user(username="testuser3", password="password")

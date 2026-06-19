@@ -123,6 +123,7 @@
 <script>
   TankGaugeIntel.init({
     calcUrl: "{% url 'tankgauge:calculate_tank_api' %}",
+    statusUrl: "{% url 'tankgauge:estimation_health_api' %}",
     storeId: "{{ store.store_num }}",
     isPreset: false,
   });

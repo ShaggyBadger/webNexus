@@ -28,3 +28,24 @@ class CalcResponseSerializer(serializers.Serializer):
     no_fit_warning = serializers.BooleanField()
     message = serializers.CharField(required=False)
     error = serializers.CharField(required=False)
+
+
+class EstimationHealthRequestSerializer(serializers.Serializer):
+    store_id = serializers.CharField(required=False, allow_blank=True)
+    fuel_type = serializers.CharField(required=False, allow_blank=True)
+    tank_id = serializers.CharField(required=False, allow_blank=True)
+    tank_index = serializers.IntegerField(required=False, allow_null=True, min_value=1)
+
+    def validate(self, attrs):
+        tank_id = attrs.get("tank_id")
+        has_mapping_id = bool(tank_id and str(tank_id).isdigit())
+        has_virtual_identity = bool(
+            attrs.get("store_id") and attrs.get("fuel_type") and attrs.get("tank_index")
+        )
+
+        if not has_mapping_id and not has_virtual_identity:
+            raise serializers.ValidationError(
+                "Provide either numeric tank_id or store_id + fuel_type + tank_index."
+            )
+
+        return attrs

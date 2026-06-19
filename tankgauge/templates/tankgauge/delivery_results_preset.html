@@ -81,6 +81,7 @@
 <script>
     TankGaugeIntel.init({
         calcUrl: "{% url 'tankgauge:calculate_tank_api' %}",
+        statusUrl: "{% url 'tankgauge:estimation_health_api' %}",
         storeId: "7-11_STD",
         isPreset: true
     });

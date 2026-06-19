@@ -4,6 +4,7 @@ from .views import (
     delivery_form,
     delivery_submit,
     CalculateTankAPIView,
+    EstimationHealthAPIView,
 )
 
 app_name = "tankgauge"
@@ -16,5 +17,10 @@ urlpatterns = [
     path("delivery/submit/", delivery_submit, name="delivery_submit"),
     path(
         "api/calculate-tank/", CalculateTankAPIView.as_view(), name="calculate_tank_api"
+    ),
+    path(
+        "api/estimation-health/",
+        EstimationHealthAPIView.as_view(),
+        name="estimation_health_api",
     ),
 ]
