@@ -31,3 +31,12 @@ class VeederTicketSerializer(serializers.ModelSerializer):
             "readings",
         ]
         read_only_fields = ["id", "uploaded_at", "uploaded_by"]
+
+    def validate(self, attrs):
+        is_create = self.instance is None
+        has_store = "store" in attrs and attrs["store"] is not None
+
+        if is_create and not has_store:
+            raise serializers.ValidationError({"store": "Store selection is required."})
+
+        return attrs

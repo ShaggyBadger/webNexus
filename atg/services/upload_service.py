@@ -22,6 +22,9 @@ class VeederUploadService:
         """
         from ..serializers.reading_serializers import VeederReadingSerializer
 
+        if not store:
+            raise ValueError("Store selection is required.")
+
         try:
             with transaction.atomic():
                 # 1. Create the Ticket (The Evidence)
@@ -34,7 +37,7 @@ class VeederUploadService:
                 )
 
                 logger.info(
-                    f"ATG_INGEST: Created Ticket {ticket.id} for Store {store.store_num if store else 'UNKNOWN'}"
+                    f"ATG_INGEST: Created Ticket {ticket.id} for Store {store.store_num}"
                 )
 
                 # 2. Process Readings (The Dataset)
@@ -46,6 +49,12 @@ class VeederUploadService:
                             f"ATG_INGEST_VALIDATION_FAILED: {serializer.errors}"
                         )
                         raise ValueError(f"Invalid readings data: {serializer.errors}")
+
+                    # Enforce unique tank_index per ticket
+                    tank_indices = [r.get("tank_index") for r in serializer.validated_data]
+                    if len(tank_indices) != len(set(tank_indices)):
+                        raise ValueError("Duplicate tank indices are not allowed on a single ticket.")
+
 
                     # Bulk create readings associated with the ticket
                     readings_to_create = []
@@ -92,7 +101,7 @@ class VeederUploadService:
 
                         for tank_index, fuel_name in sorted(mapping_targets):
                             try:
-                                AutoMapperService.ensure_mapping(
+                                AutoMapperService.trigger_updates(
                                     store,
                                     fuel_name,
                                     tank_index,

@@ -17,6 +17,19 @@ load_dotenv(BASE_DIR / ".env", override=True)
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY")
 ATG_REMOTE_OCR_KEY = os.environ.get("ATG_REMOTE_OCR_KEY")
+ATG_REMOTE_OCR_ENABLED = os.environ.get("ATG_REMOTE_OCR_ENABLED", "False").lower() in (
+    "true",
+    "1",
+    "t",
+    "y",
+    "yes",
+)
+TANKGAUGE_ENABLE_GENERATED_CHART_FALLBACK = os.environ.get(
+    "TANKGAUGE_ENABLE_GENERATED_CHART_FALLBACK", "False"
+).lower() in ("true", "1", "t", "y", "yes")
+TANKGAUGE_ENABLE_GENERATED_CHART_MATERIALIZATION = os.environ.get(
+    "TANKGAUGE_ENABLE_GENERATED_CHART_MATERIALIZATION", "False"
+).lower() in ("true", "1", "t", "y", "yes")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 # TACTICAL_BOOLEAN_PARSING:

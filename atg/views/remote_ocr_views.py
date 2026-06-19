@@ -1,5 +1,6 @@
 import logging
 import json
+from django.conf import settings
 from django.db import transaction
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -7,9 +8,22 @@ from rest_framework import status
 from ..models import VeederTicket, VeederReading
 from ..serializers import VeederTicketSerializer
 from ..utils.permissions import IsRemoteOCRClient
-from ..services import VeederUploadService
 
 logger = logging.getLogger("webnexus")
+
+
+def _remote_ocr_disabled_response():
+    return Response(
+        {
+            "status": "disabled",
+            "message": "Remote OCR endpoints are disabled. Upload images are still retained for audit.",
+        },
+        status=status.HTTP_503_SERVICE_UNAVAILABLE,
+    )
+
+
+def _is_remote_ocr_enabled():
+    return getattr(settings, "ATG_REMOTE_OCR_ENABLED", False)
 
 
 class RemoteOCRInstructionsView(APIView):
@@ -21,6 +35,9 @@ class RemoteOCRInstructionsView(APIView):
     permission_classes = [IsRemoteOCRClient]
 
     def get(self, request):
+        if not _is_remote_ocr_enabled():
+            return _remote_ocr_disabled_response()
+
         instructions = {
             "mission": "Offload OCR processing from Linode (4GB) to Desktop (GPU/12GB).",
             "protocol": "Fetch-Process-Resolve",
@@ -59,6 +76,9 @@ class RemoteOCRFetchJobView(APIView):
     permission_classes = [IsRemoteOCRClient]
 
     def get(self, request):
+        if not _is_remote_ocr_enabled():
+            return _remote_ocr_disabled_response()
+
         with transaction.atomic():
             ticket = (
                 VeederTicket.objects.filter(ocr_status="PENDING")
@@ -87,6 +107,9 @@ class RemoteOCRResolveJobView(APIView):
     permission_classes = [IsRemoteOCRClient]
 
     def post(self, request):
+        if not _is_remote_ocr_enabled():
+            return _remote_ocr_disabled_response()
+
         ticket_id = request.data.get("ticket_id")
         readings_data = request.data.get("readings", [])
         ocr_text = request.data.get("ocr_text", "")
@@ -95,6 +118,35 @@ class RemoteOCRResolveJobView(APIView):
             return Response(
                 {"error": "ticket_id required"}, status=status.HTTP_400_BAD_REQUEST
             )
+
+        # Enforce tank_index >= 1 and uniqueness within ticket
+        seen_indices = set()
+        for r_data in readings_data:
+            t_idx = r_data.get("tank_index")
+            if t_idx is None:
+                return Response(
+                    {"error": "tank_index is required for all readings."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            try:
+                t_idx_int = int(t_idx)
+                if t_idx_int < 1:
+                    raise ValueError()
+            except (ValueError, TypeError):
+                return Response(
+                    {
+                        "error": f"tank_index '{t_idx}' must be a positive integer (>= 1)."
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if t_idx_int in seen_indices:
+                return Response(
+                    {
+                        "error": f"Duplicate tank_index {t_idx_int} detected in submission."
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            seen_indices.add(t_idx_int)
 
         try:
             with transaction.atomic():

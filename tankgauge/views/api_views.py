@@ -134,7 +134,7 @@ class CalculateTankAPIView(APIView):
                 )
             else:
                 store, _ = get_store_and_preset_status(store_id)
-                mapping = get_tank_mapping(store, fuel_type)
+                mapping = get_tank_mapping(store, fuel_type, tank_index=tank_index)
 
                 if not mapping and store:
                     # VIRTUAL_RESOLVER: No explicit mapping, check if it's a virtual card from the frontend

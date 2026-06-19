@@ -117,20 +117,6 @@ class VeederUploadServiceTestCase(TestCase):
                 "ullage": 5800,
                 "height": 40.0,
             },
-            {
-                "tank_index": 2,
-                "fuel_type": self.fuel_type.id,
-                "volume": 5000,
-                "ullage": 5000,
-                "height": 52.0,
-            },
-            {
-                "tank_index": 2,
-                "fuel_type": self.fuel_type.id,
-                "volume": 6200,
-                "ullage": 3800,
-                "height": 68.0,
-            },
         ]
 
         fake_estimation = SimpleNamespace(id=999, radius=60.0)
@@ -163,6 +149,36 @@ class VeederUploadServiceTestCase(TestCase):
         self.assertTrue(
             TankType.objects.filter(name=mapping.tank_type.name).exists(),
         )
+
+    def test_process_ticket_submission_rejects_duplicate_tank_indices(self):
+        readings_data = [
+            {
+                "tank_index": 3,
+                "fuel_type": self.fuel_type.id,
+                "volume": 4000,
+                "ullage": 6000,
+                "height": 38.0,
+            },
+            {
+                "tank_index": 3,
+                "fuel_type": self.fuel_type.id,
+                "volume": 4500,
+                "ullage": 5500,
+                "height": 42.0,
+            },
+        ]
+
+        with self.assertRaisesMessage(
+            ValueError,
+            "Duplicate tank indices are not allowed on a single ticket.",
+        ):
+            VeederUploadService.process_ticket_submission(
+                user=self.user,
+                store=self.store,
+                image=self.image,
+                notes="Duplicate tank index rejection",
+                readings_data=readings_data,
+            )
 
 
 class VeederAPITestCase(APITestCase):
@@ -208,7 +224,7 @@ class VeederAPITestCase(APITestCase):
         self.assertEqual(ticket.readings.count(), 1)
         self.assertEqual(ticket.readings.first().volume, 6000)
 
-    def test_ticket_viewset_create_without_store_and_image(self):
+    def test_ticket_viewset_create_without_store_and_image_rejected(self):
         readings_data = [
             {
                 "tank_index": 1,
@@ -226,13 +242,11 @@ class VeederAPITestCase(APITestCase):
         }
 
         response = self.client.post(url, data, format="multipart")
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-
-        ticket_id = response.data.get("id")
-        self.assertIsNotNone(ticket_id)
-        ticket = VeederTicket.objects.get(id=ticket_id)
-        self.assertIsNone(ticket.store)
-        self.assertFalse(bool(ticket.image))
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("error", response.data)
+        self.assertIn("details", response.data["error"])
+        self.assertIn("store", response.data["error"]["details"])
+        self.assertEqual(VeederTicket.objects.count(), 0)
 
     def test_ticket_list_and_retrieve(self):
         ticket = VeederTicket.objects.create(
@@ -248,6 +262,16 @@ class VeederAPITestCase(APITestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["id"], ticket.id)
+
+    def test_store_typeahead_search(self):
+        Store.objects.create(store_num=202, store_name="Store 202")
+
+        url = reverse("atg:store-list")
+        response = self.client.get(url, {"search": "101"})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]["store_num"], 101)
 
     def test_reading_viewset_list_and_patch(self):
         ticket = VeederTicket.objects.create(
@@ -295,7 +319,7 @@ class VeederAPITestCase(APITestCase):
         self.assertEqual(response.data["data"][0]["volume_gal"], 5000)
 
 
-@override_settings(ATG_REMOTE_OCR_KEY="test-secret-key")
+@override_settings(ATG_REMOTE_OCR_KEY="test-secret-key", ATG_REMOTE_OCR_ENABLED=True)
 class RemoteOCRAPITestCase(APITestCase):
     def setUp(self):
         self.user = User.objects.create_user(
@@ -388,3 +412,14 @@ class RemoteOCRAPITestCase(APITestCase):
         self.assertEqual(readings.first().volume, 5000)
         self.assertEqual(readings.first().tank_index, 1)
         self.assertTrue(readings.first().is_user_corrected)
+
+
+@override_settings(ATG_REMOTE_OCR_KEY="test-secret-key", ATG_REMOTE_OCR_ENABLED=False)
+class RemoteOCRDisabledAPITestCase(APITestCase):
+    def test_instructions_endpoint_reports_disabled(self):
+        self.client.credentials(HTTP_X_ATG_REMOTE_KEY="test-secret-key")
+        url = reverse("atg:remote_ocr_instructions")
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
+        self.assertEqual(response.data["status"], "disabled")

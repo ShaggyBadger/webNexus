@@ -132,3 +132,45 @@ class AutoMapperService:
                 return True
 
         return False
+
+    @staticmethod
+    def trigger_updates(store: Optional[Store], fuel_name: str, tank_index: int) -> None:
+        """
+        Tolerant updater: ensures mapping exists, then re-runs either
+        mapped or virtual estimation to incorporate the new reading.
+        """
+        if not store:
+            return
+
+        fuel_key = canonicalize_fuel(fuel_name)
+
+        # 1. Try to ensure mapping exists if possible
+        AutoMapperService.ensure_mapping(store, fuel_name, tank_index)
+
+        # 2. Re-run estimation
+        mapping = StoreTankMapping.objects.filter(
+            store=store, fuel_type=fuel_key, tank_index=tank_index
+        ).first()
+
+        service = EstimationService()
+        if mapping:
+            service.run_estimation_for_tank(mapping)
+        else:
+            readings = VeederReading.objects.filter(
+                ticket__store=store,
+                tank_index=tank_index,
+                fuel_type__name__iexact=fuel_key,
+            ).select_related("ticket")
+            if readings.exists():
+                latest = readings.order_by("-ticket__uploaded_at").first()
+                total_capacity = float(latest.volume + latest.ullage)
+                observations = [(float(r.height), float(r.volume)) for r in readings]
+                service.run_virtual_estimation(
+                    store,
+                    fuel_key,
+                    tank_index,
+                    total_capacity,
+                    observations,
+                    latest.ticket.uploaded_at,
+                )
+

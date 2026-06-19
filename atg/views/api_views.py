@@ -1,10 +1,45 @@
 import json
+from django.db.models import Q
 from rest_framework.views import APIView
 from rest_framework import viewsets, permissions, status, serializers
 from rest_framework.response import Response
+from tankgauge.models import Store
 from ..models import VeederTicket, VeederReading
-from ..serializers import VeederTicketSerializer, VeederReadingSerializer
+from ..serializers import (
+    VeederTicketSerializer,
+    VeederReadingSerializer,
+    StoreSerializer,
+)
 from ..services import VeederUploadService
+
+
+class StoreViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    TACTICAL API:
+    Retrieve stores or search stores by store number or RISO number.
+    GET /atg/api/v1/stores/?search=
+    """
+
+    queryset = Store.objects.all().select_related("location")
+    serializer_class = StoreSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        search_query = self.request.query_params.get("search", "").strip()
+
+        if search_query:
+            if search_query.isdigit():
+                search_value = int(search_query)
+                queryset = queryset.filter(
+                    Q(store_num=search_value)
+                    | Q(riso_num=search_value)
+                    | Q(id=search_value)
+                )
+            else:
+                queryset = queryset.filter(store_name__icontains=search_query)
+
+        return queryset.order_by("store_num", "id")[:10]
 
 
 class VeederTicketViewSet(viewsets.ModelViewSet):
@@ -81,10 +116,11 @@ class VeederStatsView(APIView):
 
         data = []
         for r in readings:
+            store_num = r.ticket.store.store_num if r.ticket.store else None
             data.append(
                 {
                     "ticket_id": r.ticket.id,
-                    "store_num": r.ticket.store.store_num,
+                    "store_num": store_num,
                     "tank_index": r.tank_index,
                     "fuel_type": r.fuel_type.name,
                     "volume_gal": r.volume,

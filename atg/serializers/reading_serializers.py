@@ -10,6 +10,7 @@ class VeederReadingSerializer(serializers.ModelSerializer):
     """
 
     fuel_type_name = serializers.ReadOnlyField(source="fuel_type.name")
+    tank_index = serializers.IntegerField(required=True, min_value=1)
 
     class Meta:
         model = VeederReading
@@ -28,9 +29,9 @@ class VeederReadingSerializer(serializers.ModelSerializer):
             "is_user_corrected",
         ]
         extra_kwargs = {
-            "tank_index": {"required": False},  # Optional if not parsed
             "volume": {"required": True},
             "ullage": {"required": True},
             "height": {"required": True},
             "fuel_type": {"required": True},
         }
+

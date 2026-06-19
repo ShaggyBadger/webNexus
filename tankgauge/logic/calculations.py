@@ -1,5 +1,6 @@
 import math
 import logging
+from django.conf import settings
 from tankgauge.models import Store, StoreTankMapping, TankChart, TankEstimation
 from .geometry import GeometryEngine
 from .estimation_service import EstimationService, MIN_HEIGHT_SPREAD, MIN_READINGS
@@ -11,6 +12,10 @@ logger = logging.getLogger("tankgauge")
 MODE_OFFICIAL = "OFFICIAL"
 MODE_MATHEMATICAL = "MATHEMATICAL"
 MODE_UNAVAILABLE = "UNAVAILABLE"
+
+
+def _generated_chart_fallback_enabled():
+    return getattr(settings, "TANKGAUGE_ENABLE_GENERATED_CHART_FALLBACK", False)
 
 
 def perform_tank_calc(
@@ -114,25 +119,14 @@ def perform_tank_calc(
 def determine_operating_mode(tank_mapping, force_source=None):
     """
     Identifies the best available data source for an EXPLICIT tank mapping.
+    Priority:
+    1. Active TankEstimation
+    2. Try to trigger an on-the-fly estimation if enough data exists
+    3. Official Tank Chart
+    4. Generated Tank Chart (transitional fallback)
+    5. Unavailable
     """
-    # 1. Check for Generated Tank Chart (Highest Priority: ALWAYS default here if exists)
-    if TankChart.objects.filter(
-        store=tank_mapping.store, tank_index=tank_mapping.tank_index, is_official=False
-    ).exists():
-        return MODE_OFFICIAL, {
-            "name": "GENERATED_CHART",
-            "confidence": 1.0,
-            "store": tank_mapping.store,
-            "tank_index": tank_mapping.tank_index,
-        }
-
-    # 2. Check for Official Tank Chart
-    if TankChart.objects.filter(
-        tank_type=tank_mapping.tank_type, is_official=True
-    ).exists():
-        return MODE_OFFICIAL, {"name": "OFFICIAL_CHART", "confidence": 1.0}
-
-    # 3. Check for Active Experimental Estimation
+    # 1. Check for Active Experimental Estimation
     estimation = TankEstimation.objects.filter(
         tank_mapping=tank_mapping, is_active=True
     ).first()
@@ -144,7 +138,7 @@ def determine_operating_mode(tank_mapping, force_source=None):
             "capacity": tank_mapping.tank_type.capacity or 0,
         }
 
-    # 4. Try to trigger an on-the-fly estimation if enough data exists
+    # 2. Try to trigger an on-the-fly estimation if enough data exists
     service = EstimationService()
     estimation = service.run_estimation_for_tank(tank_mapping)
     if estimation:
@@ -155,15 +149,41 @@ def determine_operating_mode(tank_mapping, force_source=None):
             "capacity": tank_mapping.tank_type.capacity or 0,
         }
 
+    # 3. Check for Official Tank Chart
+    if TankChart.objects.filter(
+        tank_type=tank_mapping.tank_type, is_official=True
+    ).exists():
+        return MODE_OFFICIAL, {"name": "OFFICIAL_CHART", "confidence": 1.0}
+
+    # 4. Check for Generated Tank Chart (Transitional Fallback)
+    if (
+        _generated_chart_fallback_enabled()
+        and TankChart.objects.filter(
+            store=tank_mapping.store,
+            tank_index=tank_mapping.tank_index,
+            is_official=False,
+        ).exists()
+    ):
+        return MODE_OFFICIAL, {
+            "name": "GENERATED_CHART",
+            "confidence": 1.0,
+            "store": tank_mapping.store,
+            "tank_index": tank_mapping.tank_index,
+        }
+
     return MODE_UNAVAILABLE, None
 
 
-def determine_virtual_operating_mode(store_id, fuel_type, tank_index, force_source=None):
+def determine_virtual_operating_mode(
+    store_id, fuel_type, tank_index, force_source=None
+):
     """
     TACTICAL_INTEL: Reconstructs an estimation on-the-fly for unmapped tanks.
     Used when Veeder readings exist but no StoreTankMapping is defined.
     """
     from atg.models import VeederReading
+    from tankgauge.models import VirtualTankEstimation
+    from .utils import canonicalize_fuel
 
     # 1. Find Readings
     readings = VeederReading.objects.filter(
@@ -177,20 +197,23 @@ def determine_virtual_operating_mode(store_id, fuel_type, tank_index, force_sour
             "message": "No Veeder readings found for this tank/fuel combination.",
         }
 
-    # 2. Check for existing generated chart (Priority)
     latest = readings.order_by("-ticket__uploaded_at").first()
     store = latest.ticket.store
-    
-    if TankChart.objects.filter(
-        store=store, tank_index=tank_index, is_official=False
-    ).exists():
-        return MODE_OFFICIAL, {
-            "name": "GENERATED_CHART",
-            "confidence": 1.0,
-            "store": store,
-            "tank_index": tank_index,
+    fuel_key = canonicalize_fuel(fuel_type)
+
+    # 2. Check for existing active VirtualTankEstimation (Priority)
+    estimation = VirtualTankEstimation.objects.filter(
+        store=store, fuel_type=fuel_key, tank_index=tank_index, is_active=True
+    ).first()
+
+    if estimation:
+        return MODE_MATHEMATICAL, {
+            "name": "MATHEMATICAL_ESTIMATE",
+            "confidence": estimation.confidence,
+            "estimation": estimation,
+            "capacity": float(latest.volume + latest.ullage),
         }
-        
+
     # 3. Resolve/recompute persisted estimate from current evidence
     observations = [(float(r.height), float(r.volume)) for r in readings]
     count = len(observations)
@@ -227,6 +250,20 @@ def determine_virtual_operating_mode(store_id, fuel_type, tank_index, force_sour
             "capacity": total_capacity,
         }
 
+    # 4. Fallback to existing generated chart
+    if (
+        _generated_chart_fallback_enabled()
+        and TankChart.objects.filter(
+            store=store, tank_index=tank_index, is_official=False
+        ).exists()
+    ):
+        return MODE_OFFICIAL, {
+            "name": "GENERATED_CHART",
+            "confidence": 1.0,
+            "store": store,
+            "tank_index": tank_index,
+        }
+
     return MODE_UNAVAILABLE, {
         "message": "Mathematical estimation failed for available Veeder data.",
     }
@@ -241,15 +278,22 @@ def get_volume_from_depth(tank_mapping, depth, mode, source_meta):
 
     if mode == MODE_OFFICIAL:
         # Resolve store/index context from source_meta or mapping
-        store = source_meta.get("store") or (tank_mapping.store if tank_mapping else None)
+        store = source_meta.get("store") or (
+            tank_mapping.store if tank_mapping else None
+        )
         tank_index = source_meta.get("tank_index") or (
             tank_mapping.tank_index if tank_mapping else None
         )
         tank_type = tank_mapping.tank_type if tank_mapping else None
+        prefer_generated = source_meta.get("name") == "GENERATED_CHART"
 
         return (
             _get_volume_from_chart(
-                tank_type, depth, store=store, tank_index=tank_index
+                tank_type,
+                depth,
+                store=store,
+                tank_index=tank_index,
+                prefer_generated=prefer_generated,
             ),
             mode,
         )
@@ -272,14 +316,21 @@ def get_depth_from_volume(tank_mapping, target_gallons, mode, source_meta):
 
     if mode == MODE_OFFICIAL:
         # Resolve store/index context from source_meta or mapping
-        store = source_meta.get("store") or (tank_mapping.store if tank_mapping else None)
+        store = source_meta.get("store") or (
+            tank_mapping.store if tank_mapping else None
+        )
         tank_index = source_meta.get("tank_index") or (
             tank_mapping.tank_index if tank_mapping else None
         )
         tank_type = tank_mapping.tank_type if tank_mapping else None
+        prefer_generated = source_meta.get("name") == "GENERATED_CHART"
 
         return _get_depth_from_chart(
-            tank_type, target_gallons, store=store, tank_index=tank_index
+            tank_type,
+            target_gallons,
+            store=store,
+            tank_index=tank_index,
+            prefer_generated=prefer_generated,
         )
 
     if mode == MODE_MATHEMATICAL:
@@ -293,12 +344,19 @@ def get_depth_from_volume(tank_mapping, target_gallons, mode, source_meta):
     return 0.0
 
 
-def _get_volume_from_chart(tank_type, depth, store=None, tank_index=None):
+def _get_volume_from_chart(
+    tank_type, depth, store=None, tank_index=None, prefer_generated=False
+):
     """Internal: Original chart-based volume lookup."""
 
     # Resolve Chart Base Query: Prioritize generated chart if store/index provided
     chart_qs = TankChart.objects.none()
-    if store and tank_index:
+    if (
+        prefer_generated
+        and _generated_chart_fallback_enabled()
+        and store
+        and tank_index
+    ):
         chart_qs = TankChart.objects.filter(
             store=store, tank_index=tank_index, is_official=False
         )
@@ -337,12 +395,19 @@ def _get_volume_from_chart(tank_type, depth, store=None, tank_index=None):
     return 0.0
 
 
-def _get_depth_from_chart(tank_type, target_gallons, store=None, tank_index=None):
+def _get_depth_from_chart(
+    tank_type, target_gallons, store=None, tank_index=None, prefer_generated=False
+):
     """Internal: Original chart-based depth lookup."""
 
     # Resolve Chart Base Query: Prioritize generated chart if store/index provided
     chart_qs = TankChart.objects.none()
-    if store and tank_index:
+    if (
+        prefer_generated
+        and _generated_chart_fallback_enabled()
+        and store
+        and tank_index
+    ):
         chart_qs = TankChart.objects.filter(
             store=store, tank_index=tank_index, is_official=False
         )

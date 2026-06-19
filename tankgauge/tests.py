@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.core.management import call_command
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
@@ -12,7 +12,12 @@ from rest_framework.test import APITestCase
 from atg.models import VeederReading, VeederTicket
 from missionlog.models import FuelType
 from tankgauge.logic.estimation_service import EstimationService
-from tankgauge.logic.tank_lookup import get_store_and_preset_status, get_tank_mapping
+from tankgauge.logic.tank_lookup import (
+    get_mapping_resolution_metrics,
+    get_store_and_preset_status,
+    get_tank_mapping,
+    reset_mapping_resolution_metrics,
+)
 from tankgauge.models import (
     Store,
     StoreTankMapping,
@@ -23,6 +28,7 @@ from tankgauge.models import (
 
 class TankLookupTests(TestCase):
     def setUp(self):
+        reset_mapping_resolution_metrics()
         self.store_std = Store.objects.create(
             store_num=6949,
             store_name="7-11 Standard Test",
@@ -50,6 +56,7 @@ class TankLookupTests(TestCase):
             store=self.store_other,
             tank_type=self.tank_type_dsl,
             fuel_type="diesel",
+            tank_index=1,
         )
 
     def test_get_store_and_preset_status_std(self):
@@ -83,6 +90,36 @@ class TankLookupTests(TestCase):
         store = Store.objects.get(store_num=1234)
         mapping = get_tank_mapping(store, "regular")
         self.assertIsNone(mapping)
+
+    def test_get_tank_mapping_metrics_strict_and_fallback(self):
+        store = Store.objects.get(store_num=1234)
+
+        strict_mapping = get_tank_mapping(store, "diesel", tank_index=1)
+        self.assertIsNotNone(strict_mapping)
+
+        fallback_mapping = get_tank_mapping(store, "diesel")
+        self.assertIsNotNone(fallback_mapping)
+
+        metrics = get_mapping_resolution_metrics()
+        self.assertEqual(metrics["strict_match"], 1)
+        self.assertEqual(metrics["fallback_no_index_provided"], 1)
+
+
+@override_settings(TANKGAUGE_ENABLE_GENERATED_CHART_FALLBACK=False)
+class GeneratedChartFallbackDisabledTests(TestCase):
+    def test_generated_chart_source_ignored_when_flag_disabled(self):
+        from tankgauge.logic.calculations import _get_volume_from_chart
+
+        store = Store.objects.create(store_num=9999, store_name="NoChartStore")
+        tank_type = TankType.objects.create(name="NoChartType")
+        value = _get_volume_from_chart(
+            tank_type=tank_type,
+            depth=10.0,
+            store=store,
+            tank_index=1,
+            prefer_generated=True,
+        )
+        self.assertEqual(value, 0.0)
 
 
 class ConfidenceGateTests(TestCase):

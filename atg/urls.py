@@ -1,6 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views.api_views import VeederTicketViewSet, VeederReadingViewSet, VeederStatsView
+from .views.api_views import VeederTicketViewSet, VeederReadingViewSet, VeederStatsView, StoreViewSet
 from .views.ticket_views import VeederUploadView
 from .views.dashboard_views import VeederListView, VeederDetailView
 from .views.remote_ocr_views import (
@@ -14,6 +14,8 @@ app_name = "atg"
 router = DefaultRouter()
 router.register(r"tickets", VeederTicketViewSet, basename="ticket")
 router.register(r"readings", VeederReadingViewSet, basename="reading")
+router.register(r"stores", StoreViewSet, basename="store")
+
 
 urlpatterns = [
     path("api/v1/", include(router.urls)),
