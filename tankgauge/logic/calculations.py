@@ -18,6 +18,22 @@ def _generated_chart_fallback_enabled():
     return getattr(settings, "TANKGAUGE_ENABLE_GENERATED_CHART_FALLBACK", False)
 
 
+def _get_mode_priority():
+    """
+    Returns the active mode priority string: "OFFICIAL_FIRST" or "MATHEMATICAL_FIRST".
+
+    Reads from the DB-backed TankGaugeConfig singleton so admins can flip the
+    default at runtime. Falls back to settings.TANKGAUGE_DEFAULT_MODE_PRIORITY
+    if the DB row doesn't exist yet (e.g. fresh install before first migration).
+    """
+    from tankgauge.models import TankGaugeConfig
+
+    try:
+        return TankGaugeConfig.get_solo().mode_priority
+    except Exception:
+        return getattr(settings, "TANKGAUGE_DEFAULT_MODE_PRIORITY", "OFFICIAL_FIRST")
+
+
 def perform_tank_calc(
     tank_mapping, current_inches, delivery_gallons, virtual_meta=None
 ):
@@ -119,57 +135,74 @@ def perform_tank_calc(
 def determine_operating_mode(tank_mapping, force_source=None):
     """
     Identifies the best available data source for an EXPLICIT tank mapping.
-    Priority:
-    1. Active TankEstimation
-    2. Try to trigger an on-the-fly estimation if enough data exists
-    3. Official Tank Chart
-    4. Generated Tank Chart (transitional fallback)
-    5. Unavailable
+
+    Priority order is controlled by the TankGaugeConfig singleton (editable in
+    Django admin). When both sources exist, the configured priority wins.
+    When only one source is available, that source is always used regardless.
+
+    OFFICIAL_FIRST order:  Chart → Mathematical → Unavailable
+    MATHEMATICAL_FIRST order: Mathematical → Chart → Unavailable
     """
-    # 1. Check for Active Experimental Estimation
-    estimation = TankEstimation.objects.filter(
-        tank_mapping=tank_mapping, is_active=True
-    ).first()
-    if estimation:
-        return MODE_MATHEMATICAL, {
-            "name": "MATHEMATICAL_ESTIMATE",
-            "confidence": estimation.confidence,
-            "estimation": estimation,
-            "capacity": tank_mapping.tank_type.capacity or 0,
-        }
+    priority = _get_mode_priority()
+    logger.debug(f"OPERATING_MODE: Priority={priority} for TankMapping {tank_mapping.id}")
 
-    # 2. Try to trigger an on-the-fly estimation if enough data exists
-    service = EstimationService()
-    estimation = service.run_estimation_for_tank(tank_mapping)
-    if estimation:
-        return MODE_MATHEMATICAL, {
-            "name": "MATHEMATICAL_ESTIMATE",
-            "confidence": estimation.confidence,
-            "estimation": estimation,
-            "capacity": tank_mapping.tank_type.capacity or 0,
-        }
+    # --- Resolve available sources without committing to either yet ---
 
-    # 3. Check for Official Tank Chart
-    if TankChart.objects.filter(
-        tank_type=tank_mapping.tank_type, is_official=True
-    ).exists():
-        return MODE_OFFICIAL, {"name": "OFFICIAL_CHART", "confidence": 1.0}
+    def _get_mathematical():
+        """Returns (mode, meta) if any mathematical source is available, else None."""
+        est = TankEstimation.objects.filter(
+            tank_mapping=tank_mapping, is_active=True
+        ).first()
+        if est:
+            return MODE_MATHEMATICAL, {
+                "name": "MATHEMATICAL_ESTIMATE",
+                "confidence": est.confidence,
+                "estimation": est,
+                "capacity": tank_mapping.tank_type.capacity or 0,
+            }
+        # Attempt on-the-fly estimation from Veeder data
+        service = EstimationService()
+        est = service.run_estimation_for_tank(tank_mapping)
+        if est:
+            return MODE_MATHEMATICAL, {
+                "name": "MATHEMATICAL_ESTIMATE",
+                "confidence": est.confidence,
+                "estimation": est,
+                "capacity": tank_mapping.tank_type.capacity or 0,
+            }
+        return None
 
-    # 4. Check for Generated Tank Chart (Transitional Fallback)
-    if (
-        _generated_chart_fallback_enabled()
-        and TankChart.objects.filter(
-            store=tank_mapping.store,
-            tank_index=tank_mapping.tank_index,
-            is_official=False,
-        ).exists()
-    ):
-        return MODE_OFFICIAL, {
-            "name": "GENERATED_CHART",
-            "confidence": 1.0,
-            "store": tank_mapping.store,
-            "tank_index": tank_mapping.tank_index,
-        }
+    def _get_official():
+        """Returns (mode, meta) if any official/generated chart is available, else None."""
+        if TankChart.objects.filter(
+            tank_type=tank_mapping.tank_type, is_official=True
+        ).exists():
+            return MODE_OFFICIAL, {"name": "OFFICIAL_CHART", "confidence": 1.0}
+        if (
+            _generated_chart_fallback_enabled()
+            and TankChart.objects.filter(
+                store=tank_mapping.store,
+                tank_index=tank_mapping.tank_index,
+                is_official=False,
+            ).exists()
+        ):
+            return MODE_OFFICIAL, {
+                "name": "GENERATED_CHART",
+                "confidence": 1.0,
+                "store": tank_mapping.store,
+                "tank_index": tank_mapping.tank_index,
+            }
+        return None
+
+    # --- Apply priority order ---
+    if priority == "MATHEMATICAL_FIRST":
+        result = _get_mathematical() or _get_official()
+    else:  # OFFICIAL_FIRST (default)
+        result = _get_official() or _get_mathematical()
+
+    if result:
+        logger.debug(f"OPERATING_MODE: Resolved to {result[0]} (source: {result[1].get('name')})")
+        return result
 
     return MODE_UNAVAILABLE, None
 

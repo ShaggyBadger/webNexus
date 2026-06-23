@@ -63,47 +63,19 @@
      data-store-id="{{ tank.store_id }}">
   
   <!-- Operating Mode Indicator -->
-  <div class="d-flex justify-content-between align-items-center mb-3 mono small">
-    <div class="d-flex align-items-center">
-        {% if tank.mode == 'OFFICIAL' %}
-            <span class="text-success" id="source-indicator"><i class="fas fa-check-circle me-1"></i> MODE: {{ tank.mode }} ({{ tank.data_source }})</span>
-        {% elif tank.mode == 'MATHEMATICAL' %}
-            <span class="text-warning" id="source-indicator"><i class="fas fa-square-root-variable me-1"></i> MODE: {{ tank.mode }}</span>
-        {% endif %}
-    </div>
-    
-    <!-- Source Toggle Placeholder removed -->
-    
-    <div class="text-muted-custom">
-        CONFIDENCE: <span class="{% if tank.confidence > 0.8 %}text-success{% elif tank.confidence > 0.5 %}text-warning{% else %}text-danger{% endif %}">{{ tank.confidence|floatformat:2 }}</span>
-    </div>
+  <div class="d-flex align-items-center mb-3 mono small">
+    {% if tank.mode == 'OFFICIAL' %}
+        <span class="text-success" id="source-indicator"><i class="fas fa-check-circle me-1"></i> MODE: OFFICIAL TANK CHART</span>
+    {% elif tank.mode == 'MATHEMATICAL' %}
+        <span class="text-warning" id="source-indicator"><i class="fas fa-calculator me-1"></i> MODE: MATHEMATICAL (Veeder-Root Reconstruction)</span>
+    {% endif %}
   </div>
 
   {% if tank.mode == 'MATHEMATICAL' %}
-  <div class="alert alert-warning mono small py-2 mb-4" style="background: rgba(255, 184, 108, 0.1); border-color: rgba(255, 184, 108, 0.3); color: #ffb86c; font-size: 0.65rem;">
-    <i class="fas fa-calculator me-2"></i> [ CALCULATION_ENGINE: GEOMETRY_ESTIMATOR_V1 ]<br>
-    WARNING: This tank is operating in MATHEMATICAL MODE. Results are reconstructed from Veeder-Root history and may contain errors.
+  <div class="mono mb-3" style="font-size: 0.65rem; color: rgba(255,184,108,0.75); letter-spacing: 0.5px;">
+    <i class="fas fa-triangle-exclamation me-1"></i> Results estimated from Veeder-Root history. May contain errors.
   </div>
   {% endif %}
-
-  <div class="estimation-health-panel mono small mb-3" style="background: rgba(141, 163, 93, 0.08); border: 1px solid rgba(141, 163, 93, 0.25); padding: 0.6rem 0.8rem;">
-    <div class="d-flex justify-content-between align-items-center mb-1">
-      <span style="letter-spacing: 1px; color: var(--muted-text-color);">ESTIMATION_HEALTH</span>
-      <span class="health-trend text-muted-custom">INSUFFICIENT_HISTORY</span>
-    </div>
-    <div class="d-flex justify-content-between">
-      <span>READINGS: <span class="health-reading-count">--</span></span>
-      <span>SAMPLES: <span class="health-sample-count">--</span></span>
-      <span>CONF: <span class="health-confidence">--</span></span>
-    </div>
-    <div class="d-flex justify-content-between mt-1">
-      <span>MEAN_ERR: <span class="health-mean-error">--</span></span>
-      <span>DELTA: <span class="health-error-delta">--</span></span>
-    </div>
-    <div class="health-updated text-muted-custom mt-1" style="font-size: 0.6rem; letter-spacing: 0.8px;">
-      LAST_ESTIMATE: --
-    </div>
-  </div>
 
   <div class="specs-list">
     <div class="spec-line">

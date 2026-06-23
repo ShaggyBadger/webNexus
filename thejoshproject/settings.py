@@ -31,6 +31,13 @@ TANKGAUGE_ENABLE_GENERATED_CHART_MATERIALIZATION = os.environ.get(
     "TANKGAUGE_ENABLE_GENERATED_CHART_MATERIALIZATION", "False"
 ).lower() in ("true", "1", "t", "y", "yes")
 
+# TANKGAUGE_DEFAULT_MODE_PRIORITY:
+# Hard fallback used by the calculation engine if the DB-based TankGaugeConfig
+# singleton does not yet exist. Change this in the Django admin (TankGauge → Config)
+# to flip priority at runtime without a restart.
+# Valid values: "OFFICIAL_FIRST" | "MATHEMATICAL_FIRST"
+TANKGAUGE_DEFAULT_MODE_PRIORITY = "OFFICIAL_FIRST"
+
 # SECURITY WARNING: don't run with debug turned on in production!
 # TACTICAL_BOOLEAN_PARSING:
 # Convert the environment string to a robust boolean.

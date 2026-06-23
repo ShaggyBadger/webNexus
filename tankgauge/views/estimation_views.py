@@ -271,6 +271,28 @@ def delivery_submit(request):
                 logger.info(
                     f"DEBUG_TEMPLATE_CONTEXT: Rendering with {len(tanks_found)} tanks found. Tank fuels: {[t['fuel_type'] for t in tanks_found]}"
                 )
+
+                # HARD_STOP: If every tank is non-operational, surface a clear error page
+                # instead of rendering a wall of unusable red cards.
+                all_blocked = all(
+                    t.get("is_missing") or t.get("mode") == MODE_UNAVAILABLE
+                    for t in tanks_found
+                )
+                if all_blocked:
+                    logger.warning(
+                        f"NO_DATA_HARD_STOP: All tanks for store #{store.store_num} "
+                        f"are unavailable (no tank chart or Veeder-Root data)."
+                    )
+                    return render(
+                        request,
+                        "tankgauge/no_data_error.html",
+                        {
+                            "store": store,
+                            "selected_fuels": selected_fuels,
+                            "tanks_found": tanks_found,
+                        },
+                    )
+
                 context = {"store": store, "tanks": tanks_found, "is_preset": False}
                 return render(request, "tankgauge/delivery_results_db.html", context)
         else:

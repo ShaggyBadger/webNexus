@@ -1,0 +1,201 @@
+{% extends 'base.html' %} {% load static %} {% block title %}TankGauge // NO DATA — Store #{{ store.store_num }}{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'tankgauge/css/tankgauge.css' %}" />
+<style>
+  .no-data-wrap {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 2rem 1rem;
+  }
+  .no-data-icon {
+    font-size: 3.5rem;
+    color: #ff6b6b;
+    margin-bottom: 1.25rem;
+  }
+  .no-data-title {
+    font-size: 1.4rem;
+    font-weight: 900;
+    letter-spacing: 3px;
+    color: #ff6b6b;
+    margin-bottom: 0.25rem;
+  }
+  .no-data-store {
+    font-size: 0.8rem;
+    letter-spacing: 2px;
+    color: var(--muted-text-color);
+    margin-bottom: 2rem;
+  }
+  .no-data-card {
+    background: rgba(255, 107, 107, 0.06);
+    border: 1px solid rgba(255, 107, 107, 0.3);
+    border-radius: 4px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+  .no-data-card .reason-label {
+    font-size: 0.65rem;
+    letter-spacing: 2px;
+    color: #ff6b6b;
+    margin-bottom: 0.75rem;
+  }
+  .no-data-card .reason-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    font-size: 0.8rem;
+    color: var(--text-color);
+    margin-bottom: 0.5rem;
+    line-height: 1.4;
+  }
+  .no-data-card .reason-item i {
+    color: #ff6b6b;
+    margin-top: 2px;
+    flex-shrink: 0;
+  }
+  .fuel-tag {
+    display: inline-block;
+    font-size: 0.65rem;
+    letter-spacing: 1.5px;
+    padding: 0.2rem 0.6rem;
+    border: 1px solid rgba(255, 107, 107, 0.4);
+    background: rgba(255, 107, 107, 0.08);
+    color: #ff8f8f;
+    border-radius: 2px;
+    margin-right: 0.4rem;
+    margin-bottom: 0.4rem;
+  }
+  .fix-card {
+    background: rgba(141, 163, 93, 0.06);
+    border: 1px solid rgba(141, 163, 93, 0.25);
+    border-radius: 4px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+  .fix-card .fix-label {
+    font-size: 0.65rem;
+    letter-spacing: 2px;
+    color: var(--primary-color);
+    margin-bottom: 0.75rem;
+  }
+  .fix-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    font-size: 0.8rem;
+    color: var(--text-color);
+    margin-bottom: 0.75rem;
+    line-height: 1.4;
+  }
+  .fix-step .step-num {
+    font-size: 0.65rem;
+    font-weight: 900;
+    color: var(--primary-color);
+    background: rgba(141, 163, 93, 0.15);
+    border: 1px solid rgba(141, 163, 93, 0.3);
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .btn-back-subtle {
+    background: rgba(18, 20, 23, 0.8) !important;
+    color: var(--muted-text-color) !important;
+    border: 1px solid var(--navbar-border) !important;
+    font-size: 0.7rem !important;
+    padding: 0.5rem 1.2rem !important;
+    opacity: 0.7;
+  }
+  .btn-back-subtle:hover {
+    opacity: 1;
+    color: var(--text-color) !important;
+    border-color: var(--muted-text-color) !important;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4 mt-5 tankgauge-container">
+  <div class="no-data-wrap text-center">
+
+    <!-- Icon + Title -->
+    <div class="no-data-icon mono">
+      <i class="fas fa-ban"></i>
+    </div>
+    <div class="no-data-title mono">CALCULATION UNAVAILABLE</div>
+    <div class="no-data-store mono">
+      [ STORE #{{ store.store_num }}
+      {% if store.store_name %} — {{ store.store_name }}{% endif %}
+      {% if store.city %} // {{ store.city }}, {{ store.state }}{% endif %} ]
+    </div>
+
+    <!-- What went wrong -->
+    <div class="no-data-card text-start">
+      <div class="reason-label mono">WHY THIS FAILED</div>
+      <div class="reason-item mono">
+        <i class="fas fa-times-circle"></i>
+        <span>
+          Store #{{ store.store_num }} has <strong>no Tank Chart</strong> and
+          <strong>no Veeder-Root readings</strong> on file for the requested fuel type(s).
+          Without at least one of these, the calculator has nothing to work with.
+        </span>
+      </div>
+      <div class="mt-3">
+        <div class="reason-label mono mb-2">REQUESTED FUEL(S)</div>
+        {% for fuel in selected_fuels %}
+          <span class="fuel-tag mono">{{ fuel|upper }}</span>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- How to fix it -->
+    <div class="fix-card text-start">
+      <div class="fix-label mono">HOW TO FIX IT</div>
+      <div class="fix-step mono">
+        <div class="step-num">1</div>
+        <span>
+          <strong>Upload a Veeder-Root ticket</strong> for this store. Even a single
+          ticket gives the Mathematical mode enough to start reconstructing tank geometry.
+        </span>
+      </div>
+      <div class="fix-step mono">
+        <div class="step-num">2</div>
+        <span>
+          <strong>OR</strong> — have an admin assign a <strong>Tank Chart</strong> to
+          this store's tank type via Site Intel or the admin panel.
+        </span>
+      </div>
+      <div class="fix-step mono">
+        <div class="step-num">3</div>
+        <span>
+          Once either source is available, return here and run the calculation again.
+        </span>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="d-flex flex-column flex-md-row gap-3 justify-content-center">
+      <a href="{% url 'atg:ticket_upload' %}?store={{ store.id }}"
+         class="btn btn-outline-danger mono py-2 px-4" style="font-size: 0.75rem; letter-spacing: 1.5px;">
+        <i class="fas fa-upload me-2"></i>UPLOAD VEEDER TICKET
+      </a>
+      {% if store.location %}
+      <a href="{% url 'siteintel:location_detail' store.location.id %}"
+         class="btn btn-outline-primary mono py-2 px-4" style="font-size: 0.75rem; letter-spacing: 1.5px;">
+        <i class="fas fa-satellite me-2"></i>VIEW SITE INTEL
+      </a>
+      {% endif %}
+    </div>
+
+    <div class="mt-4">
+      <a href="javascript:history.back()" class="btn btn-back-subtle mono">
+        <i class="fas fa-arrow-left me-2"></i>BACK TO PARAMETERS
+      </a>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
