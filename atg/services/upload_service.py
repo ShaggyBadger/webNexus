@@ -2,6 +2,7 @@ import logging
 from django.db import transaction
 from ..models import VeederTicket, VeederReading
 from .auto_mapper import AutoMapperService
+from .reading_quality import validate_readings_for_store
 
 logger = logging.getLogger("webnexus")
 
@@ -51,10 +52,22 @@ class VeederUploadService:
                         raise ValueError(f"Invalid readings data: {serializer.errors}")
 
                     # Enforce unique tank_index per ticket
-                    tank_indices = [r.get("tank_index") for r in serializer.validated_data]
+                    tank_indices = [
+                        r.get("tank_index") for r in serializer.validated_data
+                    ]
                     if len(tank_indices) != len(set(tank_indices)):
-                        raise ValueError("Duplicate tank indices are not allowed on a single ticket.")
+                        raise ValueError(
+                            "Duplicate tank indices are not allowed on a single ticket."
+                        )
 
+                    quality_errors = validate_readings_for_store(
+                        store,
+                        serializer.validated_data,
+                    )
+                    if quality_errors:
+                        raise ValueError(
+                            "Invalid readings data: " + " | ".join(quality_errors)
+                        )
 
                     # Bulk create readings associated with the ticket
                     readings_to_create = []
@@ -80,7 +93,7 @@ class VeederUploadService:
                         )
 
                     VeederReading.objects.bulk_create(readings_to_create)
-                    
+
                     # 3. Auto-Map Tanks (after successful commit)
                     mapping_targets = {
                         (

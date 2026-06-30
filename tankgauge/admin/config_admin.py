@@ -32,9 +32,7 @@ class TankGaugeConfigAdmin(admin.ModelAdmin):
         from django.shortcuts import redirect
 
         config = TankGaugeConfig.get_solo()
-        return redirect(
-            f"tankgaugeconfig/{config.pk}/change/"
-        )
+        return redirect(f"tankgaugeconfig/{config.pk}/change/")
 
     def change_view(self, request, object_id, form_url="", extra_context=None):
         extra_context = extra_context or {}

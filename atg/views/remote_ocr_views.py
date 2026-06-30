@@ -1,5 +1,4 @@
 import logging
-import json
 from django.conf import settings
 from django.db import transaction
 from rest_framework.views import APIView
@@ -7,6 +6,9 @@ from rest_framework.response import Response
 from rest_framework import status
 from ..models import VeederTicket, VeederReading
 from ..serializers import VeederTicketSerializer
+from ..serializers.reading_serializers import VeederReadingSerializer
+from ..services.auto_mapper import AutoMapperService
+from ..services.reading_quality import validate_readings_for_store
 from ..utils.permissions import IsRemoteOCRClient
 
 logger = logging.getLogger("webnexus")
@@ -161,20 +163,77 @@ class RemoteOCRResolveJobView(APIView):
                 # We clear any partial readings first to ensure a clean slate
                 ticket.readings.all().delete()
 
-                for r_data in readings_data:
+                serializer_payload = [
+                    {
+                        "tank_index": r_data.get("tank_index"),
+                        "fuel_type": r_data.get("fuel_type_id"),
+                        "volume": r_data.get("volume"),
+                        "ullage": r_data.get("ullage"),
+                        "height": r_data.get("height"),
+                        "temp": r_data.get("temp"),
+                        "water": r_data.get("water"),
+                        "raw_line_text": r_data.get("raw_line_text"),
+                        "confidence_score": r_data.get("confidence_score", 1.0),
+                        "is_user_corrected": True,
+                    }
+                    for r_data in readings_data
+                ]
+
+                serializer = VeederReadingSerializer(data=serializer_payload, many=True)
+                if not serializer.is_valid():
+                    return Response(
+                        {"error": serializer.errors},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                quality_errors = validate_readings_for_store(
+                    ticket.store,
+                    serializer.validated_data,
+                )
+                if quality_errors:
+                    return Response(
+                        {"error": " | ".join(quality_errors)},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                mapping_targets = {
+                    (r["tank_index"], r["fuel_type"].name)
+                    for r in serializer.validated_data
+                }
+
+                for validated_reading in serializer.validated_data:
                     VeederReading.objects.create(
                         ticket=ticket,
-                        tank_index=r_data.get("tank_index"),
-                        fuel_type_id=r_data.get("fuel_type_id"),
-                        volume=r_data.get("volume"),
-                        ullage=r_data.get("ullage"),
-                        height=r_data.get("height"),
-                        temp=r_data.get("temp"),
-                        water=r_data.get("water"),
-                        raw_line_text=r_data.get("raw_line_text"),
-                        confidence_score=r_data.get("confidence_score", 1.0),
-                        is_user_corrected=True,  # Remote OCR client implies human-verified locally
+                        tank_index=validated_reading.get("tank_index"),
+                        fuel_type=validated_reading.get("fuel_type"),
+                        volume=validated_reading.get("volume"),
+                        ullage=validated_reading.get("ullage"),
+                        height=validated_reading.get("height"),
+                        temp=validated_reading.get("temp"),
+                        water=validated_reading.get("water"),
+                        raw_line_text=validated_reading.get("raw_line_text"),
+                        confidence_score=validated_reading.get("confidence_score", 1.0),
+                        is_user_corrected=True,
                     )
+
+                def run_auto_mapping() -> None:
+                    for tank_index, fuel_name in sorted(mapping_targets):
+                        try:
+                            AutoMapperService.trigger_updates(
+                                ticket.store,
+                                fuel_name,
+                                tank_index,
+                            )
+                        except Exception:
+                            logger.exception(
+                                "REMOTE_OCR_AUTO_MAPPER_FAILED: Ticket %s Store %s Tank %s Fuel %s",
+                                ticket_id,
+                                ticket.store.store_num if ticket.store else None,
+                                tank_index,
+                                fuel_name,
+                            )
+
+                transaction.on_commit(run_auto_mapping)
 
                 logger.info(
                     f"REMOTE_OCR_RESOLVE: Ticket {ticket_id} resolved with {len(readings_data)} readings."

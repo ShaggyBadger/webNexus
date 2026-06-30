@@ -18,7 +18,7 @@ class MissionValidator(BaseValidator):
                     code="MISSING_END_MILEAGE",
                     message="Mission marked completed but is missing ending odometer reading.",
                     severity=Severity.CRITICAL,
-                    affected_ids=[shift.id]
+                    affected_ids=[shift.id],
                 )
             )
 
@@ -30,7 +30,7 @@ class MissionValidator(BaseValidator):
                     code="LONG_SHIFT_DURATION",
                     message=f"Mission duration is unusually long ({duration:.2f} hours).",
                     severity=Severity.WARNING,
-                    affected_ids=[shift.id]
+                    affected_ids=[shift.id],
                 )
             )
 

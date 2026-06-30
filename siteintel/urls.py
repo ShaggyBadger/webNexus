@@ -76,5 +76,4 @@ urlpatterns = [
         views.USTVerificationListView.as_view(),
         name="api_ust_verifications",
     ),
-
 ]

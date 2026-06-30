@@ -1,9 +1,13 @@
 import json
-from django.db.models import Q
+from statistics import median
+
+from django.db.models import Avg, Count, ExpressionWrapper, F, FloatField, Q
 from rest_framework.views import APIView
 from rest_framework import viewsets, permissions, status, serializers
 from rest_framework.response import Response
-from tankgauge.models import Store
+from missionlog.models import FuelType
+from tankgauge.logic.utils import canonicalize_fuel
+from tankgauge.models import Store, StoreTankMapping
 from ..models import VeederTicket, VeederReading
 from ..serializers import (
     VeederTicketSerializer,
@@ -134,3 +138,158 @@ class VeederStatsView(APIView):
             )
 
         return Response({"status": "success", "count": len(data), "data": data})
+
+
+class StoreTankProfileAPIView(APIView):
+    """
+    Returns a normalized tank profile for ingest UI prefill/locking.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, store_num):
+        try:
+            store = Store.objects.get(store_num=store_num)
+        except Store.DoesNotExist:
+            return Response(
+                {"error": "Store not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        fuel_lookup = {
+            canonicalize_fuel(fuel.name): fuel
+            for fuel in FuelType.objects.all().only("id", "name")
+        }
+
+        known_tanks = []
+        covered_keys = set()
+        mappings = (
+            StoreTankMapping.objects.filter(store=store)
+            .select_related("tank_type")
+            .order_by("tank_index", "fuel_type", "id")
+        )
+
+        for mapping in mappings:
+            if mapping.tank_index is None:
+                continue
+
+            fuel_key = canonicalize_fuel(mapping.fuel_type)
+            if not fuel_key:
+                continue
+
+            readings_qs = VeederReading.objects.filter(
+                ticket__store=store,
+                tank_index=mapping.tank_index,
+                fuel_type__name__iexact=fuel_key,
+            )
+            implied_caps = [
+                float(volume + ullage)
+                for volume, ullage in readings_qs.values_list("volume", "ullage")
+                if volume is not None and ullage is not None
+            ]
+
+            mapped_capacity = (
+                float(mapping.tank_type.capacity)
+                if mapping.tank_type and mapping.tank_type.capacity
+                else None
+            )
+            history_capacity = median(implied_caps) if implied_caps else None
+            baseline_capacity = mapped_capacity or history_capacity
+            fuel_obj = fuel_lookup.get(fuel_key)
+
+            known_tanks.append(
+                {
+                    "mapping_id": mapping.id,
+                    "tank_index": mapping.tank_index,
+                    "fuel_key": fuel_key,
+                    "fuel_type_id": fuel_obj.id if fuel_obj else None,
+                    "fuel_type_name": fuel_obj.name if fuel_obj else mapping.fuel_type,
+                    "tank_type_name": (
+                        mapping.tank_type.name if mapping.tank_type else None
+                    ),
+                    "max_depth": (
+                        mapping.tank_type.max_depth
+                        if mapping.tank_type and mapping.tank_type.max_depth
+                        else None
+                    ),
+                    "baseline_capacity": (
+                        int(round(baseline_capacity)) if baseline_capacity else None
+                    ),
+                    "readings_count": len(implied_caps),
+                    "locked_identity": len(implied_caps) > 0,
+                    "verification_status": (
+                        "confirmed" if len(implied_caps) > 0 else "unverified_mapping"
+                    ),
+                    "source": "mapping",
+                }
+            )
+            covered_keys.add((fuel_key, mapping.tank_index))
+
+        history_only_groups = (
+            VeederReading.objects.filter(ticket__store=store)
+            .values("fuel_type__name", "tank_index")
+            .annotate(
+                reading_count=Count("id"),
+                avg_capacity=Avg(
+                    ExpressionWrapper(
+                        F("volume") + F("ullage"),
+                        output_field=FloatField(),
+                    )
+                ),
+            )
+            .order_by("tank_index", "fuel_type__name")
+        )
+
+        for group in history_only_groups:
+            tank_index = group["tank_index"]
+            if tank_index is None:
+                continue
+
+            fuel_key = canonicalize_fuel(group["fuel_type__name"])
+            if not fuel_key or (fuel_key, tank_index) in covered_keys:
+                continue
+
+            fuel_obj = fuel_lookup.get(fuel_key)
+            known_tanks.append(
+                {
+                    "mapping_id": None,
+                    "tank_index": tank_index,
+                    "fuel_key": fuel_key,
+                    "fuel_type_id": fuel_obj.id if fuel_obj else None,
+                    "fuel_type_name": (
+                        fuel_obj.name if fuel_obj else group["fuel_type__name"]
+                    ),
+                    "tank_type_name": None,
+                    "max_depth": None,
+                    "baseline_capacity": (
+                        int(round(group["avg_capacity"]))
+                        if group["avg_capacity"]
+                        else None
+                    ),
+                    "readings_count": group["reading_count"],
+                    "locked_identity": True,
+                    "verification_status": "confirmed_from_history",
+                    "source": "history_only",
+                }
+            )
+
+        known_tanks.sort(
+            key=lambda item: (
+                item["tank_index"] if item["tank_index"] is not None else 999,
+                item["fuel_key"],
+                item["source"],
+            )
+        )
+
+        return Response(
+            {
+                "store": {
+                    "store_pk": store.id,
+                    "store_num": store.store_num,
+                    "name": store.store_name,
+                    "city": store.city,
+                    "state": store.state,
+                },
+                "known_tanks": known_tanks,
+            }
+        )

@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}TankGauge Telemetry Console{% endblock %}
+
+{% block extra_head %}
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link rel="stylesheet" href="{% static 'tankgauge/css/tankgauge.css' %}" />
+<link rel="stylesheet" href="{% static 'tankgauge/css/tankgauge_spa.css' %}" />
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4 tankgauge-spa" x-data="tankGaugeApp()">
+    <h1 class="mb-4 mono fw-bold" style="color: var(--status-amber);">TANK_GAUGE // TELEMETRY_CONSOLE</h1>
+
+    <div class="tactical-card" x-show="step >= 1">
+        <h2 class="h5 mono text-tactical-warning mb-3">01 // SELECT_STORE</h2>
+        <div class="d-flex flex-wrap gap-2 mb-3">
+            <input type="number" class="form-control tactical-input flex-grow-1" style="max-width: 200px;" x-model="storeNumber" placeholder="Enter Store #">
+            <button class="btn btn-primary btn-tactical-olive mono fw-bold" @click="fetchStoreTanks()" :disabled="loading.store">
+                INITIALIZE DATA_FETCH_SEQUENCE
+            </button>
+            <button class="btn btn-primary btn-tactical-amber mono fw-bold" @click="fetchClosestStore()" :disabled="loading.store">
+                GPS // CLOSEST_STORE
+            </button>
+        </div>
+        <div x-show="error" class="text-tactical-danger mt-2 mono fw-bold" x-text="error"></div>
+        <div x-show="storeData" class="mt-3 p-2 bg-dark rounded border border-secondary mono text-muted-custom">
+            <span x-text="storeData?.store_name"></span> | <span x-text="storeData?.city + ', ' + storeData?.state"></span>
+        </div>
+    </div>
+
+    <div class="tactical-card" x-show="step >= 2" x-transition>
+        <h2 class="h5 mono text-tactical-warning mb-3">02 // SELECT_TARGET_TANK</h2>
+        <div class="d-flex flex-column gap-2">
+            <template x-for="tank in tanks" :key="tank.id">
+                <label class="btn btn-tactical-secondary text-start mono p-3 d-flex align-items-center gap-3 w-100"
+                       :class="{ 'active btn-tactical-amber': selectedTank?.id === tank.id }">
+                    <input type="radio" class="d-none" name="tankSelect" :value="tank.id" @change="selectTank(tank)">
+                    <span x-text="(tank.tank_index ? 'Tank ' + tank.tank_index + ': ' : '') + tank.fuel_type.toUpperCase() + ' (' + (tank.capacity ? tank.capacity + ' Gal Max' : 'Unknown Capacity') + ')' "></span>
+                </label>
+            </template>
+        </div>
+    </div>
+
+    <div class="tactical-card" x-show="step >= 3" x-transition>
+        <h2 class="h5 mono text-tactical-warning mb-3">03 // INPUT_DELIVERY_TELEMETRY</h2>
+
+        <div class="mb-3 p-2 bg-dark rounded border border-secondary mono">
+            <strong>TARGET:</strong> <span x-text="selectedTank?.fuel_type.toUpperCase()"></span><br>
+            <strong>MAX CAPACITY:</strong> <span x-text="selectedTank?.capacity + ' Gal'"></span>
+        </div>
+
+        <div class="row g-3 mb-3">
+            <div class="col-12 col-md-6">
+                <label class="form-label mono text-muted-custom">GROSS_GALLONS_DELIVERED</label>
+                <input type="number" class="form-control tactical-input" x-model="inputs.deliveryGallons">
+            </div>
+            <div class="col-12 col-md-6">
+                <label class="form-label mono text-muted-custom">CURRENT_MEASURED_INCHES</label>
+                <input type="number" step="any" class="form-control tactical-input" x-model="inputs.currentInches">
+            </div>
+        </div>
+
+        <button class="btn btn-primary btn-tactical-olive mono fw-bold w-100" @click="calculateTelemetry()" :disabled="loading.calculate || !canCalculate">
+            <span x-show="!loading.calculate">CALCULATE TELEMETRY</span>
+            <span x-show="loading.calculate">PROCESSING...</span>
+        </button>
+    </div>
+
+    <div class="tactical-card" x-show="step >= 4" x-transition>
+        <h2 class="h5 mono text-tactical-warning mb-3">04 // TELEMETRY_RESULTS</h2>
+        <template x-if="results">
+            <div class="row g-3 mono">
+                <div class="col-12 col-md-6">
+                    <div class="p-3 border border-secondary rounded h-100" style="background-color: #121417;">
+                        <h6 class="text-muted-custom">STARTING_TELEMETRY</h6>
+                        <div class="fs-4" x-text="results.initial_gallons + ' Gal'"></div>
+                        <div class="text-muted-custom" x-text="results.initial_inches + ' Inches'"></div>
+                    </div>
+                </div>
+                <div class="col-12 col-md-6">
+                    <div class="p-3 border border-secondary rounded h-100" style="background-color: #121417;">
+                        <h6 class="text-muted-custom">ESTIMATED_ENDING_TELEMETRY</h6>
+                        <div class="fs-4 text-tactical-warning" x-text="results.final_gallons + ' Gal'"></div>
+                        <div class="text-muted-custom" x-text="results.final_inches + ' Inches'"></div>
+                    </div>
+                </div>
+                <div class="col-12 mt-3">
+                    <div class="p-3 border rounded mb-3" :class="(results.final_gallons > results.ninety_limit) ? 'border-danger bg-danger text-white' : 'border-success bg-success text-dark'">
+                        <strong>ULLAGE_REMAINING: </strong> <span x-text="results.avail_90 + ' Gal'"></span>
+                        <div x-show="results.final_gallons > results.ninety_limit" class="mt-2 fw-bold">
+                            WARNING: 90% SAFE FILL CAPACITY EXCEEDED
+                        </div>
+                    </div>
+
+                    <div class="p-3 border border-secondary rounded user-select-all font-monospace" style="background-color: #121417; color: #f8f9fa; white-space: pre-wrap;">[ DELIVERY_TICKET_INTEL ]
+START GAL    <span x-text="results.initial_gallons"></span> G
+90% HOLD     <span x-text="results.ninety_limit"></span> G
+END GAL      <span x-text="results.final_gallons"></span> G
+END INCH     <span x-text="results.final_inches"></span>"</div>
+                </div>
+            </div>
+        </template>
+    </div>
+
+    <div class="tactical-card" x-show="step >= 3" x-transition>
+        <h2 class="h5 mono text-tactical-warning mb-3">05 // TANK_CHART_VISUALIZATION</h2>
+        <div x-show="loading.chart" class="text-muted-custom mono">LOADING_CHART_DATA...</div>
+        <div class="chart-wrap" x-show="!loading.chart">
+            <canvas id="tankChart"></canvas>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'tankgauge/js/tankgauge_spa.js' %}"></script>
+{% endblock %}

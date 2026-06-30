@@ -1,4 +1,5 @@
 import logging
+import math
 
 from django.http import JsonResponse
 from rest_framework import status
@@ -7,7 +8,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from ..logic.calculations import perform_tank_calc
-from ..models import Store, StoreTankMapping
+from ..models import Store, StoreTankMapping, TankChart
 from ..logic.tank_lookup import get_store_and_preset_status, get_tank_mapping
 from ..logic.utils import haversine
 from ..serializers import (
@@ -377,3 +378,179 @@ class EstimationHealthAPIView(APIView):
                 parts.append(f"{field}: {rendered}")
             return " | ".join(parts)
         return str(errors)
+
+
+class StoreTanksAPIView(APIView):
+    """
+    Returns the list of tank hardware mappings for a given store number.
+    """
+
+    permission_classes = [AllowAny]
+
+    def _serialize_mapping(self, mapping):
+        return {
+            "id": mapping.id,
+            "tank_index": mapping.tank_index,
+            "fuel_type": mapping.fuel_type,
+            "tank_type_name": mapping.tank_type.name if mapping.tank_type else None,
+            "capacity": mapping.tank_type.capacity if mapping.tank_type else None,
+            "max_depth": mapping.tank_type.max_depth if mapping.tank_type else None,
+        }
+
+    def get(self, request, store_num):
+        try:
+            store = Store.objects.get(store_num=store_num)
+        except Store.DoesNotExist:
+            return Response(
+                {"error": "Store not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        mappings = (
+            StoreTankMapping.objects.filter(store=store)
+            .select_related("tank_type")
+            .order_by("tank_index", "id")
+        )
+
+        tanks = [self._serialize_mapping(mapping) for mapping in mappings]
+
+        return Response(
+            {
+                "store": {
+                    "store_num": store.store_num,
+                    "store_name": store.store_name,
+                    "address": store.address,
+                    "city": store.city,
+                    "state": store.state,
+                },
+                "tanks": tanks,
+            },
+        )
+
+
+class TankChartDataAPIView(APIView):
+    """
+    Returns chart data for a specific tank mapping (Section 5 Chart.js).
+    """
+
+    permission_classes = [AllowAny]
+
+    def _get_official_chart(self, mapping):
+        official_chart = list(
+            TankChart.objects.filter(
+                store=mapping.store,
+                tank_index=mapping.tank_index,
+                is_official=True,
+            )
+            .order_by("inches")
+            .values("inches", "gallons")
+        )
+
+        if official_chart or not mapping.tank_type:
+            return official_chart
+
+        return list(
+            TankChart.objects.filter(
+                tank_type=mapping.tank_type,
+                is_official=True,
+            )
+            .order_by("inches")
+            .values("inches", "gallons")
+        )
+
+    def _get_generated_curve(self, mapping, max_depth):
+        generated_curve = []
+        estimation = TankEstimation.objects.filter(
+            tank_mapping=mapping,
+            is_active=True,
+        ).first()
+        if not estimation or not estimation.radius or not estimation.length:
+            return generated_curve
+
+        radius = estimation.radius
+        length = estimation.length
+
+        for inch in range(1, int(max_depth) + 1):
+            height = float(inch)
+            if height > 2 * radius:
+                height = 2 * radius
+
+            try:
+                area = (radius**2) * math.acos((radius - height) / radius) - (
+                    radius - height
+                ) * math.sqrt(max(0, 2 * radius * height - height**2))
+                volume_gallons = (area * length) / 231.0
+                generated_curve.append(
+                    {
+                        "inches": inch,
+                        "gallons": round(volume_gallons, 1),
+                    }
+                )
+            except Exception:
+                continue
+
+        return generated_curve
+
+    def _get_scatter_points(self, mapping):
+        readings = VeederReading.objects.filter(
+            ticket__store=mapping.store,
+            tank_index=mapping.tank_index,
+            fuel_type__name__iexact=mapping.fuel_type,
+        ).order_by("-ticket__uploaded_at")[:100]
+
+        scatter_points = []
+        for reading in readings:
+            if reading.height is None or reading.volume is None:
+                continue
+            scatter_points.append(
+                {
+                    "inches": float(reading.height),
+                    "gallons": float(reading.volume),
+                    "date": (
+                        reading.ticket.uploaded_at.isoformat()
+                        if reading.ticket and reading.ticket.uploaded_at
+                        else None
+                    ),
+                }
+            )
+
+        return scatter_points
+
+    def get(self, request, tank_id):
+        try:
+            mapping = StoreTankMapping.objects.select_related("tank_type", "store").get(
+                id=tank_id
+            )
+        except StoreTankMapping.DoesNotExist:
+            return Response(
+                {"error": "Tank not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        max_depth = (
+            mapping.tank_type.max_depth
+            if mapping.tank_type and mapping.tank_type.max_depth
+            else 120
+        )
+
+        official_chart = self._get_official_chart(mapping)
+        generated_curve = self._get_generated_curve(mapping, max_depth)
+        scatter_points = self._get_scatter_points(mapping)
+
+        return Response(
+            {
+                "tank": {
+                    "id": mapping.id,
+                    "fuel_type": mapping.fuel_type,
+                    "capacity": (
+                        mapping.tank_type.capacity if mapping.tank_type else None
+                    ),
+                    "tank_index": mapping.tank_index,
+                },
+                "series": {
+                    "official_chart": official_chart,
+                    "generated_curve": generated_curve,
+                    "scatter_points": scatter_points,
+                },
+            },
+        )

@@ -1,0 +1,105 @@
+.tankgauge-spa .tactical-card {
+  background-color: #1c1f23;
+  border: 1px solid #2a2e33;
+  border-radius: 4px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  color: #f8f9fa;
+}
+
+.tankgauge-spa .tactical-card.active {
+  border-color: #ffb86c;
+}
+
+.tankgauge-spa input::-webkit-outer-spin-button,
+.tankgauge-spa input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.tankgauge-spa input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+.tankgauge-spa .tactical-input {
+  background-color: #1c1f23;
+  color: #f8f9fa;
+  border: 1px solid #2a2e33;
+  font-family: "JetBrains Mono", monospace;
+}
+
+.tankgauge-spa .tactical-input:focus {
+  border-color: #ffb86c;
+  outline: 2px solid #ffb86c;
+  outline-offset: 2px;
+}
+
+.tankgauge-spa .btn-tactical-primary,
+.tankgauge-spa .btn-tactical-olive {
+  background-color: #8da35d;
+  color: #121417;
+  border: none;
+  min-height: 44px;
+}
+
+.tankgauge-spa .btn-tactical-amber {
+  background-color: #ffb86c;
+  color: #121417;
+  border: none;
+  min-height: 44px;
+}
+
+.tankgauge-spa .btn-tactical-secondary {
+  background-color: #1c1f23;
+  color: #f8f9fa;
+  border: 1px solid #2a2e33;
+  min-height: 44px;
+}
+
+.tankgauge-spa .btn-tactical-danger {
+  background-color: #1c1f23;
+  color: #e94560;
+  border: 1px solid #e94560;
+  min-height: 44px;
+}
+
+.tankgauge-spa .btn-tactical-primary:hover,
+.tankgauge-spa .btn-tactical-olive:hover,
+.tankgauge-spa .btn-tactical-amber:hover,
+.tankgauge-spa .btn-tactical-secondary:hover,
+.tankgauge-spa .btn-tactical-danger:hover {
+  filter: brightness(1.1);
+}
+
+.tankgauge-spa .btn-tactical-primary:active,
+.tankgauge-spa .btn-tactical-olive:active,
+.tankgauge-spa .btn-tactical-amber:active,
+.tankgauge-spa .btn-tactical-secondary:active,
+.tankgauge-spa .btn-tactical-danger:active {
+  transform: scale(0.98);
+}
+
+.tankgauge-spa .btn-tactical-primary:focus,
+.tankgauge-spa .btn-tactical-olive:focus,
+.tankgauge-spa .btn-tactical-amber:focus,
+.tankgauge-spa .btn-tactical-secondary:focus,
+.tankgauge-spa .btn-tactical-danger:focus {
+  outline: 2px solid #ffb86c;
+  outline-offset: 2px;
+}
+
+.tankgauge-spa .btn-tactical-primary:disabled,
+.tankgauge-spa .btn-tactical-olive:disabled,
+.tankgauge-spa .btn-tactical-amber:disabled,
+.tankgauge-spa .btn-tactical-secondary:disabled,
+.tankgauge-spa .btn-tactical-danger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.tankgauge-spa .chart-wrap {
+  position: relative;
+  height: 400px;
+  width: 100%;
+}

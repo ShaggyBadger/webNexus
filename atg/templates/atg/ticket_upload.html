@@ -4,601 +4,182 @@
 {% block title %}ATG TICKET_UPLOAD | {{ SITE_NAME }}{% endblock %}
 
 {% block extra_head %}
-<style>
-    .tactical-card {
-        background-color: rgba(18, 20, 23, 0.95);
-        border: 1px solid var(--navbar-border);
-        border-radius: 0;
-        margin-bottom: 1rem;
-    }
-    .tactical-header {
-        background-color: var(--navbar-bg);
-        border-bottom: 1px solid var(--navbar-border);
-        padding: 0.75rem 1rem;
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 0.85rem;
-        text-transform: uppercase;
-        letter-spacing: 2px;
-        color: var(--primary-color);
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-    .form-label {
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 0.7rem;
-        text-transform: uppercase;
-        color: var(--muted-text-color);
-        margin-bottom: 0.25rem;
-        letter-spacing: 1px;
-    }
-    .reading-row {
-        border-left: 2px solid var(--navbar-border);
-        padding: 1rem;
-        margin-bottom: 0.5rem;
-        background: rgba(255, 255, 255, 0.02);
-        position: relative;
-    }
-    .reading-row.active {
-        border-left-color: var(--primary-color);
-        background: rgba(255, 255, 255, 0.04);
-    }
-    .camera-btn-large {
-        height: 120px;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        border: 2px dashed var(--navbar-border);
-        color: var(--muted-text-color);
-        cursor: pointer;
-        transition: all 0.2s ease;
-    }
-    .camera-btn-large:hover, .camera-btn-large.has-file {
-        border-color: var(--primary-color);
-        color: var(--primary-color);
-        background: rgba(141, 163, 93, 0.05);
-    }
-    .preview-img {
-        max-width: 100%;
-        max-height: 200px;
-        border: 1px solid var(--navbar-border);
-        display: none;
-    }
-    .remove-reading {
-        position: absolute;
-        top: 5px;
-        right: 5px;
-        font-size: 0.6rem;
-        padding: 2px 6px;
-    }
-    .search-results-overlay {
-        position: absolute;
-        z-index: 1000;
-        width: 100%;
-        background: #1e2227;
-        border: 1px solid var(--primary-color);
-        max-height: 200px;
-        overflow-y: auto;
-    }
-    .search-item {
-        padding: 0.75rem;
-        cursor: pointer;
-        font-size: 0.85rem;
-        border-bottom: 1px solid #2a2e33;
-    }
-    .search-item:hover {
-        background: var(--navbar-bg);
-        color: var(--primary-color);
-    }
-</style>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<link rel="stylesheet" href="{% static 'atg/css/ticket_upload.css' %}" />
 {% endblock %}
 
 {% block content %}
-<div class="container py-3">
+{{ fuel_types|json_script:"fuel-types-data" }}
+
+<div class="container py-3" x-data="atgTicketUploadApp()">
     <div class="row justify-content-center">
-        <div class="col-lg-8">
+        <div class="col-lg-9">
             <h2 class="mono text-primary mb-3">[ ATG_TICKET_INGEST ]</h2>
 
-            <form id="atg-upload-form" enctype="multipart/form-data">
+            <form @submit.prevent="submitTicket()">
                 {% csrf_token %}
 
-                <!-- STEP 1: TARGET ACQUISITION -->
-                <div class="tactical-card">
+                <div class="tactical-card" x-show="step >= 1">
                     <div class="tactical-header">
                         <span>01_TARGET_ACQUISITION</span>
                         <i class="fa-solid fa-crosshairs"></i>
                     </div>
                     <div class="card-body">
-                        <div class="position-relative">
-                            <label class="form-label">Search Store / RISO</label>
-                            <input type="text" id="store-search" class="form-control form-control-lg mono" placeholder="ENTER STORE #" autocomplete="off" inputmode="numeric">
-                            <div id="store-results" class="search-results-overlay d-none"></div>
-                        </div>
-                        <input type="hidden" name="store" id="id_store_pk">
-                        
-                        <div id="selected-store-display" class="mt-2 p-2 border border-primary d-none" style="background: rgba(141, 163, 93, 0.1);">
+                        <template x-if="!hasStore">
+                            <div class="position-relative">
+                                <label class="form-label">Search Store / RISO</label>
+                                <input type="text" class="form-control form-control-lg mono" x-model="searchQuery" @input="onSearchInput()" placeholder="ENTER STORE #" autocomplete="off" inputmode="numeric">
+                                <div class="search-results-overlay" x-show="searchResults.length > 0">
+                                    <template x-for="result in searchResults" :key="result.store_pk">
+                                        <div class="search-item mono" @click="chooseStore(result)">
+                                            <strong x-text="'#' + result.store_num"></strong>
+                                            <span x-text="' - ' + result.name"></span>
+                                            <br>
+                                            <small class="text-muted" x-text="result.city"></small>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+
+                        <div x-show="hasStore" class="mt-2 p-2 border border-primary" style="background: rgba(141, 163, 93, 0.1);">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
-                                    <div id="display-store-name" class="fw-bold text-primary mono"></div>
-                                    <div id="display-store-details" class="small text-muted-custom mono"></div>
+                                    <div class="fw-bold text-primary mono" x-text="selectedStore?.name"></div>
+                                    <div class="small text-muted-custom mono" x-text="'#' + selectedStore?.store_num + ' // ' + (selectedStore?.city || '')"></div>
                                 </div>
-                                <button type="button" class="btn btn-outline-secondary btn-sm mono" id="clear-store-btn" style="font-size: 0.6rem;">[ CHANGE ]</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm mono" @click="clearStore()">[ CHANGE ]</button>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- STEP 2: EVIDENCE CAPTURE -->
-                <div class="tactical-card">
+                <div class="tactical-card" x-show="hasStore && step >= 2" x-transition>
                     <div class="tactical-header">
-                        <span>02_EVIDENCE_CAPTURE</span>
-                        <i class="fa-solid fa-camera"></i>
-                    </div>
-                    <div class="card-body">
-                        <input type="file" id="id_image" name="image" accept="image/*" capture="camera" class="d-none">
-                        <div id="camera-trigger" class="camera-btn-large mono">
-                            <i class="fa-solid fa-camera fa-2x mb-2"></i>
-                            <span>[ CAPTURE_TICKET_PHOTO ]</span>
-                        </div>
-                        <div class="text-center mt-2">
-                            <img id="image-preview" class="preview-img" alt="Ticket Preview">
-                        </div>
-                        <div id="file-info" class="small text-muted-custom mono mt-2 text-center d-none"></div>
-                    </div>
-                </div>
-
-                <!-- STEP 3: DATA EXTRACTION -->
-                <div class="tactical-card">
-                    <div class="tactical-header">
-                        <span>03_DATA_EXTRACTION</span>
+                        <span>02_TANK_TELEMETRY_INPUT</span>
                         <i class="fa-solid fa-microchip"></i>
                     </div>
                     <div class="card-body">
-                        <div id="readings-container">
-                            <!-- Dynamic Reading Rows injected here -->
-                        </div>
-                        
-                        <button type="button" class="btn btn-outline-primary btn-sm mono w-100 py-2 mt-2" id="add-reading-btn">
-                            [ + ADD_TANK_READING ]
-                        </button>
+                        <div class="mono small text-muted-custom mb-2" x-show="loadingProfile">Loading tank profile...</div>
+
+                        <template x-for="reading in knownReadings" :key="'known-' + reading.fuel_type_name + '-' + reading.tank_index">
+                            <div class="reading-card known">
+                                <div class="d-flex justify-content-between mb-2 mono small">
+                                    <strong x-text="'Tank ' + reading.tank_index + ' // ' + reading.fuel_type_name"></strong>
+                                    <span class="text-muted-custom" x-text="reading.locked_identity ? 'CONFIRMED LOCKED' : 'UNVERIFIED EDITABLE'"></span>
+                                </div>
+                                <div class="row g-2">
+                                    <div class="col-md-3 col-6">
+                                        <label class="form-label">Tank Index</label>
+                                        <input type="number" class="form-control form-control-sm mono" x-model="reading.tank_index" :disabled="reading.locked_identity" min="1" inputmode="numeric">
+                                    </div>
+                                    <div class="col-md-3 col-6">
+                                        <label class="form-label">Fuel Type</label>
+                                        <template x-if="reading.locked_identity">
+                                            <input type="text" class="form-control form-control-sm mono" :value="reading.fuel_type_name" disabled>
+                                        </template>
+                                        <template x-if="!reading.locked_identity">
+                                            <select class="form-select form-select-sm mono" x-model="reading.fuel_type_id">
+                                                <option value="">-- SELECT --</option>
+                                                <template x-for="fuel in fuelTypes" :key="fuel.id">
+                                                    <option :value="fuel.id" x-text="fuel.name.toUpperCase()"></option>
+                                                </template>
+                                            </select>
+                                        </template>
+                                    </div>
+                                    <div class="col-md-2 col-6">
+                                        <label class="form-label">Volume</label>
+                                        <input type="number" step="any" class="form-control form-control-sm mono" x-model="reading.volume" @input="onKnownVolumeInput(reading)" inputmode="decimal">
+                                    </div>
+                                    <div class="col-md-2 col-6">
+                                        <label class="form-label">Height</label>
+                                        <input type="number" step="0.01" class="form-control form-control-sm mono" x-model="reading.height" inputmode="decimal">
+                                    </div>
+                                    <div class="col-md-2 col-12">
+                                        <label class="form-label">Ullage</label>
+                                        <input type="number" step="any" class="form-control form-control-sm mono" x-model="reading.ullage" @input="markUllageOverridden(reading)" inputmode="decimal">
+                                    </div>
+                                </div>
+                                <div class="mono small text-muted-custom mt-2" x-show="reading.baseline_capacity">
+                                    BASELINE_CAPACITY <span x-text="reading.baseline_capacity"></span> GAL // EXPECTED_ULLAGE <span x-text="reading.expected_ullage ?? '--'"></span>
+                                </div>
+                            </div>
+                        </template>
+
+                        <template x-for="(reading, idx) in manualReadings" :key="'manual-' + idx">
+                            <div class="reading-card manual">
+                                <div class="d-flex justify-content-between mb-2 mono small">
+                                    <strong>[ UNMAPPED_TANK_ENTRY ]</strong>
+                                    <button type="button" class="btn btn-outline-danger btn-sm mono" @click="removeManualReading(idx)">[ REMOVE ]</button>
+                                </div>
+                                <div class="row g-2">
+                                    <div class="col-md-3 col-6">
+                                        <label class="form-label">Tank Index</label>
+                                        <input type="number" class="form-control form-control-sm mono" x-model="reading.tank_index" min="1" inputmode="numeric">
+                                    </div>
+                                    <div class="col-md-3 col-6">
+                                        <label class="form-label">Fuel Type</label>
+                                        <select class="form-select form-select-sm mono" x-model="reading.fuel_type_id">
+                                            <option value="">-- SELECT --</option>
+                                            <template x-for="fuel in fuelTypes" :key="fuel.id">
+                                                <option :value="fuel.id" x-text="fuel.name.toUpperCase()"></option>
+                                            </template>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-2 col-4">
+                                        <label class="form-label">Volume</label>
+                                        <input type="number" step="any" class="form-control form-control-sm mono" x-model="reading.volume" inputmode="decimal">
+                                    </div>
+                                    <div class="col-md-2 col-4">
+                                        <label class="form-label">Height</label>
+                                        <input type="number" step="0.01" class="form-control form-control-sm mono" x-model="reading.height" inputmode="decimal">
+                                    </div>
+                                    <div class="col-md-2 col-4">
+                                        <label class="form-label">Ullage</label>
+                                        <input type="number" step="any" class="form-control form-control-sm mono" x-model="reading.ullage" inputmode="decimal">
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+
+                        <button type="button" class="btn btn-outline-primary btn-sm mono w-100 py-2 mt-2" @click="addManualReading()">[ + ADD_UNMAPPED_TANK ]</button>
                     </div>
                 </div>
 
-                <!-- STEP 4: METADATA -->
-                <div class="tactical-card">
+                <div class="tactical-card" x-show="hasStore && step >= 2" x-transition>
                     <div class="tactical-header">
-                        <span>04_FIELD_OBSERVATIONS</span>
+                        <span>03_FIELD_OBSERVATIONS</span>
                         <i class="fa-solid fa-pen-to-square"></i>
                     </div>
                     <div class="card-body">
                         <div class="row g-2">
-                            <div class="col-6">
+                            <div class="col-md-6 col-12">
                                 <label class="form-label">Ticket Timestamp</label>
-                                <input type="datetime-local" name="ticket_timestamp" id="id_ticket_timestamp" class="form-control form-control-sm mono">
+                                <input type="datetime-local" class="form-control form-control-sm mono" x-model="ticketTimestamp">
                             </div>
                             <div class="col-12">
                                 <label class="form-label">Notes</label>
-                                <textarea name="notes" id="id_notes" class="form-control form-control-sm mono" rows="2" placeholder="SITE_QUIRKS..."></textarea>
+                                <textarea class="form-control form-control-sm mono" rows="2" x-model="notes" placeholder="SITE_QUIRKS..."></textarea>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div id="status-message" class="p-2 mb-3 mono small border d-none"></div>
+                <div class="p-2 mb-3 mono small border" x-show="statusMessage" :class="statusClass()" x-text="statusMessage"></div>
 
                 <div class="d-grid gap-2 mb-5">
-                    <button type="button" id="submit-btn" class="btn btn-primary btn-lg mono py-3">
-                        [ TRANSMIT_DATA_PACKAGE ]
+                    <button type="submit" class="btn btn-primary btn-lg mono py-3" :disabled="submitting || !hasStore || !hasAnyReadings">
+                        <span x-show="!submitting">[ TRANSMIT_DATA_PACKAGE ]</span>
+                        <span x-show="submitting">[ TRANSMITTING... ]</span>
                     </button>
-                    <a href="/" class="btn btn-outline-secondary btn-sm mono">
-                        [ ABORT_MISSION ]
-                    </a>
+                    <a href="/" class="btn btn-outline-secondary btn-sm mono">[ ABORT_MISSION ]</a>
                 </div>
             </form>
         </div>
     </div>
 </div>
-
-<!-- Template for Reading Row -->
-<template id="reading-row-template">
-    <div class="reading-row" data-index="INDEX">
-        <button type="button" class="btn btn-outline-danger remove-reading mono">[ X ]</button>
-        <div class="row g-2">
-            <div class="col-12">
-                <label class="form-label">Fuel Type</label>
-                <select class="form-select form-select-sm mono reading-fuel-type" required>
-                    <option value="">-- SELECT_PRODUCT --</option>
-                    {% for ft in fuel_types %}
-                    <option value="{{ ft.id }}">{{ ft.name|upper }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-3">
-                <label class="form-label">Tank</label>
-                <input type="number" class="form-control form-control-sm mono reading-tank-index" placeholder="ID" required min="1" inputmode="numeric">
-            </div>
-            <div class="col-3">
-                <label class="form-label">Volume</label>
-                <input type="number" step="any" class="form-control form-control-sm mono reading-volume" placeholder="GAL" required inputmode="decimal">
-            </div>
-            <div class="col-3">
-                <label class="form-label">Ullage</label>
-                <input type="number" step="any" class="form-control form-control-sm mono reading-ullage" placeholder="EMPTY" required inputmode="decimal">
-            </div>
-            <div class="col-3">
-                <label class="form-label">Height</label>
-                <input type="number" step="0.01" class="form-control form-control-sm mono reading-height" placeholder="IN" required inputmode="decimal">
-            </div>
-        </div>
-    </div>
-</template>
 {% endblock %}
 
 {% block extra_scripts %}
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-    const storeSearch = document.getElementById('store-search');
-    const storeResults = document.getElementById('store-results');
-    const storePkInput = document.getElementById('id_store_pk');
-    const selectedStoreDisplay = document.getElementById('selected-store-display');
-    const displayStoreName = document.getElementById('display-store-name');
-    const displayStoreDetails = document.getElementById('display-store-details');
-    const clearStoreBtn = document.getElementById('clear-store-btn');
-
-    const cameraTrigger = document.getElementById('camera-trigger');
-    const imageInput = document.getElementById('id_image');
-    const imagePreview = document.getElementById('image-preview');
-    const fileInfo = document.getElementById('file-info');
-    const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
-    const TARGET_COMPRESSED_BYTES = 2 * 1024 * 1024;
-    let uploadImageFile = null;
-
-    const readingsContainer = document.getElementById('readings-container');
-    const addReadingBtn = document.getElementById('add-reading-btn');
-    const rowTemplate = document.getElementById('reading-row-template');
-
-    const submitBtn = document.getElementById('submit-btn');
-    const uploadForm = document.getElementById('atg-upload-form');
-
-    const statusMessage = document.getElementById('status-message');
-    function showStatus(message, type) {
-        statusMessage.classList.remove('d-none');
-        if (type === 'error') {
-            statusMessage.className = "p-2 mb-3 mono small border border-danger text-danger bg-danger bg-opacity-10";
-            statusMessage.innerText = `[ ERROR: ${message} ]`;
-        } else if (type === 'success') {
-            statusMessage.className = "p-2 mb-3 mono small border border-success text-success bg-success bg-opacity-10";
-            statusMessage.innerText = `[ SUCCESS: ${message} ]`;
-        } else {
-            statusMessage.className = "p-2 mb-3 mono small border border-warning text-warning bg-warning bg-opacity-10";
-            statusMessage.innerText = `[ STATUS: ${message} ]`;
-        }
-    }
-    function hideStatus() {
-        statusMessage.classList.add('d-none');
-    }
-
-    async function compressImageForUpload(file) {
-        if (!file || !file.type || !file.type.startsWith('image/')) {
-            return file;
-        }
-
-        const srcDataUrl = await new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = (event) => resolve(event.target.result);
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-        });
-
-        const img = await new Promise((resolve, reject) => {
-            const image = new Image();
-            image.onload = () => resolve(image);
-            image.onerror = reject;
-            image.src = srcDataUrl;
-        });
-
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return file;
-
-        const maxDimension = 1920;
-        const scale = Math.min(1, maxDimension / Math.max(img.width, img.height));
-        canvas.width = Math.max(1, Math.round(img.width * scale));
-        canvas.height = Math.max(1, Math.round(img.height * scale));
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-        let quality = 0.86;
-        let blob = null;
-        while (quality >= 0.45) {
-            // eslint-disable-next-line no-await-in-loop
-            blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', quality));
-            if (blob && blob.size <= TARGET_COMPRESSED_BYTES) {
-                break;
-            }
-            quality -= 0.1;
-        }
-
-        if (!blob) {
-            return file;
-        }
-
-        return new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), {
-            type: 'image/jpeg',
-            lastModified: Date.now()
-        });
-    }
-
-    // 1. STORE SEARCH LOGIC
-    let searchTimeout;
-    storeSearch.addEventListener('input', (e) => {
-        const q = e.target.value.trim();
-        clearTimeout(searchTimeout);
-        if (q.length < 1) {
-            storeResults.classList.add('d-none');
-            return;
-        }
-
-        searchTimeout = setTimeout(async () => {
-            try {
-                const response = await fetch(`/atg/api/v1/stores/?search=${q}`);
-                const data = await response.json();
-                
-                if (data && data.length > 0) {
-                    storeResults.innerHTML = '';
-                    data.forEach(res => {
-                        const div = document.createElement('div');
-                        div.className = 'search-item mono';
-                        div.innerHTML = `<strong>#${res.store_num}</strong> - ${res.name}<br><small class="text-muted">${res.city}</small>`;
-                        div.addEventListener('click', () => selectStore(res));
-                        storeResults.appendChild(div);
-                    });
-                    storeResults.classList.remove('d-none');
-                } else {
-                    storeResults.classList.add('d-none');
-                }
-            } catch (err) {
-                console.error("Search failed");
-            }
-        }, 300);
-    });
-
-    function selectStore(res) {
-        storePkInput.value = res.store_pk;
-        displayStoreName.innerText = res.name;
-        displayStoreDetails.innerText = `#${res.store_num} // ${res.city}`;
-        
-        storeSearch.value = '';
-        storeResults.classList.add('d-none');
-        storeSearch.parentElement.classList.add('d-none');
-        selectedStoreDisplay.classList.remove('d-none');
-        
-        // Auto-focus on camera trigger or add reading
-        addReadingBtn.scrollIntoView({ behavior: 'smooth' });
-    }
-
-    clearStoreBtn.addEventListener('click', () => {
-        storePkInput.value = '';
-        selectedStoreDisplay.classList.add('d-none');
-        storeSearch.parentElement.classList.remove('d-none');
-        storeSearch.focus();
-    });
-
-    // 2. CAMERA / IMAGE LOGIC
-    cameraTrigger.addEventListener('click', () => imageInput.click());
-
-    imageInput.addEventListener('change', async (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            fileInfo.innerText = '[ COMPRESSING_IMAGE... ]';
-            fileInfo.classList.remove('d-none');
-
-            try {
-                uploadImageFile = await compressImageForUpload(file);
-            } catch (err) {
-                console.error('Image compression failed, using original:', err);
-                uploadImageFile = file;
-            }
-
-            const previewReader = new FileReader();
-            previewReader.onload = (event) => {
-                imagePreview.src = event.target.result;
-                imagePreview.style.display = 'inline-block';
-                cameraTrigger.classList.add('has-file');
-                cameraTrigger.querySelector('span').innerText = '[ CHANGE_PHOTO ]';
-
-                const originalKb = (file.size / 1024).toFixed(1);
-                const uploadKb = (uploadImageFile.size / 1024).toFixed(1);
-                fileInfo.innerText = `${uploadImageFile.name} (${uploadKb} KB) // RAW ${originalKb} KB`;
-                fileInfo.classList.remove('d-none');
-            };
-            previewReader.readAsDataURL(uploadImageFile);
-        } else {
-            uploadImageFile = null;
-        }
-    });
-
-    // 3. READING ROWS LOGIC
-    let rowCount = 0;
-    function addReadingRow() {
-        const clone = rowTemplate.content.cloneNode(true);
-        const row = clone.querySelector('.reading-row');
-        row.setAttribute('data-index', rowCount++);
-        
-        row.querySelector('.remove-reading').addEventListener('click', () => {
-            row.remove();
-        });
-
-        readingsContainer.appendChild(row);
-        
-        // Mobile UX: Scroll new row into view
-        row.scrollIntoView({ behavior: 'smooth' });
-        
-        // Highlight active row
-        document.querySelectorAll('.reading-row').forEach(r => r.classList.remove('active'));
-        row.classList.add('active');
-        
-        // Auto-focus fuel type
-        row.querySelector('select').focus();
-    }
-
-    addReadingBtn.addEventListener('click', addReadingRow);
-    
-    // Start with one row
-    addReadingRow();
-
-    // 4. SUBMISSION LOGIC
-    submitBtn.addEventListener('click', async () => {
-        hideStatus();
-
-        // Remove previous validation highlighting
-        document.querySelectorAll('.reading-row').forEach(row => {
-            row.classList.remove('border-danger');
-        });
-
-        // Validation
-        const storePk = storePkInput.value;
-        const image = uploadImageFile || imageInput.files[0];
-
-        if (!storePk) {
-            showStatus("DATA_ERROR: STORE SELECTION IS REQUIRED", "error");
-            return;
-        }
-
-        const rows = document.querySelectorAll('.reading-row');
-        if (rows.length === 0) {
-            showStatus("DATA_ERROR: AT LEAST ONE TANK READING REQUIRED", "error");
-            return;
-        }
-
-        if (image && image.size > MAX_UPLOAD_BYTES) {
-            showStatus("FILE_TOO_LARGE: IMAGE EXCEEDS UPLOAD LIMIT", "error");
-            return;
-        }
-
-        const readings = [];
-        let valid = true;
-        const seenIndices = new Set();
-        let duplicateIndexFound = false;
-        let invalidIndexFound = false;
-
-        rows.forEach(row => {
-            const fuelType = row.querySelector('.reading-fuel-type').value;
-            const vol = row.querySelector('.reading-volume').value;
-            const ull = row.querySelector('.reading-ullage').value;
-            const hgt = row.querySelector('.reading-height').value;
-            const idxRaw = row.querySelector('.reading-tank-index').value;
-            const idx = parseInt(idxRaw, 10);
-
-            if (!fuelType || !vol || !ull || !hgt || isNaN(idx)) {
-                valid = false;
-                row.classList.add('border-danger');
-            } else if (idx < 1) {
-                invalidIndexFound = true;
-                row.classList.add('border-danger');
-            } else {
-                if (seenIndices.has(idx)) {
-                    duplicateIndexFound = true;
-                    row.classList.add('border-danger');
-                }
-                seenIndices.add(idx);
-                readings.push({
-                    fuel_type: fuelType,
-                    tank_index: idx,
-                    volume: vol,
-                    ullage: ull,
-                    height: hgt,
-                    is_user_corrected: true,
-                    confidence_score: 1.0
-                });
-            }
-        });
-
-        if (!valid) {
-            showStatus("VALIDATION_ERROR: FILL ALL REQUIRED FIELDS (HIGHLIGHTED)", "error");
-            return;
-        }
-        if (invalidIndexFound) {
-            showStatus("VALIDATION_ERROR: TANK INDEX MUST BE A POSITIVE INTEGER (>= 1)", "error");
-            return;
-        }
-        if (duplicateIndexFound) {
-            showStatus("VALIDATION_ERROR: DUPLICATE TANK INDEX DETECTED IN TICKET", "error");
-            return;
-        }
-
-        // MONOLITHIC TRANSMISSION
-        submitBtn.disabled = true;
-        submitBtn.innerText = "[ TRANSMITTING... ]";
-        showStatus("TRANSMITTING DATA PACKAGE...", "info");
-
-        const formData = new FormData();
-        formData.append('store', storePk);
-
-        if (image) {
-            formData.append('image', image);
-        }
-        formData.append('notes', document.getElementById('id_notes').value);
-        if (document.getElementById('id_ticket_timestamp').value) {
-            formData.append('ticket_timestamp', document.getElementById('id_ticket_timestamp').value);
-        }
-        
-        // Send readings as a single JSON string for reliable backend parsing
-        formData.append('readings_json', JSON.stringify(readings));
-        
-        try {
-            // We'll use the API endpoint
-            const response = await fetch('/atg/api/v1/tickets/', {
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-                },
-                body: formData
-            });
-
-            const rawText = await response.text();
-            let result = {};
-            if (rawText) {
-                try {
-                    result = JSON.parse(rawText);
-                } catch (parseErr) {
-                    result = { error: { message: rawText } };
-                }
-            }
-
-            if (response.ok) {
-                showStatus("MISSION_COMPLETE: DATA PACKAGE INGESTED SUCCESSFULLY", "success");
-                setTimeout(() => {
-                    window.location.href = '/';
-                }, 1500);
-            } else {
-                console.error(result);
-                let errMsg = "TRANSMISSION_FAILED";
-                if (result.error && result.error.message) {
-                    errMsg = result.error.message;
-                } else if (result.error && result.error.details) {
-                    errMsg = JSON.stringify(result.error.details);
-                } else if (result.error) {
-                    errMsg = typeof result.error === 'string' ? result.error : JSON.stringify(result.error);
-                } else if (rawText) {
-                    errMsg = rawText;
-                }
-
-                if (response.status === 413) {
-                    errMsg = "UPLOAD_REJECTED: IMAGE TOO LARGE (SERVER LIMIT)";
-                }
-
-                showStatus(`TRANSMISSION_FAILED: ${errMsg}`, "error");
-                submitBtn.disabled = false;
-                submitBtn.innerText = "[ RETRY_TRANSMISSION ]";
-            }
-        } catch (err) {
-            console.error(err);
-            showStatus(`CRITICAL_ERROR: ${err?.message || 'NETWORK_FAILURE'}`, "error");
-            submitBtn.disabled = false;
-            submitBtn.innerText = "[ RETRY_TRANSMISSION ]";
-        }
-    });
-});
-</script>
+<script src="{% static 'atg/js/ticket_upload_alpine.js' %}"></script>
 {% endblock %}

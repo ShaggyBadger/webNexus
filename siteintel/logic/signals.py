@@ -20,9 +20,11 @@ def populate_location_timezone(sender, instance, **kwargs):
         if instance.pk:
             try:
                 old_instance = Location.objects.get(pk=instance.pk)
-                if (old_instance.lat == instance.lat and 
-                    old_instance.lon == instance.lon and 
-                    instance.timezone):
+                if (
+                    old_instance.lat == instance.lat
+                    and old_instance.lon == instance.lon
+                    and instance.timezone
+                ):
                     return
             except Location.DoesNotExist:
                 pass
@@ -30,7 +32,9 @@ def populate_location_timezone(sender, instance, **kwargs):
         resolved_tz = get_timezone_from_coords(instance.lat, instance.lon)
         if resolved_tz:
             instance.timezone = resolved_tz
-            logger.info(f"SIGNAL_ACTION: Updated timezone for Site {instance.id or 'NEW'}: {resolved_tz}")
+            logger.info(
+                f"SIGNAL_ACTION: Updated timezone for Site {instance.id or 'NEW'}: {resolved_tz}"
+            )
 
 
 @receiver(post_save, sender=Location)

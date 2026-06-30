@@ -22,6 +22,7 @@ class BaseReport(ABC):
     """
     A collection of sections forming a complete intelligence package.
     """
+
     title: str = "Base Tactical Report"
     sections_classes: List[type] = []
 
@@ -41,5 +42,5 @@ class BaseReport(ABC):
             },
             "sections": {
                 sec.__class__.__name__.lower(): sec.generate() for sec in self.sections
-            }
+            },
         }

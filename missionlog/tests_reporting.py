@@ -3,7 +3,13 @@ from django.contrib.auth.models import User
 from django.urls import reverse
 from django.utils import timezone
 from datetime import timedelta
-from missionlog.models import Mission, FuelType, OrderNumber, PurchaseOrder, LoadDelivery
+from missionlog.models import (
+    Mission,
+    FuelType,
+    OrderNumber,
+    PurchaseOrder,
+    LoadDelivery,
+)
 from tankgauge.models.store_models import Store
 from missionlog.logic.reports.context import ReportContext
 from missionlog.logic.validators.mission import MissionValidator
@@ -12,20 +18,26 @@ from missionlog.logic.validators.base import Severity
 
 class ReportingFoundationTests(TestCase):
     def setUp(self):
-        self.user = User.objects.create_user(username="testuser", email="test@example.com")
-        self.fuel_type = FuelType.objects.create(name="Regular", color_name="green", color_hex="#00ff00")
+        self.user = User.objects.create_user(
+            username="testuser", email="test@example.com"
+        )
+        self.fuel_type = FuelType.objects.create(
+            name="Regular", color_name="green", color_hex="#00ff00"
+        )
         self.store = Store.objects.create(store_num=7979, store_name="Test Store")
-        
+
         self.mission = Mission.objects.create(
             user=self.user,
             shift_start=timezone.now() - timedelta(hours=10),
             shift_end=timezone.now(),
             start_miles=1000,
             end_miles=1200,
-            is_completed=True
+            is_completed=True,
         )
-        
-        self.order = OrderNumber.objects.create(mission=self.mission, order_number="ORD-001")
+
+        self.order = OrderNumber.objects.create(
+            mission=self.mission, order_number="ORD-001"
+        )
         self.po = PurchaseOrder.objects.create(order_parent=self.order, po_number=12345)
         self.load = LoadDelivery.objects.create(
             purchase_order=self.po,
@@ -33,14 +45,14 @@ class ReportingFoundationTests(TestCase):
             store=self.store,
             gross_gal=8000,
             net_gal=7950,
-            temp=72.5
+            temp=72.5,
         )
 
     def test_report_context_normalization(self):
         """Verify Mission ORM models correctly map to Shift domain objects."""
         context = ReportContext(self.mission)
         shift = context.shift
-        
+
         self.assertEqual(shift.id, self.mission.id)
         self.assertEqual(shift.user_email, "test@example.com")
         self.assertEqual(len(shift.deliveries), 1)
@@ -53,11 +65,11 @@ class ReportingFoundationTests(TestCase):
         """Verify that missions marked completed but missing end mileage trigger CRITICAL."""
         self.mission.end_miles = None
         self.mission.save()
-        
+
         context = ReportContext(self.mission)
         validator = MissionValidator(context)
         issues = validator.validate()
-        
+
         codes = [issue.code for issue in issues]
         self.assertIn("MISSING_END_MILEAGE", codes)
         self.assertEqual(issues[0].severity, Severity.CRITICAL)
@@ -66,11 +78,11 @@ class ReportingFoundationTests(TestCase):
         """Verify that unusually long missions trigger a WARNING."""
         self.mission.shift_start = timezone.now() - timedelta(hours=20)
         self.mission.save()
-        
+
         context = ReportContext(self.mission)
         validator = MissionValidator(context)
         issues = validator.validate()
-        
+
         codes = [issue.code for issue in issues]
         self.assertIn("LONG_SHIFT_DURATION", codes)
         # Find the specific issue

@@ -25,7 +25,7 @@ def delivery_form(request):
     """
     logger.debug(f"UI_ACCESS: Delivery form accessed by {request.user}")
     form = DeliveryEstimationForm()
-    return render(request, "tankgauge/delivery_form.html", {"form": form})
+    return render(request, "tankgauge/index.html")
 
 
 def delivery_submit(request):
@@ -167,7 +167,7 @@ def delivery_submit(request):
                             if mapping.tank_type:
                                 # Determine Operating Mode (Official vs Experimental vs Unavailable)
                                 mode, source_meta = determine_operating_mode(mapping)
-                                
+
                                 has_data = mode != MODE_UNAVAILABLE
                                 capacity = mapping.tank_type.capacity or 0
 
@@ -203,7 +203,11 @@ def delivery_submit(request):
                                         "has_data": has_data,
                                         "has_official": has_official,
                                         "has_generated": has_generated,
-                                        "data_source": source_meta.get("name") if source_meta else "OFFICIAL_CHART",
+                                        "data_source": (
+                                            source_meta.get("name")
+                                            if source_meta
+                                            else "OFFICIAL_CHART"
+                                        ),
                                         "confidence": (
                                             source_meta.get("confidence")
                                             if source_meta

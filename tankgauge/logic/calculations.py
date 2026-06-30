@@ -144,7 +144,9 @@ def determine_operating_mode(tank_mapping, force_source=None):
     MATHEMATICAL_FIRST order: Mathematical → Chart → Unavailable
     """
     priority = _get_mode_priority()
-    logger.debug(f"OPERATING_MODE: Priority={priority} for TankMapping {tank_mapping.id}")
+    logger.debug(
+        f"OPERATING_MODE: Priority={priority} for TankMapping {tank_mapping.id}"
+    )
 
     # --- Resolve available sources without committing to either yet ---
 
@@ -201,7 +203,9 @@ def determine_operating_mode(tank_mapping, force_source=None):
         result = _get_official() or _get_mathematical()
 
     if result:
-        logger.debug(f"OPERATING_MODE: Resolved to {result[0]} (source: {result[1].get('name')})")
+        logger.debug(
+            f"OPERATING_MODE: Resolved to {result[0]} (source: {result[1].get('name')})"
+        )
         return result
 
     return MODE_UNAVAILABLE, None

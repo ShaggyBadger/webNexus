@@ -1,0 +1,66 @@
+.tactical-card {
+  background-color: rgba(18, 20, 23, 0.95);
+  border: 1px solid var(--navbar-border);
+  border-radius: 0;
+  margin-bottom: 1rem;
+}
+
+.tactical-header {
+  background-color: var(--navbar-bg);
+  border-bottom: 1px solid var(--navbar-border);
+  padding: 0.75rem 1rem;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--primary-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.form-label {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  color: var(--muted-text-color);
+  margin-bottom: 0.25rem;
+  letter-spacing: 1px;
+}
+
+.search-results-overlay {
+  position: absolute;
+  z-index: 1000;
+  width: 100%;
+  background: #1e2227;
+  border: 1px solid var(--primary-color);
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.search-item {
+  padding: 0.75rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+  border-bottom: 1px solid #2a2e33;
+}
+
+.search-item:hover {
+  background: var(--navbar-bg);
+  color: var(--primary-color);
+}
+
+.reading-card {
+  border-left: 3px solid #39424d;
+  padding: 1rem;
+  margin-bottom: 0.65rem;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.reading-card.known {
+  border-left-color: var(--primary-color);
+}
+
+.reading-card.manual {
+  border-left-color: #ffb86c;
+}

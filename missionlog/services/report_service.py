@@ -27,7 +27,9 @@ class ReportService:
         )
 
     @staticmethod
-    def generate(mission_id: int, user: Optional[AbstractBaseUser] = None) -> Dict[str, Any]:
+    def generate(
+        mission_id: int, user: Optional[AbstractBaseUser] = None
+    ) -> Dict[str, Any]:
         queryset = ReportService._base_queryset()
         if user is not None:
             queryset = queryset.filter(user=user)

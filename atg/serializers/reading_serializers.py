@@ -11,6 +11,10 @@ class VeederReadingSerializer(serializers.ModelSerializer):
 
     fuel_type_name = serializers.ReadOnlyField(source="fuel_type.name")
     tank_index = serializers.IntegerField(required=True, min_value=1)
+    volume = serializers.IntegerField(required=True, min_value=0)
+    ullage = serializers.IntegerField(required=True, min_value=0)
+    height = serializers.FloatField(required=True, min_value=0)
+    confidence_score = serializers.FloatField(required=False, min_value=0, max_value=1)
 
     class Meta:
         model = VeederReading
@@ -29,9 +33,23 @@ class VeederReadingSerializer(serializers.ModelSerializer):
             "is_user_corrected",
         ]
         extra_kwargs = {
-            "volume": {"required": True},
-            "ullage": {"required": True},
-            "height": {"required": True},
             "fuel_type": {"required": True},
         }
 
+    def validate(self, attrs):
+        water = attrs.get("water")
+        if water is not None and water < 0:
+            raise serializers.ValidationError("water must be >= 0")
+
+        temp = attrs.get("temp")
+        if temp is not None and abs(temp) > 200:
+            raise serializers.ValidationError(
+                "temp out of plausible range (-200 to 200)"
+            )
+
+        volume = attrs.get("volume")
+        ullage = attrs.get("ullage")
+        if volume is not None and ullage is not None and (volume + ullage) <= 0:
+            raise serializers.ValidationError("volume + ullage must be > 0")
+
+        return attrs

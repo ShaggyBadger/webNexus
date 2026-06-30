@@ -19,6 +19,20 @@ class AutoMapperService:
         """
         Ensures a StoreTankMapping exists for the given store, fuel, and index.
         If not, attempts to auto-map based on historical data.
+
+        MERGE LOGIC:
+        Before creating a new AUTO_ record, checks if a mapping already exists
+        for this store + fuel_type at a *different* tank_index. This catches the
+        common case where a manual SiteIntel entry had the wrong index.
+
+        - If a conflicting mapping exists and its old index has NO Veeder readings
+          (meaning the manual index was simply wrong), the existing mapping's
+          tank_index is corrected to the ATG ground-truth value in place. No new
+          record is created.
+
+        - If the conflicting mapping's old index DOES have Veeder readings, the
+          store genuinely has two physical tanks of the same fuel type. The new
+          AUTO_ record is created normally.
         """
         if store is None:
             logger.info(
@@ -28,6 +42,7 @@ class AutoMapperService:
 
         fuel_key = canonicalize_fuel(fuel_type)
 
+        # --- Step 1: Exact match — mapping already correct, nothing to do ---
         if StoreTankMapping.objects.filter(
             store=store,
             fuel_type=fuel_key,
@@ -35,6 +50,50 @@ class AutoMapperService:
         ).exists():
             return False
 
+        # --- Step 2: Conflict check — same fuel, different tank_index ---
+        conflicting_mappings = StoreTankMapping.objects.filter(
+            store=store,
+            fuel_type=fuel_key,
+        ).exclude(tank_index=tank_index)
+
+        for conflict in conflicting_mappings:
+            old_index = conflict.tank_index
+
+            # Does the OLD index have any real Veeder-Root readings?
+            old_index_has_readings = VeederReading.objects.filter(
+                ticket__store=store,
+                tank_index=old_index,
+                fuel_type__name__iexact=fuel_key,
+            ).exists()
+
+            if not old_index_has_readings:
+                # The old index has no supporting readings — it was a manual
+                # entry with the wrong index. Correct it in place.
+                logger.info(
+                    "AUTO_MAPPER: Correcting tank_index for existing mapping %s "
+                    "(Store %s, %s: index %s → %s). Old index has no ATG readings.",
+                    conflict.id,
+                    store.store_num,
+                    fuel_key,
+                    old_index,
+                    tank_index,
+                )
+                conflict.tank_index = tank_index
+                conflict.save(update_fields=["tank_index"])
+                return True
+            else:
+                # Old index has real readings — this is a genuine second tank
+                # of the same fuel type. Fall through to create an AUTO_ record.
+                logger.info(
+                    "AUTO_MAPPER: Store %s has confirmed readings at tank_index %s (%s). "
+                    "Treating incoming index %s as a second physical tank.",
+                    store.store_num,
+                    old_index,
+                    fuel_key,
+                    tank_index,
+                )
+
+        # --- Step 3: No merge possible — proceed with standard AUTO_ creation ---
         logger.info(
             "AUTO_MAPPER: Attempting to map Store %s Fuel %s Tank %s",
             store.store_num,
@@ -134,7 +193,9 @@ class AutoMapperService:
         return False
 
     @staticmethod
-    def trigger_updates(store: Optional[Store], fuel_name: str, tank_index: int) -> None:
+    def trigger_updates(
+        store: Optional[Store], fuel_name: str, tank_index: int
+    ) -> None:
         """
         Tolerant updater: ensures mapping exists, then re-runs either
         mapped or virtual estimation to incorporate the new reading.
@@ -173,4 +234,3 @@ class AutoMapperService:
                     observations,
                     latest.ticket.uploaded_at,
                 )
-

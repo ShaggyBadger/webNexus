@@ -1,6 +1,12 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views.api_views import VeederTicketViewSet, VeederReadingViewSet, VeederStatsView, StoreViewSet
+from .views.api_views import (
+    VeederTicketViewSet,
+    VeederReadingViewSet,
+    VeederStatsView,
+    StoreViewSet,
+    StoreTankProfileAPIView,
+)
 from .views.ticket_views import VeederUploadView
 from .views.dashboard_views import VeederListView, VeederDetailView
 from .views.remote_ocr_views import (
@@ -20,6 +26,11 @@ router.register(r"stores", StoreViewSet, basename="store")
 urlpatterns = [
     path("api/v1/", include(router.urls)),
     path("api/v1/stats/", VeederStatsView.as_view(), name="veeder_stats"),
+    path(
+        "api/v1/stores/<int:store_num>/tank-profile/",
+        StoreTankProfileAPIView.as_view(),
+        name="store_tank_profile_api",
+    ),
     path(
         "api/v1/remote-ocr/instructions/",
         RemoteOCRInstructionsView.as_view(),

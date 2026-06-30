@@ -16,6 +16,7 @@ class EventType(Enum):
 @dataclass(frozen=True)
 class TimelineEvent:
     """Represents a discrete moment in time during a mission."""
+
     event_type: EventType
     timestamp: datetime
     description: str
@@ -25,6 +26,7 @@ class TimelineEvent:
 @dataclass(frozen=True)
 class Delivery:
     """Canonical domain model for a single fuel delivery."""
+
     id: int
     store_number: Optional[str]
     fuel_type: str
@@ -39,6 +41,7 @@ class Delivery:
 @dataclass(frozen=True)
 class TruckFuel:
     """Canonical domain model for truck fuel purchase."""
+
     id: int
     gallons: Decimal
     price_per_gallon: Decimal
@@ -48,6 +51,7 @@ class TruckFuel:
 @dataclass(frozen=True)
 class Shift:
     """Canonical domain model for a single operational mission/shift."""
+
     id: int
     user_email: str
     start_time: datetime
@@ -84,14 +88,16 @@ class ReportContext:
 
     def _normalize_mission(self, mission: Mission) -> Shift:
         deliveries = []
-        
+
         # Flatten the hierarchy: Mission -> Order -> PO -> LoadDelivery
         for order in mission.order_numbers.all():
             for po in order.purchase_orders.all():
                 for load in po.loads.all():
                     deliveries.append(self._normalize_delivery(load))
 
-        truck_fuel = [self._normalize_truck_fuel(log) for log in mission.fuel_logs.all()]
+        truck_fuel = [
+            self._normalize_truck_fuel(log) for log in mission.fuel_logs.all()
+        ]
 
         return Shift(
             id=mission.id,
@@ -102,20 +108,24 @@ class ReportContext:
             end_miles=mission.end_miles,
             is_completed=mission.is_completed,
             deliveries=deliveries,
-            truck_fuel_logs=truck_fuel
+            truck_fuel_logs=truck_fuel,
         )
 
     def _normalize_delivery(self, load: LoadDelivery) -> Delivery:
         return Delivery(
             id=load.id,
-            store_number=str(load.store.store_num) if load.store and load.store.store_num else None,
+            store_number=(
+                str(load.store.store_num)
+                if load.store and load.store.store_num
+                else None
+            ),
             fuel_type=load.fuel_type.name,
             gross_gal=load.gross_gal,
             net_gal=load.net_gal,
             temp=load.temp,
             start_gallons=load.start_gallons,
             end_gallons=load.end_gallons,
-            price_at_store=load.price_at_store
+            price_at_store=load.price_at_store,
         )
 
     def _normalize_truck_fuel(self, log: TruckFuelLog) -> TruckFuel:
@@ -123,5 +133,5 @@ class ReportContext:
             id=log.id,
             gallons=log.gallons,
             price_per_gallon=log.price_per_gallon,
-            timestamp=log.timestamp
+            timestamp=log.timestamp,
         )

@@ -40,5 +40,61 @@
                 </tr>
             </table>
         </div>
+
+        <div class="module" style="margin-top: 16px;">
+            <table style="width: 100%;">
+                <caption>
+                    <span class="section" style="background: #282a36; color: #ffb86c; border: 1px solid #44475a;">
+                        TANK MAPPING CONFLICT RESOLVER
+                    </span>
+                </caption>
+                <tr>
+                    <td style="padding: 15px; background: #1e1f29; color: #f8f8f2;">
+                        <p class="small" style="margin-bottom: 10px;">
+                            Detect and resolve duplicate store/fuel tank mappings created by manual index mismatches vs ATG uploads.
+                        </p>
+                        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                            <form method="post" action="{% url 'admin_resolve_tank_conflicts' %}">
+                                {% csrf_token %}
+                                <button type="submit" class="button">PREVIEW (DRY RUN)</button>
+                            </form>
+                            <form method="post" action="{% url 'admin_resolve_tank_conflicts' %}" onsubmit="return confirm('Apply conflict resolution changes to database?');">
+                                {% csrf_token %}
+                                <input type="hidden" name="commit" value="1">
+                                <button type="submit" class="button default">RUN CONFLICT RESOLUTION</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="module" style="margin-top: 16px;">
+            <table style="width: 100%;">
+                <caption>
+                    <span class="section" style="background: #282a36; color: #ffb86c; border: 1px solid #44475a;">
+                        VEEDER READING SANITIZER
+                    </span>
+                </caption>
+                <tr>
+                    <td style="padding: 15px; background: #1e1f29; color: #f8f8f2;">
+                        <p class="small" style="margin-bottom: 10px;">
+                            Scan incoming and historical Veeder readings for impossible values. Commit mode deletes only hard-invalid rows by default.
+                        </p>
+                        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                            <form method="post" action="{% url 'admin_sanitize_veeder_readings' %}">
+                                {% csrf_token %}
+                                <button type="submit" class="button">PREVIEW (DRY RUN)</button>
+                            </form>
+                            <form method="post" action="{% url 'admin_sanitize_veeder_readings' %}" onsubmit="return confirm('Delete hard-invalid Veeder readings now?');">
+                                {% csrf_token %}
+                                <input type="hidden" name="commit" value="1">
+                                <button type="submit" class="button default">DELETE HARD INVALID READINGS</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+            </table>
+        </div>
     </div>
 {% endblock %}

@@ -1,0 +1,336 @@
+function atgTicketUploadApp() {
+  return {
+    step: 1,
+    searchQuery: "",
+    searchResults: [],
+    selectedStore: null,
+    loadingSearch: false,
+    loadingProfile: false,
+    searchTimer: null,
+
+    knownReadings: [],
+    manualReadings: [],
+    fuelTypes: [],
+
+    notes: "",
+    ticketTimestamp: "",
+
+    statusMessage: "",
+    statusType: "info",
+    submitting: false,
+
+    init() {
+      const fuelScript = document.getElementById("fuel-types-data");
+      if (fuelScript?.textContent) {
+        this.fuelTypes = JSON.parse(fuelScript.textContent);
+      }
+    },
+
+    get hasStore() {
+      return !!this.selectedStore;
+    },
+
+    get hasAnyReadings() {
+      return this.knownReadings.length > 0 || this.manualReadings.length > 0;
+    },
+
+    clearStatus() {
+      this.statusMessage = "";
+    },
+
+    showStatus(message, type = "info") {
+      this.statusMessage = message;
+      this.statusType = type;
+    },
+
+    statusClass() {
+      if (this.statusType === "error") {
+        return "border-danger text-danger bg-danger bg-opacity-10";
+      }
+      if (this.statusType === "success") {
+        return "border-success text-success bg-success bg-opacity-10";
+      }
+      return "border-warning text-warning bg-warning bg-opacity-10";
+    },
+
+    async onSearchInput() {
+      this.clearStatus();
+      if (this.searchTimer) {
+        clearTimeout(this.searchTimer);
+      }
+
+      const q = this.searchQuery.trim();
+      if (q.length < 1) {
+        this.searchResults = [];
+        return;
+      }
+
+      this.searchTimer = setTimeout(async () => {
+        this.loadingSearch = true;
+        try {
+          const response = await fetch(`/atg/api/v1/stores/?search=${encodeURIComponent(q)}`);
+          if (!response.ok) {
+            throw new Error("Store search failed");
+          }
+          this.searchResults = await response.json();
+        } catch (error) {
+          this.searchResults = [];
+          this.showStatus(error.message, "error");
+        } finally {
+          this.loadingSearch = false;
+        }
+      }, 250);
+    },
+
+    async chooseStore(store) {
+      this.selectedStore = store;
+      this.searchResults = [];
+      this.searchQuery = "";
+      this.step = 2;
+      this.knownReadings = [];
+      this.manualReadings = [];
+      await this.loadStoreProfile();
+    },
+
+    clearStore() {
+      this.selectedStore = null;
+      this.knownReadings = [];
+      this.manualReadings = [];
+      this.step = 1;
+    },
+
+    async loadStoreProfile() {
+      if (!this.selectedStore?.store_num) {
+        return;
+      }
+
+      this.loadingProfile = true;
+      try {
+        const response = await fetch(
+          `/atg/api/v1/stores/${this.selectedStore.store_num}/tank-profile/`,
+        );
+        if (!response.ok) {
+          throw new Error("Failed to load tank profile");
+        }
+        const data = await response.json();
+        this.knownReadings = (data.known_tanks || []).map((tank) => ({
+          source: "known",
+          profile_source: tank.source,
+          verification_status: tank.verification_status,
+          mapping_id: tank.mapping_id,
+          tank_index: tank.tank_index,
+          fuel_type_id: tank.fuel_type_id,
+          fuel_type_name: tank.fuel_type_name,
+          locked_identity: !!tank.locked_identity,
+          baseline_capacity: tank.baseline_capacity,
+          max_depth: tank.max_depth,
+          volume: "",
+          height: "",
+          ullage: "",
+          expected_ullage: null,
+          ullage_overridden: false,
+        }));
+
+        if (this.knownReadings.length === 0) {
+          this.addManualReading();
+          this.showStatus(
+            "No known tank profile for this store yet. Use manual entries for this ticket.",
+            "info",
+          );
+        }
+
+        this.step = 2;
+      } catch (error) {
+        this.showStatus(error.message, "error");
+      } finally {
+        this.loadingProfile = false;
+      }
+    },
+
+    addManualReading() {
+      this.manualReadings.push({
+        source: "manual",
+        tank_index: "",
+        fuel_type_id: "",
+        volume: "",
+        height: "",
+        ullage: "",
+      });
+      this.step = Math.max(this.step, 2);
+    },
+
+    removeManualReading(idx) {
+      this.manualReadings.splice(idx, 1);
+    },
+
+    onKnownVolumeInput(reading) {
+      if (!reading.baseline_capacity || reading.volume === "") {
+        reading.expected_ullage = null;
+        return;
+      }
+
+      const numericVolume = Number(reading.volume);
+      if (Number.isNaN(numericVolume)) {
+        return;
+      }
+
+      const expected = Math.round(reading.baseline_capacity - numericVolume);
+      reading.expected_ullage = expected;
+
+      if (!reading.ullage_overridden) {
+        reading.ullage = expected;
+      }
+    },
+
+    markUllageOverridden(reading) {
+      if (reading.source === "known") {
+        reading.ullage_overridden = true;
+      }
+    },
+
+    buildPayloadReadings() {
+      const readings = [];
+      const seenIndices = new Set();
+
+      const pushReading = (item, locked = false) => {
+        const tankIndex = Number(item.tank_index);
+        const fuelTypeId = Number(item.fuel_type_id);
+        const volume = Number(item.volume);
+        const ullage = Number(item.ullage);
+        const height = Number(item.height);
+
+        if (
+          !tankIndex ||
+          !fuelTypeId ||
+          Number.isNaN(volume) ||
+          Number.isNaN(ullage) ||
+          Number.isNaN(height)
+        ) {
+          throw new Error("All readings require tank, fuel, volume, ullage, and height.");
+        }
+        if (tankIndex < 1) {
+          throw new Error("Tank index must be a positive integer.");
+        }
+        if (seenIndices.has(tankIndex)) {
+          throw new Error(`Duplicate tank index ${tankIndex} detected in this ticket.`);
+        }
+        seenIndices.add(tankIndex);
+
+        readings.push({
+          tank_index: tankIndex,
+          fuel_type: fuelTypeId,
+          volume,
+          ullage,
+          height,
+          is_user_corrected: true,
+          confidence_score: 1.0,
+          raw_line_text: locked
+            ? `[LOCKED_PROFILE] expected_ullage=${item.expected_ullage ?? "n/a"}`
+            : `[UNVERIFIED_PROFILE] expected_ullage=${item.expected_ullage ?? "n/a"}`,
+        });
+      };
+
+      this.knownReadings.forEach((reading) => {
+        if (
+          reading.volume === "" &&
+          reading.ullage === "" &&
+          reading.height === ""
+        ) {
+          return;
+        }
+        pushReading(reading, !!reading.locked_identity);
+      });
+
+      this.manualReadings.forEach((reading) => {
+        if (
+          reading.volume === "" &&
+          reading.ullage === "" &&
+          reading.height === "" &&
+          reading.tank_index === "" &&
+          reading.fuel_type_id === ""
+        ) {
+          return;
+        }
+        pushReading(reading, false);
+      });
+
+      if (readings.length === 0) {
+        throw new Error("At least one tank reading is required.");
+      }
+
+      return readings;
+    },
+
+    async submitTicket() {
+      this.clearStatus();
+      if (!this.selectedStore?.store_pk) {
+        this.showStatus("Store selection is required.", "error");
+        return;
+      }
+
+      let readings = [];
+      try {
+        readings = this.buildPayloadReadings();
+      } catch (error) {
+        this.showStatus(error.message, "error");
+        return;
+      }
+
+      this.submitting = true;
+      this.showStatus("Transmitting data package...", "info");
+
+      const formData = new FormData();
+      formData.append("store", this.selectedStore.store_pk);
+      formData.append("notes", this.notes || "");
+      if (this.ticketTimestamp) {
+        formData.append("ticket_timestamp", this.ticketTimestamp);
+      }
+      formData.append("readings_json", JSON.stringify(readings));
+
+      try {
+        const response = await fetch("/atg/api/v1/tickets/", {
+          method: "POST",
+          headers: {
+            "X-CSRFToken": document.querySelector('[name=csrfmiddlewaretoken]').value,
+          },
+          body: formData,
+        });
+
+        const rawText = await response.text();
+        let result = {};
+        if (rawText) {
+          try {
+            result = JSON.parse(rawText);
+          } catch (error) {
+            result = { error: rawText };
+          }
+        }
+
+        if (!response.ok) {
+          let errMsg = "Transmission failed.";
+          if (typeof result.error === "string") {
+            errMsg = result.error;
+          } else if (result.error?.message) {
+            errMsg = result.error.message;
+          } else if (result.error) {
+            errMsg = JSON.stringify(result.error);
+          }
+          throw new Error(errMsg);
+        }
+
+        this.showStatus("Mission complete. Ticket ingested successfully.", "success");
+        setTimeout(() => {
+          window.location.href = "/";
+        }, 1400);
+      } catch (error) {
+        this.showStatus(error.message, "error");
+      } finally {
+        this.submitting = false;
+      }
+    },
+  };
+}
+
+document.addEventListener("alpine:init", () => {
+  Alpine.data("atgTicketUploadApp", atgTicketUploadApp);
+});

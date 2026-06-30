@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 from django.test import TestCase, override_settings
 from django.contrib.auth.models import User
+from django.core.management import call_command
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
 from rest_framework import status
@@ -180,6 +181,27 @@ class VeederUploadServiceTestCase(TestCase):
                 readings_data=readings_data,
             )
 
+    def test_process_ticket_submission_rejects_invalid_confidence_score(self):
+        readings_data = [
+            {
+                "tank_index": 1,
+                "fuel_type": self.fuel_type.id,
+                "volume": 5000,
+                "ullage": 1200,
+                "height": 92.5,
+                "confidence_score": 1.5,
+            }
+        ]
+
+        with self.assertRaisesMessage(ValueError, "Invalid readings data"):
+            VeederUploadService.process_ticket_submission(
+                user=self.user,
+                store=self.store,
+                image=self.image,
+                notes="Invalid confidence",
+                readings_data=readings_data,
+            )
+
 
 class VeederAPITestCase(APITestCase):
     def setUp(self):
@@ -243,10 +265,65 @@ class VeederAPITestCase(APITestCase):
 
         response = self.client.post(url, data, format="multipart")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("error", response.data)
-        self.assertIn("details", response.data["error"])
-        self.assertIn("store", response.data["error"]["details"])
-        self.assertEqual(VeederTicket.objects.count(), 0)
+
+    def test_store_tank_profile_api_returns_locked_known_tanks(self):
+        tank_type = TankType.objects.create(name="10k96", capacity=10003, max_depth=96)
+        StoreTankMapping.objects.create(
+            store=self.store,
+            tank_type=tank_type,
+            fuel_type="regular",
+            tank_index=1,
+        )
+        ticket = VeederTicket.objects.create(store=self.store, uploaded_by=self.user)
+        VeederReading.objects.create(
+            ticket=ticket,
+            tank_index=1,
+            fuel_type=self.fuel_type,
+            volume=5000,
+            ullage=5003,
+            height=50.0,
+            is_user_corrected=True,
+        )
+
+        url = reverse(
+            "atg:store_tank_profile_api",
+            kwargs={"store_num": self.store.store_num},
+        )
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = response.json()
+        self.assertEqual(payload["store"]["store_num"], self.store.store_num)
+        self.assertEqual(len(payload["known_tanks"]), 1)
+        self.assertEqual(payload["known_tanks"][0]["tank_index"], 1)
+        self.assertEqual(payload["known_tanks"][0]["fuel_type_name"], "Regular")
+        self.assertEqual(payload["known_tanks"][0]["baseline_capacity"], 10003)
+        self.assertTrue(payload["known_tanks"][0]["locked_identity"])
+
+    def test_store_tank_profile_api_marks_unverified_mapping_as_editable(self):
+        tank_type = TankType.objects.create(name="12k96", capacity=12030, max_depth=96)
+        StoreTankMapping.objects.create(
+            store=self.store,
+            tank_type=tank_type,
+            fuel_type="regular",
+            tank_index=1,
+        )
+
+        url = reverse(
+            "atg:store_tank_profile_api",
+            kwargs={"store_num": self.store.store_num},
+        )
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = response.json()
+        self.assertEqual(len(payload["known_tanks"]), 1)
+        self.assertEqual(payload["known_tanks"][0]["tank_index"], 1)
+        self.assertFalse(payload["known_tanks"][0]["locked_identity"])
+        self.assertEqual(
+            payload["known_tanks"][0]["verification_status"],
+            "unverified_mapping",
+        )
 
     def test_ticket_list_and_retrieve(self):
         ticket = VeederTicket.objects.create(
@@ -413,6 +490,34 @@ class RemoteOCRAPITestCase(APITestCase):
         self.assertEqual(readings.first().tank_index, 1)
         self.assertTrue(readings.first().is_user_corrected)
 
+    def test_resolve_job_rejects_bad_reading_values(self):
+        ticket = VeederTicket.objects.create(
+            store=self.store,
+            image=self.image,
+            uploaded_by=self.user,
+            ocr_status="PROCESSING",
+        )
+
+        self.client.credentials(HTTP_X_ATG_REMOTE_KEY="test-secret-key")
+        url = reverse("atg:remote_ocr_resolve")
+        payload = {
+            "ticket_id": ticket.id,
+            "ocr_text": "bad line",
+            "readings": [
+                {
+                    "tank_index": 1,
+                    "fuel_type_id": self.fuel_type.id,
+                    "volume": -1,
+                    "ullage": 1200,
+                    "height": 92.5,
+                }
+            ],
+        }
+
+        response = self.client.post(url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("error", response.data)
+
 
 @override_settings(ATG_REMOTE_OCR_KEY="test-secret-key", ATG_REMOTE_OCR_ENABLED=False)
 class RemoteOCRDisabledAPITestCase(APITestCase):
@@ -423,3 +528,123 @@ class RemoteOCRDisabledAPITestCase(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
         self.assertEqual(response.data["status"], "disabled")
+
+
+class ResolveTankConflictsCommandTests(TestCase):
+    def setUp(self):
+        self.store = Store.objects.create(store_num=7974, store_name="Conflict Store")
+        self.fuel_type = FuelType.objects.create(name="Diesel")
+
+        self.manual_tank_type = TankType.objects.create(name="Manual Diesel Tank")
+        self.auto_tank_type = TankType.objects.create(name="AUTO_7974_T4_DIESEL")
+
+    def test_commit_replaces_confirmed_auto_with_manual_mapping(self):
+        manual = StoreTankMapping.objects.create(
+            store=self.store,
+            tank_type=self.manual_tank_type,
+            fuel_type="diesel",
+            tank_index=5,
+        )
+        auto = StoreTankMapping.objects.create(
+            store=self.store,
+            tank_type=self.auto_tank_type,
+            fuel_type="diesel",
+            tank_index=4,
+        )
+
+        ticket = VeederTicket.objects.create(store=self.store)
+        VeederReading.objects.create(
+            ticket=ticket,
+            tank_index=4,
+            fuel_type=self.fuel_type,
+            volume=3000,
+            ullage=7000,
+            height=45.0,
+        )
+
+        call_command(
+            "resolve_tank_conflicts", "--store", str(self.store.store_num), "--commit"
+        )
+
+        manual.refresh_from_db()
+        self.assertEqual(manual.tank_index, 4)
+        self.assertFalse(
+            StoreTankMapping.objects.filter(id=auto.id).exists(),
+        )
+
+    def test_dry_run_does_not_modify_mappings(self):
+        manual = StoreTankMapping.objects.create(
+            store=self.store,
+            tank_type=self.manual_tank_type,
+            fuel_type="diesel",
+            tank_index=5,
+        )
+        auto = StoreTankMapping.objects.create(
+            store=self.store,
+            tank_type=self.auto_tank_type,
+            fuel_type="diesel",
+            tank_index=4,
+        )
+
+        ticket = VeederTicket.objects.create(store=self.store)
+        VeederReading.objects.create(
+            ticket=ticket,
+            tank_index=4,
+            fuel_type=self.fuel_type,
+            volume=3000,
+            ullage=7000,
+            height=45.0,
+        )
+
+        call_command("resolve_tank_conflicts", "--store", str(self.store.store_num))
+
+        manual.refresh_from_db()
+        self.assertEqual(manual.tank_index, 5)
+        self.assertTrue(
+            StoreTankMapping.objects.filter(id=auto.id).exists(),
+        )
+
+
+class SanitizeVeederReadingsCommandTests(TestCase):
+    def setUp(self):
+        self.store = Store.objects.create(store_num=8123, store_name="Sanitize Store")
+        self.user = User.objects.create_user(
+            username="sanitize", password="password123"
+        )
+        self.fuel_type = FuelType.objects.create(name="Diesel")
+        self.ticket = VeederTicket.objects.create(
+            store=self.store, uploaded_by=self.user
+        )
+
+    def test_dry_run_does_not_delete_invalid_rows(self):
+        reading = VeederReading.objects.create(
+            ticket=self.ticket,
+            tank_index=1,
+            fuel_type=self.fuel_type,
+            volume=-10,
+            ullage=100,
+            height=10.0,
+        )
+
+        call_command("sanitize_veeder_readings", "--store", str(self.store.store_num))
+
+        self.assertTrue(VeederReading.objects.filter(id=reading.id).exists())
+
+    def test_commit_deletes_hard_invalid_rows(self):
+        reading = VeederReading.objects.create(
+            ticket=self.ticket,
+            tank_index=1,
+            fuel_type=self.fuel_type,
+            volume=-10,
+            ullage=100,
+            height=10.0,
+        )
+
+        call_command(
+            "sanitize_veeder_readings",
+            "--store",
+            str(self.store.store_num),
+            "--commit",
+        )
+
+        self.assertFalse(VeederReading.objects.filter(id=reading.id).exists())

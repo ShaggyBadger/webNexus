@@ -20,6 +20,7 @@ from tankgauge.logic.tank_lookup import (
 )
 from tankgauge.models import (
     Store,
+    TankChart,
     StoreTankMapping,
     TankEstimation,
     TankType,
@@ -414,3 +415,142 @@ class AdminSyncButtonTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.url, reverse("admin:index"))
         call_command_mock.assert_called_once_with("sync_tank_estimates")
+
+    def test_admin_conflict_resolver_endpoint_dry_run(self):
+        self.client.force_login(self.user)
+
+        with patch("tankgauge.admin_views.call_command") as call_command_mock:
+            response = self.client.post(reverse("admin_resolve_tank_conflicts"))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("admin:index"))
+
+        args, kwargs = call_command_mock.call_args
+        self.assertEqual(args, ("resolve_tank_conflicts",))
+        self.assertFalse(kwargs["commit"])
+        self.assertIn("stdout", kwargs)
+
+    def test_admin_conflict_resolver_endpoint_commit_mode(self):
+        self.client.force_login(self.user)
+
+        with patch("tankgauge.admin_views.call_command") as call_command_mock:
+            response = self.client.post(
+                reverse("admin_resolve_tank_conflicts"),
+                data={"commit": "1"},
+            )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("admin:index"))
+
+        args, kwargs = call_command_mock.call_args
+        self.assertEqual(args, ("resolve_tank_conflicts",))
+        self.assertTrue(kwargs["commit"])
+        self.assertIn("stdout", kwargs)
+
+    def test_admin_sanitize_veeder_readings_endpoint_dry_run(self):
+        self.client.force_login(self.user)
+
+        with patch("tankgauge.admin_views.call_command") as call_command_mock:
+            response = self.client.post(reverse("admin_sanitize_veeder_readings"))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("admin:index"))
+
+        args, kwargs = call_command_mock.call_args
+        self.assertEqual(args, ("sanitize_veeder_readings",))
+        self.assertFalse(kwargs["commit"])
+        self.assertFalse(kwargs["delete_suspicious"])
+        self.assertIn("stdout", kwargs)
+
+    def test_admin_sanitize_veeder_readings_endpoint_commit_mode(self):
+        self.client.force_login(self.user)
+
+        with patch("tankgauge.admin_views.call_command") as call_command_mock:
+            response = self.client.post(
+                reverse("admin_sanitize_veeder_readings"),
+                data={"commit": "1"},
+            )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("admin:index"))
+
+        args, kwargs = call_command_mock.call_args
+        self.assertEqual(args, ("sanitize_veeder_readings",))
+        self.assertTrue(kwargs["commit"])
+        self.assertFalse(kwargs["delete_suspicious"])
+        self.assertIn("stdout", kwargs)
+
+
+class StoreChartApiTests(TestCase):
+    def setUp(self):
+        self.store = Store.objects.create(store_num=8111, store_name="API Store")
+        self.tank_type = TankType.objects.create(
+            name="API Tank", capacity=10000, max_depth=120
+        )
+        self.mapping = StoreTankMapping.objects.create(
+            store=self.store,
+            tank_type=self.tank_type,
+            fuel_type="diesel",
+            tank_index=2,
+        )
+        self.fuel_type = FuelType.objects.create(name="Diesel")
+
+    def test_store_tanks_api_returns_sorted_records(self):
+        StoreTankMapping.objects.create(
+            store=self.store,
+            tank_type=self.tank_type,
+            fuel_type="regular",
+            tank_index=1,
+        )
+
+        response = self.client.get(
+            reverse(
+                "tankgauge:store_tanks_api", kwargs={"store_num": self.store.store_num}
+            )
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        tank_indices = [item["tank_index"] for item in response.json()["tanks"]]
+        self.assertEqual(tank_indices, [1, 2])
+
+    def test_tank_chart_data_api_returns_official_generated_and_scatter_series(self):
+        TankChart.objects.create(
+            tank_type=self.tank_type,
+            inches=10,
+            gallons=1000,
+            tank_name="API Tank",
+            is_official=True,
+        )
+        TankEstimation.objects.create(
+            tank_mapping=self.mapping,
+            radius=40.0,
+            length=180.0,
+            confidence=0.8,
+            mean_error=12.0,
+            max_error=20.0,
+            sample_count=3,
+            algorithm_version="v1",
+            is_active=True,
+        )
+        ticket = VeederTicket.objects.create(store=self.store)
+        VeederReading.objects.create(
+            ticket=ticket,
+            tank_index=2,
+            fuel_type=self.fuel_type,
+            height=20.0,
+            volume=2200,
+            ullage=7800,
+        )
+
+        response = self.client.get(
+            reverse(
+                "tankgauge:tank_chart_data_api", kwargs={"tank_id": self.mapping.id}
+            )
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = response.json()
+        self.assertEqual(payload["tank"]["id"], self.mapping.id)
+        self.assertGreater(len(payload["series"]["official_chart"]), 0)
+        self.assertGreater(len(payload["series"]["generated_curve"]), 0)
+        self.assertGreater(len(payload["series"]["scatter_points"]), 0)
