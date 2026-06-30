@@ -125,5 +125,6 @@ class ReportEndpointAccessTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         payload = response.json()
-        self.assertIn("timeline", payload)
-        self.assertTrue(len(payload["timeline"]) >= 2)
+        self.assertEqual(payload["status"], "success")
+        self.assertIn("timeline", payload["data"])
+        self.assertTrue(len(payload["data"]["timeline"]) >= 2)

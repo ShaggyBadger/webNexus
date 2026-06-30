@@ -1,13 +1,13 @@
 import json
 import logging
-from django.shortcuts import get_object_or_404
-from django.http import JsonResponse
-from django.contrib.auth.decorators import login_required
-from django.utils import timezone
-from django.views.decorators.csrf import csrf_exempt
-from datetime import timedelta
+
 from django.conf import settings
-from ..models import Mission, FuelType, OrderNumber
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
+
+from ..models import FuelType, Mission, OrderNumber
+from .api_contract import json_error_response, json_success_response
 
 logger = logging.getLogger("webnexus")
 
@@ -24,6 +24,11 @@ def serialize_mission(mission):
         "total_stops": mission.total_stops,
         "hours_on_duty": (
             float(mission.hours_on_duty) if mission.hours_on_duty else None
+        ),
+        "hours_on_duty_not_driving": (
+            float(mission.hours_on_duty_not_driving)
+            if mission.hours_on_duty_not_driving
+            else None
         ),
         "is_completed": mission.is_completed,
         "notes": mission.notes,
@@ -88,96 +93,111 @@ def serialize_mission(mission):
 
 @login_required
 def mission_list_or_create(request):
-    """
-    MISSION_CONTROL_API:
-    GET: Lists historical completed missions.
-    POST: Triggers initialization protocol for a new shift/mission.
-    """
+    """GET all missions or POST a new mission."""
     if request.method == "GET":
         missions = Mission.objects.filter(user=request.user).order_by("-shift_start")
-        return JsonResponse([serialize_mission(m) for m in missions], safe=False)
+        return json_success_response(
+            data={"missions": [serialize_mission(mission) for mission in missions]}
+        )
 
-    elif request.method == "POST":
+    if request.method == "POST":
         try:
             data = json.loads(request.body)
-            # Support time adjustments if they did not log in exactly at start of shift
             start_time_str = data.get("shift_start")
-            if start_time_str:
-                shift_start = timezone.datetime.fromisoformat(start_time_str)
-            else:
-                shift_start = timezone.now()
+            shift_start = (
+                timezone.datetime.fromisoformat(start_time_str)
+                if start_time_str
+                else timezone.now()
+            )
 
-            # Ensure there is no existing uncompleted active shift
-            active_shift = Mission.objects.filter(
-                user=request.user,
-                is_completed=False,
-                shift_start__gte=timezone.now() - timedelta(hours=24),
-            ).first()
+            active_shift = (
+                Mission.objects.filter(user=request.user, is_completed=False)
+                .order_by("-shift_start", "-id")
+                .first()
+            )
 
             if active_shift:
                 logger.warning(
-                    f"INIT_WARN: User {request.user.username} tried to start a new mission, but Mission #{active_shift.id} is already active."
+                    "INIT_WARN: User %s tried to start a new mission, but Mission #%s is already active.",
+                    request.user.username,
+                    active_shift.id,
                 )
-                return JsonResponse(
-                    {
-                        "status": "error",
-                        "message": "An active mission is already in progress. Close it before initiating a new deployment.",
-                    },
-                    status=400,
+                return json_error_response(
+                    request=request,
+                    code="active_mission_exists",
+                    message="An active mission is already in progress. Close it before initiating a new deployment.",
+                    details={"mission_id": active_shift.id},
+                    status_code=400,
                 )
 
             mission = Mission.objects.create(
                 user=request.user,
                 shift_start=shift_start,
                 start_miles=data.get("start_miles"),
+                hours_on_duty_not_driving=data.get("hours_on_duty_not_driving"),
                 notes=data.get("notes", ""),
             )
             logger.info(
-                f"MISSION_INIT: Mission #{mission.id} initialized by operator {request.user.username} at {shift_start}."
+                "MISSION_INIT: Mission #%s initialized by operator %s at %s.",
+                mission.id,
+                request.user.username,
+                shift_start,
             )
-            return JsonResponse(
-                {"status": "success", "mission": serialize_mission(mission)}, status=201
+            return json_success_response(
+                data={"mission": serialize_mission(mission)}, status_code=201
             )
-        except Exception as e:
-            logger.error(f"MISSION_INIT_FAIL: {str(e)}")
-            return JsonResponse({"status": "error", "message": str(e)}, status=400)
+        except Exception as exc:
+            logger.error("MISSION_INIT_FAIL: %s", str(exc))
+            return json_error_response(
+                request=request,
+                code="mission_init_failed",
+                message="Mission initialization failed.",
+                details={"exception": str(exc)},
+                status_code=400,
+            )
 
-    return JsonResponse({"error": "Method not allowed"}, status=405)
+    return json_error_response(
+        request=request,
+        code="method_not_allowed",
+        message="Method not allowed.",
+        details={"method": request.method},
+        status_code=405,
+    )
 
 
 @login_required
 def active_mission(request):
-    """
-    ACTIVE_MISSION_API:
-    GET: Resolves and returns the currently running mission (if active and within 24h window).
-    """
+    """GET the latest incomplete mission for the user."""
     if request.method == "GET":
-        cutoff = timezone.now() - timedelta(hours=24)
-        mission = Mission.objects.filter(
-            user=request.user, is_completed=False, shift_start__gte=cutoff
-        ).first()
-
+        mission = (
+            Mission.objects.filter(user=request.user, is_completed=False)
+            .order_by("-shift_start", "-id")
+            .first()
+        )
         if mission:
-            return JsonResponse({"active": True, "mission": serialize_mission(mission)})
-        return JsonResponse({"active": False})
+            return json_success_response(
+                data={"active": True, "mission": serialize_mission(mission)}
+            )
+        return json_success_response(data={"active": False})
 
-    return JsonResponse({"error": "Method not allowed"}, status=405)
+    return json_error_response(
+        request=request,
+        code="method_not_allowed",
+        message="Method not allowed.",
+        details={"method": request.method},
+        status_code=405,
+    )
 
 
 @login_required
 def mission_detail_or_update(request, pk):
-    """
-    MISSION_DETAIL_API:
-    GET: Details of a specific historical mission.
-    PUT: Updates primary metrics (miles, notes).
-    DELETE: Aborts/Deletes the mission and all associated data.
-    """
+    """GET mission detail, PUT updates, DELETE mission."""
     mission = get_object_or_404(Mission, pk=pk, user=request.user)
 
     if request.method == "GET":
-        return JsonResponse(serialize_mission(mission))
+        return json_success_response(data={"mission": serialize_mission(mission)})
 
-    elif request.method == "PUT":
+    if request.method == "PUT":
         try:
             data = json.loads(request.body)
             if "start_miles" in data:
@@ -188,66 +208,88 @@ def mission_detail_or_update(request, pk):
                 mission.notes = data["notes"]
             if "hours_on_duty" in data:
                 mission.hours_on_duty = data["hours_on_duty"]
+            if "hours_on_duty_not_driving" in data:
+                mission.hours_on_duty_not_driving = data["hours_on_duty_not_driving"]
             mission.save()
             logger.info(
-                f"MISSION_UPDATE: Mission #{mission.id} updated by {request.user.username}."
+                "MISSION_UPDATE: Mission #%s updated by %s.",
+                mission.id,
+                request.user.username,
             )
-            return JsonResponse(
-                {"status": "success", "mission": serialize_mission(mission)}
+            return json_success_response(data={"mission": serialize_mission(mission)})
+        except Exception as exc:
+            logger.error("MISSION_UPDATE_FAIL: %s", str(exc))
+            return json_error_response(
+                request=request,
+                code="mission_update_failed",
+                message="Mission update failed.",
+                details={"exception": str(exc)},
+                status_code=400,
             )
-        except Exception as e:
-            logger.error(f"MISSION_UPDATE_FAIL: {str(e)}")
-            return JsonResponse({"status": "error", "message": str(e)}, status=400)
 
-    elif request.method == "DELETE":
+    if request.method == "DELETE":
         try:
             mission_id = mission.id
             mission.delete()
             logger.info(
-                f"MISSION_DELETE: Mission #{mission_id} aborted/deleted by {request.user.username}."
+                "MISSION_DELETE: Mission #%s aborted/deleted by %s.",
+                mission_id,
+                request.user.username,
             )
-            return JsonResponse(
-                {"status": "success", "message": "Mission aborted and deleted."}
+            return json_success_response(
+                data={"message": "Mission aborted and deleted."}
             )
-        except Exception as e:
-            logger.error(f"MISSION_DELETE_FAIL: {str(e)}")
-            return JsonResponse({"status": "error", "message": str(e)}, status=400)
+        except Exception as exc:
+            logger.error("MISSION_DELETE_FAIL: %s", str(exc))
+            return json_error_response(
+                request=request,
+                code="mission_delete_failed",
+                message="Mission deletion failed.",
+                details={"exception": str(exc)},
+                status_code=400,
+            )
 
-    return JsonResponse({"error": "Method not allowed"}, status=405)
+    return json_error_response(
+        request=request,
+        code="method_not_allowed",
+        message="Method not allowed.",
+        details={"method": request.method},
+        status_code=405,
+    )
 
 
 @login_required
 def complete_mission(request, pk):
-    """
-    MISSION_COMPLETE_API:
-    POST: Finalizes the mission log. Counts stops, records ending odometer, logs completed state.
-    """
+    """POST finalization of mission log."""
     if request.method == "POST":
         mission = get_object_or_404(Mission, pk=pk, user=request.user)
         try:
             data = json.loads(request.body)
 
             end_time_str = data.get("shift_end")
-            if end_time_str:
-                mission.shift_end = timezone.datetime.fromisoformat(end_time_str)
-            else:
-                mission.shift_end = timezone.now()
+            mission.shift_end = (
+                timezone.datetime.fromisoformat(end_time_str)
+                if end_time_str
+                else timezone.now()
+            )
 
-            # Record final odometer
             if "end_miles" in data:
                 val = data["end_miles"]
                 mission.end_miles = int(val) if val is not None else None
 
-            # Hours on duty
             val = data.get("hours_on_duty")
             if val is not None:
                 mission.hours_on_duty = float(val)
             else:
-                # Calculate elapsed time automatically
                 delta = mission.shift_end - mission.shift_start
                 mission.hours_on_duty = round(delta.total_seconds() / 3600.0, 2)
 
-            # Auto calculate total stops based on distinct stores visited across the entire mission
+            val_not_driving = data.get("hours_on_duty_not_driving")
+            if val_not_driving is not None and str(val_not_driving).strip() != "":
+                mission.hours_on_duty_not_driving = float(val_not_driving)
+            else:
+                mission.hours_on_duty_not_driving = None
+
             from ..models import LoadDelivery
 
             mission.total_stops = (
@@ -264,102 +306,131 @@ def complete_mission(request, pk):
             mission.save()
 
             logger.info(
-                f"MISSION_COMPLETE: Mission #{mission.id} signed off by operator {request.user.username}. Odometer end: {mission.end_miles}. stops: {mission.total_stops}."
+                "MISSION_COMPLETE: Mission #%s signed off by operator %s. Odometer end: %s. stops: %s.",
+                mission.id,
+                request.user.username,
+                mission.end_miles,
+                mission.total_stops,
             )
-            return JsonResponse(
-                {"status": "success", "mission": serialize_mission(mission)}
+            return json_success_response(data={"mission": serialize_mission(mission)})
+        except Exception as exc:
+            logger.error("MISSION_COMPLETE_FAIL: %s", str(exc))
+            return json_error_response(
+                request=request,
+                code="mission_complete_failed",
+                message="Mission completion failed.",
+                details={"exception": str(exc)},
+                status_code=400,
             )
-        except Exception as e:
-            logger.error(f"MISSION_COMPLETE_FAIL: {str(e)}")
-            return JsonResponse({"status": "error", "message": str(e)}, status=400)
 
-    return JsonResponse({"error": "Method not allowed"}, status=405)
+    return json_error_response(
+        request=request,
+        code="method_not_allowed",
+        message="Method not allowed.",
+        details={"method": request.method},
+        status_code=405,
+    )
 
 
 @login_required
 def order_create(request, mission_id):
-    """
-    ORDER_CREATE_API:
-    POST: Adds a new OrderNumber container to the mission.
-    """
+    """POST create an order number container under mission."""
     if request.method == "POST":
         mission = get_object_or_404(Mission, pk=mission_id, user=request.user)
         if mission.is_completed:
-            return JsonResponse(
-                {"status": "error", "message": "Cannot modify a completed mission."},
-                status=400,
+            return json_error_response(
+                request=request,
+                code="mission_completed",
+                message="Cannot modify a completed mission.",
+                status_code=400,
             )
 
         try:
             data = json.loads(request.body)
             order_number = data.get("order_number")
 
-            # Check if this order number already exists in this mission
-            # Note: The database constraint now enforces global uniqueness,
-            # but we keep this check for better API feedback.
             from django.db import IntegrityError
 
             try:
                 order = OrderNumber.objects.create(
-                    mission=mission, order_number=order_number
+                    mission=mission,
+                    order_number=order_number,
                 )
                 logger.info(
-                    f"ORDER_CREATE: Order #{order.order_number} created under Mission #{mission.id}."
+                    "ORDER_CREATE: Order #%s created under Mission #%s.",
+                    order.order_number,
+                    mission.id,
                 )
-                return JsonResponse(
-                    {
-                        "status": "success",
+                return json_success_response(
+                    data={
                         "order": {
                             "id": order.id,
                             "order_number": order.order_number,
                             "purchase_orders": [],
-                        },
+                        }
                     },
-                    status=201,
+                    status_code=201,
                 )
             except IntegrityError:
-                return JsonResponse(
-                    {
-                        "status": "error",
-                        "code": "DUPLICATE",
-                        "message": f"Order #{order_number} already exists in the system.",
-                    },
-                    status=400,
+                return json_error_response(
+                    request=request,
+                    code="duplicate_order_number",
+                    message=f"Order #{order_number} already exists in the system.",
+                    status_code=400,
                 )
-        except Exception as e:
-            logger.error(f"ORDER_CREATE_FAIL: {str(e)}")
-            return JsonResponse({"status": "error", "message": str(e)}, status=400)
+        except Exception as exc:
+            logger.error("ORDER_CREATE_FAIL: %s", str(exc))
+            return json_error_response(
+                request=request,
+                code="order_create_failed",
+                message="Order creation failed.",
+                details={"exception": str(exc)},
+                status_code=400,
+            )
 
-    return JsonResponse({"error": "Method not allowed"}, status=405)
+    return json_error_response(
+        request=request,
+        code="method_not_allowed",
+        message="Method not allowed.",
+        details={"method": request.method},
+        status_code=405,
+    )
 
 
 @login_required
 def fuel_types_list(request):
-    """API endpoint to get list of standardized fuel types with visual hex metadata."""
+    """GET list of standardized fuel types with visual hex metadata."""
     if request.method == "GET":
-        types = FuelType.objects.all()
-        return JsonResponse(
-            [
-                {
-                    "id": t.id,
-                    "name": t.name,
-                    "color_name": t.color_name,
-                    "color_hex": t.color_hex,
-                }
-                for t in types
-            ],
-            safe=False,
+        fuel_types = FuelType.objects.all()
+        return json_success_response(
+            data={
+                "fuel_types": [
+                    {
+                        "id": fuel_type.id,
+                        "name": fuel_type.name,
+                        "color_name": fuel_type.color_name,
+                        "color_hex": fuel_type.color_hex,
+                    }
+                    for fuel_type in fuel_types
+                ]
+            }
         )
-    return JsonResponse({"error": "Method not allowed"}, status=405)
+    return json_error_response(
+        request=request,
+        code="method_not_allowed",
+        message="Method not allowed.",
+        details={"method": request.method},
+        status_code=405,
+    )
 
 
 @login_required
 def agent_info(request):
-    """API endpoint to get tactical agent identity details."""
+    """GET tactical agent identity details."""
     if request.method == "GET":
         profile = getattr(request.user, "profile", None)
-        return JsonResponse(
-            {
+        return json_success_response(
+            data={
                 "username": request.user.username,
                 "callsign": (
                     profile.callsign
@@ -370,4 +441,10 @@ def agent_info(request):
                 "version": settings.APP_VERSION,
             }
         )
-    return JsonResponse({"error": "Method not allowed"}, status=405)
+    return json_error_response(
+        request=request,
+        code="method_not_allowed",
+        message="Method not allowed.",
+        details={"method": request.method},
+        status_code=405,
+    )

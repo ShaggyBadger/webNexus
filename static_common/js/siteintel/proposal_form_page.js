@@ -128,11 +128,11 @@ document.addEventListener("DOMContentLoaded", () => {
           (pos) => {
             updateLocation(pos.coords.latitude, pos.coords.longitude, 18);
             btn.innerText = "[ SIGNAL_LOCKED ]";
-            btn.classList.replace("btn-outline-primary", "btn-outline-success");
+            btn.classList.replace("btn-primary", "btn-success");
           },
           () => {
             btn.innerText = "[ SIGNAL_FAILED ]";
-            btn.classList.replace("btn-outline-primary", "btn-outline-danger");
+            btn.classList.replace("btn-primary", "btn-danger");
           },
           { enableHighAccuracy: true, timeout: 10000 },
         );
@@ -140,13 +140,13 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (error) {
       console.error("PROPOSAL_GPS_CAPTURE_FAILED", error);
       btn.innerText = "[ SIGNAL_FAILED ]";
-      btn.classList.replace("btn-outline-primary", "btn-outline-danger");
+      btn.classList.replace("btn-primary", "btn-danger");
     } finally {
       setTimeout(() => {
         btn.innerText = originalText;
         btn.disabled = false;
-        btn.classList.remove("btn-outline-success", "btn-outline-danger");
-        btn.classList.add("btn-outline-primary");
+        btn.classList.remove("btn-success", "btn-danger");
+        btn.classList.add("btn-primary");
       }, 3000);
     }
   };

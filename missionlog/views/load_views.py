@@ -1,11 +1,11 @@
 import json
 import logging
 from django.shortcuts import get_object_or_404
-from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
 from ..models import PurchaseOrder, LoadDelivery, FuelType
 from tankgauge.models.store_models import Store
 from ..logic.tank_calculations import calculate_gallons, calculate_inches
+from .api_contract import json_error_response, json_success_response
 
 logger = logging.getLogger("webnexus")
 
@@ -21,9 +21,11 @@ def load_create(request, po_id):
             PurchaseOrder, pk=po_id, order_parent__mission__user=request.user
         )
         if po.order_parent.mission.is_completed:
-            return JsonResponse(
-                {"status": "error", "message": "Cannot modify a completed mission."},
-                status=400,
+            return json_error_response(
+                request=request,
+                code="mission_completed",
+                message="Cannot modify a completed mission.",
+                status_code=400,
             )
 
         try:
@@ -53,12 +55,24 @@ def load_create(request, po_id):
             logger.info(
                 f"LOAD_CREATE: Load {fuel_type.name} to Store {store.store_num if store else 'Unlisted'} logged under PO #{po.po_number}."
             )
-            return JsonResponse({"status": "success", "load_id": load.id}, status=201)
+            return json_success_response(data={"load_id": load.id}, status_code=201)
         except Exception as e:
             logger.error(f"LOAD_CREATE_FAIL: {str(e)}")
-            return JsonResponse({"status": "error", "message": str(e)}, status=400)
+            return json_error_response(
+                request=request,
+                code="load_create_failed",
+                message="Load creation failed.",
+                details={"exception": str(e)},
+                status_code=400,
+            )
 
-    return JsonResponse({"error": "Method not allowed"}, status=405)
+    return json_error_response(
+        request=request,
+        code="method_not_allowed",
+        message="Method not allowed.",
+        details={"method": request.method},
+        status_code=405,
+    )
 
 
 @login_required
@@ -72,9 +86,11 @@ def load_update_delete(request, pk):
         LoadDelivery, pk=pk, purchase_order__order_parent__mission__user=request.user
     )
     if load.purchase_order.order_parent.mission.is_completed:
-        return JsonResponse(
-            {"status": "error", "message": "Cannot modify a completed mission."},
-            status=400,
+        return json_error_response(
+            request=request,
+            code="mission_completed",
+            message="Cannot modify a completed mission.",
+            status_code=400,
         )
 
     if request.method == "PUT":
@@ -114,17 +130,29 @@ def load_update_delete(request, pk):
 
             load.save()
             logger.info(f"LOAD_UPDATE: Load ID {load.id} delivery metrics updated.")
-            return JsonResponse({"status": "success"})
+            return json_success_response(data={"updated": True})
         except Exception as e:
             logger.error(f"LOAD_UPDATE_FAIL: {str(e)}")
-            return JsonResponse({"status": "error", "message": str(e)}, status=400)
+            return json_error_response(
+                request=request,
+                code="load_update_failed",
+                message="Load update failed.",
+                details={"exception": str(e)},
+                status_code=400,
+            )
 
     elif request.method == "DELETE":
         logger.info(f"LOAD_DELETE: Load ID {load.id} delivery record deleted.")
         load.delete()
-        return JsonResponse({"status": "success", "message": "Load deleted."})
+        return json_success_response(data={"message": "Load deleted."})
 
-    return JsonResponse({"error": "Method not allowed"}, status=405)
+    return json_error_response(
+        request=request,
+        code="method_not_allowed",
+        message="Method not allowed.",
+        details={"method": request.method},
+        status_code=405,
+    )
 
 
 @login_required
@@ -135,20 +163,27 @@ def stores_list(request):
     """
     if request.method == "GET":
         stores = Store.objects.all().order_by("store_num")
-        return JsonResponse(
-            [
-                {
-                    "id": s.id,
-                    "store_num": s.store_num,
-                    "store_name": s.store_name,
-                    "address": s.address,
-                    "city": s.city,
-                }
-                for s in stores
-            ],
-            safe=False,
+        return json_success_response(
+            data={
+                "stores": [
+                    {
+                        "id": s.id,
+                        "store_num": s.store_num,
+                        "store_name": s.store_name,
+                        "address": s.address,
+                        "city": s.city,
+                    }
+                    for s in stores
+                ]
+            }
         )
-    return JsonResponse({"error": "Method not allowed"}, status=405)
+    return json_error_response(
+        request=request,
+        code="method_not_allowed",
+        message="Method not allowed.",
+        details={"method": request.method},
+        status_code=405,
+    )
 
 
 @login_required
@@ -166,16 +201,15 @@ def tank_chart_lookup(request):
         end_gallons = request.GET.get("end_gallons")
 
         if not all([store_id, fuel_type]):
-            return JsonResponse(
-                {
-                    "status": "error",
-                    "message": "Parameters 'store_id' and 'fuel_type' are required.",
-                },
-                status=400,
+            return json_error_response(
+                request=request,
+                code="missing_required_parameters",
+                message="Parameters 'store_id' and 'fuel_type' are required.",
+                status_code=400,
             )
 
         try:
-            results = {"status": "success"}
+            results = {}
             if start_inches:
                 results["start_gallons"] = calculate_gallons(
                     store_id, fuel_type, start_inches
@@ -189,8 +223,20 @@ def tank_chart_lookup(request):
                     store_id, fuel_type, end_gallons
                 )
 
-            return JsonResponse(results)
+            return json_success_response(data=results)
         except Exception as e:
-            return JsonResponse({"status": "error", "message": str(e)}, status=400)
+            return json_error_response(
+                request=request,
+                code="tank_chart_lookup_failed",
+                message="Tank chart lookup failed.",
+                details={"exception": str(e)},
+                status_code=400,
+            )
 
-    return JsonResponse({"error": "Method not allowed"}, status=405)
+    return json_error_response(
+        request=request,
+        code="method_not_allowed",
+        message="Method not allowed.",
+        details={"method": request.method},
+        status_code=405,
+    )

@@ -85,7 +85,8 @@ urlpatterns = [
         fuel_views.fuel_log_update_delete,
         name="fuel_log_update_delete",
     ),
-    # The SPA Catch-All
-    # This captures /missionlog/, /missionlog/dashboard, etc., and serves the same index.html
+    # MissionLog shell catch-all
+    # Captures /missionlog/ and any legacy deep links, then serves the
+    # Django template shell used by the Alpine workflow.
     re_path(r"^.*$", spa_index, name="spa_index"),
 ]

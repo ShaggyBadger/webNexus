@@ -1,9 +1,9 @@
 import json
 import logging
 from django.shortcuts import get_object_or_404
-from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
 from ..models import Mission, PurchaseOrder, OrderNumber
+from .api_contract import json_error_response, json_success_response
 
 logger = logging.getLogger("webnexus")
 
@@ -17,9 +17,11 @@ def po_create(request, order_id):
     if request.method == "POST":
         order = get_object_or_404(OrderNumber, pk=order_id, mission__user=request.user)
         if order.mission.is_completed:
-            return JsonResponse(
-                {"status": "error", "message": "Cannot modify a completed mission."},
-                status=400,
+            return json_error_response(
+                request=request,
+                code="mission_completed",
+                message="Cannot modify a completed mission.",
+                status_code=400,
             )
 
         try:
@@ -35,27 +37,34 @@ def po_create(request, order_id):
                 logger.info(
                     f"PO_CREATE: PO #{po.po_number} created under Order #{order.order_number}."
                 )
-                return JsonResponse(
-                    {
-                        "status": "success",
-                        "po": {"id": po.id, "po_number": po.po_number, "loads": []},
-                    },
-                    status=201,
+                return json_success_response(
+                    data={"po": {"id": po.id, "po_number": po.po_number, "loads": []}},
+                    status_code=201,
                 )
             except IntegrityError:
-                return JsonResponse(
-                    {
-                        "status": "error",
-                        "code": "DUPLICATE",
-                        "message": f"PO #{po_number} already exists in the system.",
-                    },
-                    status=400,
+                return json_error_response(
+                    request=request,
+                    code="duplicate_po_number",
+                    message=f"PO #{po_number} already exists in the system.",
+                    status_code=400,
                 )
         except Exception as e:
             logger.error(f"PO_CREATE_FAIL: {str(e)}")
-            return JsonResponse({"status": "error", "message": str(e)}, status=400)
+            return json_error_response(
+                request=request,
+                code="po_create_failed",
+                message="Purchase order creation failed.",
+                details={"exception": str(e)},
+                status_code=400,
+            )
 
-    return JsonResponse({"error": "Method not allowed"}, status=405)
+    return json_error_response(
+        request=request,
+        code="method_not_allowed",
+        message="Method not allowed.",
+        details={"method": request.method},
+        status_code=405,
+    )
 
 
 @login_required
@@ -69,9 +78,11 @@ def po_detail_update_delete(request, pk):
         PurchaseOrder, pk=pk, order_parent__mission__user=request.user
     )
     if po.order_parent.mission.is_completed:
-        return JsonResponse(
-            {"status": "error", "message": "Cannot modify a completed mission."},
-            status=400,
+        return json_error_response(
+            request=request,
+            code="mission_completed",
+            message="Cannot modify a completed mission.",
+            status_code=400,
         )
 
     if request.method == "PUT":
@@ -83,16 +94,28 @@ def po_detail_update_delete(request, pk):
             logger.info(
                 f"PO_UPDATE: PO ID {po.id} changed from #{old_num} to #{po.po_number}."
             )
-            return JsonResponse({"status": "success", "po_number": po.po_number})
+            return json_success_response(data={"po_number": po.po_number})
         except Exception as e:
             logger.error(f"PO_UPDATE_FAIL: {str(e)}")
-            return JsonResponse({"status": "error", "message": str(e)}, status=400)
+            return json_error_response(
+                request=request,
+                code="po_update_failed",
+                message="Purchase order update failed.",
+                details={"exception": str(e)},
+                status_code=400,
+            )
 
     elif request.method == "DELETE":
         logger.info(
             f"PO_DELETE: PO #{po.po_number} removed from Order #{po.order_parent.order_number}."
         )
         po.delete()
-        return JsonResponse({"status": "success", "message": "Purchase Order deleted."})
+        return json_success_response(data={"message": "Purchase Order deleted."})
 
-    return JsonResponse({"error": "Method not allowed"}, status=405)
+    return json_error_response(
+        request=request,
+        code="method_not_allowed",
+        message="Method not allowed.",
+        details={"method": request.method},
+        status_code=405,
+    )

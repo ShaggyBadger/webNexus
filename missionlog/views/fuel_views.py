@@ -1,9 +1,9 @@
 import json
 import logging
 from django.shortcuts import get_object_or_404
-from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
 from ..models import Mission, TruckFuelLog
+from .api_contract import json_error_response, json_success_response
 
 logger = logging.getLogger("webnexus")
 
@@ -17,9 +17,11 @@ def fuel_log_create(request, mission_id):
     if request.method == "POST":
         mission = get_object_or_404(Mission, pk=mission_id, user=request.user)
         if mission.is_completed:
-            return JsonResponse(
-                {"status": "error", "message": "Cannot modify a completed mission."},
-                status=400,
+            return json_error_response(
+                request=request,
+                code="mission_completed",
+                message="Cannot modify a completed mission.",
+                status_code=400,
             )
 
         try:
@@ -33,14 +35,24 @@ def fuel_log_create(request, mission_id):
             logger.info(
                 f"FUEL_CREATE: Truck fuel log logged under Mission #{mission.id} ({gallons} gal pumped)."
             )
-            return JsonResponse(
-                {"status": "success", "fuel_log_id": fuel.id}, status=201
-            )
+            return json_success_response(data={"fuel_log_id": fuel.id}, status_code=201)
         except Exception as e:
             logger.error(f"FUEL_CREATE_FAIL: {str(e)}")
-            return JsonResponse({"status": "error", "message": str(e)}, status=400)
+            return json_error_response(
+                request=request,
+                code="fuel_log_create_failed",
+                message="Fuel log creation failed.",
+                details={"exception": str(e)},
+                status_code=400,
+            )
 
-    return JsonResponse({"error": "Method not allowed"}, status=405)
+    return json_error_response(
+        request=request,
+        code="method_not_allowed",
+        message="Method not allowed.",
+        details={"method": request.method},
+        status_code=405,
+    )
 
 
 @login_required
@@ -52,9 +64,11 @@ def fuel_log_update_delete(request, pk):
     """
     fuel = get_object_or_404(TruckFuelLog, pk=pk, mission__user=request.user)
     if fuel.mission.is_completed:
-        return JsonResponse(
-            {"status": "error", "message": "Cannot modify a completed mission."},
-            status=400,
+        return json_error_response(
+            request=request,
+            code="mission_completed",
+            message="Cannot modify a completed mission.",
+            status_code=400,
         )
 
     if request.method == "PUT":
@@ -68,16 +82,28 @@ def fuel_log_update_delete(request, pk):
             logger.info(
                 f"FUEL_UPDATE: Truck fuel log ID {fuel.id} purchase values updated."
             )
-            return JsonResponse({"status": "success"})
+            return json_success_response(data={"updated": True})
         except Exception as e:
             logger.error(f"FUEL_UPDATE_FAIL: {str(e)}")
-            return JsonResponse({"status": "error", "message": str(e)}, status=400)
+            return json_error_response(
+                request=request,
+                code="fuel_log_update_failed",
+                message="Fuel log update failed.",
+                details={"exception": str(e)},
+                status_code=400,
+            )
 
     elif request.method == "DELETE":
         logger.info(
             f"FUEL_DELETE: Truck fuel log ID {fuel.id} removed from Mission #{fuel.mission.id}."
         )
         fuel.delete()
-        return JsonResponse({"status": "success", "message": "Fuel log entry deleted."})
+        return json_success_response(data={"message": "Fuel log entry deleted."})
 
-    return JsonResponse({"error": "Method not allowed"}, status=405)
+    return json_error_response(
+        request=request,
+        code="method_not_allowed",
+        message="Method not allowed.",
+        details={"method": request.method},
+        status_code=405,
+    )

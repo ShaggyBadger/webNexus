@@ -4,7 +4,6 @@ import uuid
 import random
 from django.shortcuts import get_object_or_404
 from django.db import transaction
-from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 from ..models import (
@@ -17,6 +16,7 @@ from ..models import (
 )
 from tankgauge.models.store_models import Store
 from .mission_views import serialize_mission
+from .api_contract import json_error_response, json_success_response
 
 logger = logging.getLogger("webnexus")
 
@@ -57,6 +57,15 @@ def post_trip_create(request):
                 hours_on_duty = None
                 shift_end = None
 
+            hours_on_duty_not_driving = data.get("hours_on_duty_not_driving")
+            if (
+                hours_on_duty_not_driving is not None
+                and str(hours_on_duty_not_driving).strip() != ""
+            ):
+                hours_on_duty_not_driving = float(hours_on_duty_not_driving)
+            else:
+                hours_on_duty_not_driving = None
+
             start_miles = data.get("start_miles")
             total_miles = data.get("total_miles")
 
@@ -76,13 +85,18 @@ def post_trip_create(request):
             deliveries_data = data.get("deliveries", [])
             truck_fuel = data.get("truck_fuel")  # Expecting {gallons, price_per_gallon}
 
-            # SAFEGUARD: Check if an active mission already exists to prevent duplication
-            # if is_completed is False (partial save).
+            # SAFEGUARD: Check if an active mission already exists to prevent
+            # duplication when this is a partial save. No time-window cutoff is
+            # used so operators can resume work after multiple days.
             if not is_completed:
-                cutoff = timezone.now() - timezone.timedelta(hours=48)
-                existing_active = Mission.objects.filter(
-                    user=request.user, is_completed=False, shift_start__gte=cutoff
-                ).first()
+                existing_active = (
+                    Mission.objects.filter(
+                        user=request.user,
+                        is_completed=False,
+                    )
+                    .order_by("-shift_start", "-id")
+                    .first()
+                )
                 if existing_active:
                     logger.info(
                         f"POST_TRIP_SAFEGUARD: Redirecting partial save to existing Active Mission #{existing_active.id}"
@@ -91,14 +105,12 @@ def post_trip_create(request):
                     # For simplicity here, we'll just return a message asking to update or we can handle it.
                     # Actually, better to redirect the frontend or just handle it here.
                     # Let's let the frontend handle the ID resolution, but this check ensures DB integrity.
-                    return JsonResponse(
-                        {
-                            "status": "error",
-                            "code": "ACTIVE_EXISTS",
-                            "message": "An active mission already exists. Your session will refresh to sync with it.",
-                            "mission_id": existing_active.id,
-                        },
-                        status=409,
+                    return json_error_response(
+                        request=request,
+                        code="active_mission_exists",
+                        message="An active mission already exists. Your session will refresh to sync with it.",
+                        details={"mission_id": existing_active.id},
+                        status_code=409,
                     )
 
             # 1. Create Mission
@@ -109,6 +121,7 @@ def post_trip_create(request):
                 start_miles=start_miles,
                 end_miles=end_miles,
                 hours_on_duty=hours_on_duty,
+                hours_on_duty_not_driving=hours_on_duty_not_driving,
                 is_completed=is_completed,
                 notes=notes,
             )
@@ -209,15 +222,28 @@ def post_trip_create(request):
             logger.info(
                 f"POST_TRIP_SUCCESS: Mission #{mission.id} ingested successfully. status: {'COMPLETED' if is_completed else 'ACTIVE'}."
             )
-            return JsonResponse(
-                {"status": "success", "mission": serialize_mission(mission)}, status=201
+            return json_success_response(
+                data={"mission": serialize_mission(mission)},
+                status_code=201,
             )
 
         except Exception as e:
             logger.error(f"POST_TRIP_FAIL: {str(e)}")
-            return JsonResponse({"status": "error", "message": str(e)}, status=400)
+            return json_error_response(
+                request=request,
+                code="post_trip_create_failed",
+                message="Post-trip creation failed.",
+                details={"exception": str(e)},
+                status_code=400,
+            )
 
-    return JsonResponse({"error": "Method not allowed"}, status=405)
+    return json_error_response(
+        request=request,
+        code="method_not_allowed",
+        message="Method not allowed.",
+        details={"method": request.method},
+        status_code=405,
+    )
 
 
 @login_required
@@ -253,6 +279,15 @@ def post_trip_update(request, pk):
                 hours_on_duty = None
                 shift_end = None
 
+            hours_on_duty_not_driving = data.get("hours_on_duty_not_driving")
+            if (
+                hours_on_duty_not_driving is not None
+                and str(hours_on_duty_not_driving).strip() != ""
+            ):
+                hours_on_duty_not_driving = float(hours_on_duty_not_driving)
+            else:
+                hours_on_duty_not_driving = None
+
             start_miles = data.get("start_miles")
             total_miles = data.get("total_miles")
 
@@ -278,6 +313,7 @@ def post_trip_update(request, pk):
             mission.start_miles = start_miles
             mission.end_miles = end_miles
             mission.hours_on_duty = hours_on_duty
+            mission.hours_on_duty_not_driving = hours_on_duty_not_driving
             mission.is_completed = is_completed
             mission.notes = notes
             mission.save()
@@ -381,12 +417,22 @@ def post_trip_update(request, pk):
             logger.info(
                 f"POST_TRIP_UPDATE_SUCCESS: Mission #{mission.id} updated. status: {'COMPLETED' if is_completed else 'ACTIVE'}."
             )
-            return JsonResponse(
-                {"status": "success", "mission": serialize_mission(mission)}
-            )
+            return json_success_response(data={"mission": serialize_mission(mission)})
 
         except Exception as e:
             logger.error(f"POST_TRIP_UPDATE_FAIL: {str(e)}")
-            return JsonResponse({"status": "error", "message": str(e)}, status=400)
+            return json_error_response(
+                request=request,
+                code="post_trip_update_failed",
+                message="Post-trip update failed.",
+                details={"exception": str(e)},
+                status_code=400,
+            )
 
-    return JsonResponse({"error": "Method not allowed"}, status=405)
+    return json_error_response(
+        request=request,
+        code="method_not_allowed",
+        message="Method not allowed.",
+        details={"method": request.method},
+        status_code=405,
+    )

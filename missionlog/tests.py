@@ -1,3 +1,115 @@
-from django.test import TestCase
+import json
+from datetime import timedelta
 
-# Create your tests here.
+from django.contrib.auth.models import User
+from django.test import TestCase
+from django.urls import reverse
+from django.utils import timezone
+
+from missionlog.models import Mission
+
+
+class MissionResumeBehaviorTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="operator", password="pass12345")
+        self.client.force_login(self.user)
+
+    def test_active_mission_returns_latest_incomplete_without_time_cutoff(self):
+        old_incomplete = Mission.objects.create(
+            user=self.user,
+            shift_start=timezone.now() - timedelta(days=3),
+            is_completed=False,
+        )
+        latest_incomplete = Mission.objects.create(
+            user=self.user,
+            shift_start=timezone.now() - timedelta(days=1),
+            is_completed=False,
+        )
+        Mission.objects.create(
+            user=self.user,
+            shift_start=timezone.now(),
+            is_completed=True,
+        )
+
+        response = self.client.get(reverse("missionlog:active_mission"))
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "success")
+        self.assertTrue(payload["data"]["active"])
+        self.assertEqual(payload["data"]["mission"]["id"], latest_incomplete.id)
+        self.assertNotEqual(payload["data"]["mission"]["id"], old_incomplete.id)
+
+    def test_active_mission_serializes_not_driving_hours(self):
+        mission = Mission.objects.create(
+            user=self.user,
+            shift_start=timezone.now() - timedelta(hours=5),
+            is_completed=False,
+            hours_on_duty_not_driving=1.75,
+        )
+
+        response = self.client.get(reverse("missionlog:active_mission"))
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "success")
+        self.assertEqual(payload["data"]["mission"]["id"], mission.id)
+        self.assertEqual(payload["data"]["mission"]["hours_on_duty_not_driving"], 1.75)
+
+    def test_start_mission_blocks_when_old_incomplete_exists(self):
+        Mission.objects.create(
+            user=self.user,
+            shift_start=timezone.now() - timedelta(days=4),
+            is_completed=False,
+        )
+
+        response = self.client.post(
+            reverse("missionlog:mission_list_or_create"),
+            data=json.dumps({"start_miles": 100}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        payload = response.json()
+        self.assertEqual(payload["error"]["code"], "active_mission_exists")
+        self.assertIn("active mission", payload["error"]["message"].lower())
+
+    def test_post_trip_partial_save_returns_existing_old_incomplete(self):
+        existing = Mission.objects.create(
+            user=self.user,
+            shift_start=timezone.now() - timedelta(days=5),
+            is_completed=False,
+        )
+
+        response = self.client.post(
+            reverse("missionlog:post_trip_create"),
+            data=json.dumps(
+                {
+                    "shift_start": timezone.now().isoformat(),
+                    "is_completed": False,
+                    "deliveries": [],
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 409)
+        payload = response.json()
+        self.assertEqual(payload["error"]["code"], "active_mission_exists")
+        self.assertEqual(payload["error"]["details"]["mission_id"], existing.id)
+
+
+class MissionLogShellAccessTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="shelluser", password="pass12345")
+
+    def test_shell_requires_login(self):
+        response = self.client.get(reverse("missionlog:spa_index"))
+        self.assertEqual(response.status_code, 302)
+
+    def test_shell_renders_django_template_for_authenticated_user(self):
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("missionlog:spa_index"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "[ MISSIONLOG CONSOLE ]")

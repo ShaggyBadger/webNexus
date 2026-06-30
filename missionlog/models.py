@@ -64,6 +64,13 @@ class Mission(models.Model):
         blank=True,
         help_text="Total duty hours logged.",
     )
+    hours_on_duty_not_driving = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Total on-duty hours where the truck was not being driven.",
+    )
     is_completed = models.BooleanField(
         default=False, help_text="True if Jocko 'Mission Complete' protocol executed."
     )

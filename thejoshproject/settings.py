@@ -115,7 +115,6 @@ TEMPLATES = [
         "BACKEND": "django.template.backends.django.DjangoTemplates",
         "DIRS": [
             BASE_DIR / "templates",
-            BASE_DIR / "frontend-missionlog" / "dist",
         ],
         "APP_DIRS": True,
         "OPTIONS": {
@@ -199,7 +198,6 @@ STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [
     BASE_DIR / "static_common",
-    BASE_DIR / "frontend-missionlog" / "dist",
 ]
 
 # Media files (uploaded documents)

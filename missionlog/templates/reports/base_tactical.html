@@ -32,7 +32,7 @@
 <div class="container tactical-report-container">
     <h2 class="text-primary mb-4">Mission Report #{{ mission_id }}</h2>
     
-    <div id="report-content">
+    <div id="report-content" data-report-url="{% url 'missionlog:report_api' mission_id %}">
         <!-- JS will populate this from the API -->
         <p>Loading Intelligence...</p>
     </div>
@@ -40,20 +40,5 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script>
-    fetch('/missionlog/api/reports/{{ mission_id }}/')
-        .then(response => response.json())
-        .then(data => {
-            const container = document.getElementById('report-content');
-            container.innerHTML = `
-                <div class="tactical-card">
-                    <h4>Fuel Intelligence</h4>
-                    <div class="metric-label">Gross Gallons</div>
-                    <div class="metric-value">${data.metrics.fuel.total_gross_gallons.value}</div>
-                    <div class="metric-label">MPG</div>
-                    <div class="metric-value">${data.metrics.efficiency.mpg.value}</div>
-                </div>
-            `;
-        });
-</script>
+<script src="{% static 'js/missionlog/report_page.js' %}"></script>
 {% endblock %}
