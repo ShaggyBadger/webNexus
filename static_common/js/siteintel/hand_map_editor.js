@@ -22,6 +22,10 @@ document.addEventListener("DOMContentLoaded", function () {
   const returnUrl = container.dataset.returnUrl;
   const existingMapJson = container.dataset.existingMapJson || "";
   const modeToggle = document.getElementById("mode-toggle");
+  const controlsPanel = document.querySelector(".map-controls");
+  const toggleControlsButton = document.getElementById("btn-toggle-controls");
+  const zoomInButton = document.getElementById("btn-zoom-in");
+  const zoomOutButton = document.getElementById("btn-zoom-out");
 
   const canvas = new fabric.Canvas("hand-map-canvas", {
     isDrawingMode: true,
@@ -38,6 +42,7 @@ document.addEventListener("DOMContentLoaded", function () {
   let redoStack = [];
   let isProcessingStack = false;
   let initialDistance = null;
+  let controlsCollapsed = false;
 
   canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
   canvas.freeDrawingBrush.color = "#ffb86c";
@@ -139,6 +144,16 @@ document.addEventListener("DOMContentLoaded", function () {
     document.getElementById("zoom-level").innerText = `ZOOM: ${zoom}%`;
   }
 
+  function applyZoom(multiplier) {
+    const center = new fabric.Point(canvas.getWidth() / 2, canvas.getHeight() / 2);
+    let zoom = canvas.getZoom() * multiplier;
+    if (zoom > 20) zoom = 20;
+    if (zoom < 0.05) zoom = 0.05;
+    canvas.zoomToPoint(center, zoom);
+    canvas.requestRenderAll();
+    updateZoomDisplay();
+  }
+
   function getEventCoordinates(evt) {
     if (evt.touches && evt.touches.length > 0) {
       return { x: evt.touches[0].clientX, y: evt.touches[0].clientY };
@@ -183,6 +198,28 @@ document.addEventListener("DOMContentLoaded", function () {
       }
     }
   });
+
+  if (zoomInButton) {
+    zoomInButton.addEventListener("click", function () {
+      applyZoom(1.12);
+    });
+  }
+
+  if (zoomOutButton) {
+    zoomOutButton.addEventListener("click", function () {
+      applyZoom(0.88);
+    });
+  }
+
+  if (toggleControlsButton && controlsPanel) {
+    toggleControlsButton.addEventListener("click", function () {
+      controlsCollapsed = !controlsCollapsed;
+      controlsPanel.classList.toggle("collapsed", controlsCollapsed);
+      toggleControlsButton.innerText = controlsCollapsed
+        ? "[ SHOW_TOOLS ]"
+        : "[ HIDE_TOOLS ]";
+    });
+  }
 
   canvas.on("mouse:down", function (opt) {
     const evt = opt.e;
@@ -504,6 +541,7 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 
   setActiveTool("brush");
+  updateZoomDisplay();
   window.addEventListener("resize", () => {
     canvas.setWidth(window.innerWidth);
     canvas.setHeight(window.innerHeight);

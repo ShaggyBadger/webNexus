@@ -1,4 +1,8 @@
 (function () {
+  let intelMapInstance = null;
+  let intelMapTileLayer = null;
+  let intelMapInitialMode = "STANDARD";
+
   function getMapTileLayer(mode) {
     if (mode === "DARK") {
       return L.tileLayer(
@@ -54,8 +58,24 @@
   }
 
   function createMapController() {
+    if (intelMapInstance) {
+      return {
+        initialMode: intelMapInitialMode,
+        setMode: function (mode) {
+          if (intelMapTileLayer) {
+            intelMapInstance.removeLayer(intelMapTileLayer);
+          }
+          intelMapTileLayer = getMapTileLayer(mode).addTo(intelMapInstance);
+        },
+      };
+    }
+
     const container = document.getElementById("intel-map");
     if (!container || typeof L === "undefined") {
+      return null;
+    }
+
+    if (container._leaflet_id) {
       return null;
     }
 
@@ -75,13 +95,17 @@
     L.marker([lat, lon]).addTo(map).bindPopup(`<span class="mono">TARGET: ${siteName}</span>`);
     renderOverlay(map, overlay);
 
+    intelMapInstance = map;
+    intelMapTileLayer = layer;
+    intelMapInitialMode = initialMode;
+
     return {
       initialMode: initialMode,
       setMode: function (mode) {
-        if (layer) {
-          map.removeLayer(layer);
+        if (intelMapTileLayer) {
+          intelMapInstance.removeLayer(intelMapTileLayer);
         }
-        layer = getMapTileLayer(mode).addTo(map);
+        intelMapTileLayer = getMapTileLayer(mode).addTo(intelMapInstance);
       },
     };
   }
@@ -91,6 +115,14 @@
       return raw.data;
     }
     return raw;
+  }
+
+  function parseNumberOrNull(value) {
+    if (value === undefined || value === null || value === "") {
+      return null;
+    }
+    const parsed = Number(value);
+    return Number.isNaN(parsed) ? null : parsed;
   }
 
   window.siteLocationDetailApp = function () {
@@ -168,7 +200,7 @@
       init: function () {
         const initialMode = this.$root.dataset.initialIntelMode || "DEFAULT";
         this.intelLayer = initialMode === "PERSONAL" ? "PERSONAL" : "DEFAULT";
-        this.mapController = createMapController();
+        this.mapController = this.mapController || createMapController();
         if (this.mapController) {
           this.setMapMode(this.mapController.initialMode);
         }
@@ -201,7 +233,14 @@
         this.$nextTick(function () {
           const firstButton = self.$root.querySelector(".tank-config-btn");
           if (firstButton) {
-            firstButton.click();
+            self.selectTank({
+              id: Number(firstButton.dataset.tankId),
+              tankIndex: parseNumberOrNull(firstButton.dataset.tankIndex),
+              fuelType: firstButton.dataset.fuelType || "UNKNOWN",
+              capacity: parseNumberOrNull(firstButton.dataset.capacity),
+              maxDepth: parseNumberOrNull(firstButton.dataset.maxDepth),
+              model: firstButton.dataset.model || "UNKNOWN",
+            });
           }
         });
       },
@@ -247,26 +286,41 @@
             `/tankgauge/api/tanks/${this.selectedTank.id}/chart-data/`,
           );
           this.tankProfileData = data;
+          this.tankProfileLoading = false;
           const self = this;
           this.$nextTick(function () {
-            self.renderTankChart();
+            window.requestAnimationFrame(function () {
+              self.renderTankChart();
+            });
           });
         } catch (error) {
           this.tankProfileError = error.message;
-        } finally {
           this.tankProfileLoading = false;
         }
       },
 
       destroyTankChart: function () {
         if (this.tankChartInstance) {
-          this.tankChartInstance.destroy();
+          try {
+            this.tankChartInstance.destroy();
+          } catch (error) {
+            console.warn("TANK_CHART_DESTROY_WARNING", error);
+          }
           this.tankChartInstance = null;
         }
       },
 
       renderTankChart: function () {
-        if (typeof Chart === "undefined" || !this.$refs.tankProfileChart) {
+        const canvas = this.$refs.tankProfileChart;
+        if (
+          typeof Chart === "undefined" ||
+          !canvas ||
+          typeof canvas.getContext !== "function"
+        ) {
+          return;
+        }
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
           return;
         }
 
@@ -329,10 +383,16 @@
           });
         }
 
-        this.tankChartInstance = new Chart(this.$refs.tankProfileChart, {
+        if (!datasets.length) {
+          this.tankProfileError = "No chart data available for this tank.";
+          return;
+        }
+
+        this.tankChartInstance = new Chart(ctx, {
           type: "scatter",
           data: { datasets: datasets },
           options: {
+            animation: false,
             responsive: true,
             maintainAspectRatio: false,
             scales: {

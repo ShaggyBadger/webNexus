@@ -38,13 +38,19 @@
     }
     .map-controls {
         position: absolute;
-        top: 10px;
+        top: 48px;
         left: 10px;
         z-index: 1000;
         display: flex;
         flex-direction: column;
         gap: 8px;
         width: 180px;
+        transition: transform 0.2s ease, opacity 0.2s ease;
+    }
+    .map-controls.collapsed {
+        transform: translateX(-210px);
+        opacity: 0;
+        pointer-events: none;
     }
     .map-actions {
         position: absolute;
@@ -132,6 +138,29 @@
         z-index: 1000;
         border: 1px solid var(--navbar-border);
     }
+    .controls-toggle-btn {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        z-index: 1100;
+        font-size: 0.58rem;
+        letter-spacing: 1px;
+        background: rgba(18, 20, 23, 0.92);
+    }
+    .zoom-controls {
+        position: absolute;
+        bottom: 20px;
+        left: 115px;
+        z-index: 1100;
+        display: flex;
+        gap: 6px;
+    }
+    .zoom-controls .btn {
+        min-width: 34px;
+        font-size: 0.75rem;
+        line-height: 1;
+        padding: 5px 8px;
+    }
     .nav-hint {
         position: absolute;
         top: 10px;
@@ -156,11 +185,17 @@
 >
     <canvas id="hand-map-canvas"></canvas>
 
+    <button id="btn-toggle-controls" type="button" class="btn btn-outline-secondary btn-sm mono controls-toggle-btn">[ HIDE_TOOLS ]</button>
+
     <div class="nav-hint mono">
         ALT+DRAG or [PAN_MODE] to move
     </div>
 
     <div class="zoom-indicator mono" id="zoom-level">ZOOM: 100%</div>
+    <div class="zoom-controls">
+        <button id="btn-zoom-out" type="button" class="btn btn-outline-secondary btn-sm mono">-</button>
+        <button id="btn-zoom-in" type="button" class="btn btn-outline-secondary btn-sm mono">+</button>
+    </div>
 
     <!-- Overlay Controls -->
     <div class="map-controls">

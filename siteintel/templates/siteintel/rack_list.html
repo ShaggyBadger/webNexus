@@ -86,57 +86,5 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script>
-document.querySelectorAll('.manual-checkin-btn').forEach(btn => {
-    btn.addEventListener('click', async function() {
-        const rackId = this.getAttribute('data-rack-id');
-        const rackName = this.getAttribute('data-rack-name');
-        const originalText = this.innerText;
-        
-        this.disabled = true;
-        this.innerText = "RECORDING...";
-
-        try {
-            // Get current position if possible
-            let lat = null, lon = null, accuracy = null;
-            if (navigator.geolocation) {
-                const pos = await new Promise((resolve, reject) => {
-                    navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 });
-                }).catch(() => null);
-                if (pos) {
-                    lat = pos.coords.latitude;
-                    lon = pos.coords.longitude;
-                    accuracy = pos.coords.accuracy;
-                }
-            }
-
-            const response = await fetch('/siteintel/api/rack-checkin/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': '{{ csrf_token }}'
-                },
-                body: JSON.stringify({
-                    rack_id: rackId,
-                    lat: lat,
-                    lon: lon,
-                    accuracy: accuracy
-                })
-            });
-
-            if (response.ok) {
-                this.innerText = "CHECK-IN SUCCESS";
-                this.classList.replace('btn-outline-warning', 'btn-success');
-                setTimeout(() => location.reload(), 2000);
-            } else {
-                throw new Error("Check-in failed");
-            }
-        } catch (error) {
-            console.error("Manual Check-in Error:", error);
-            this.innerText = "ERROR - RETRY";
-            this.disabled = false;
-        }
-    });
-});
-</script>
+<script src="{% static 'js/siteintel/rack_list_page.js' %}"></script>
 {% endblock %}

@@ -140,9 +140,9 @@
                         <span class="d-md-none">SITE_CONFIG</span>
                     </div>
                     {% if user.is_authenticated %}
-                    <a href="{% url 'siteintel:proposal_create' %}?location_id={{ location.id }}" class="btn btn-outline-warning btn-sm mono py-0" style="font-size: 0.65rem;">
+                    <a href="{% url 'siteintel:proposal_create' %}?location_id={{ location.id }}" class="btn btn-warning btn-sm mono py-1 px-2 text-dark text-nowrap" style="font-size: 0.65rem;">
                         <span class="d-none d-md-inline">[ PROPOSE_UPDATE ]</span>
-                        <span class="d-none d-md-none">UPDATE</span>
+                        <span class="d-md-none">UPDATE</span>
                     </a>
                     {% endif %}
                 </div>
@@ -412,7 +412,7 @@
                     </div>
                     
                     {% if user.is_authenticated %}
-                    <a href="{% url 'siteintel:intel_update' location.id %}" class="btn btn-primary btn-sm mono py-0 flex-shrink-0 ms-2" style="font-size: 0.65rem;">
+                    <a href="{% url 'siteintel:intel_update' location.id %}" class="btn btn-warning btn-sm mono py-0 flex-shrink-0 ms-2 text-dark" style="font-size: 0.65rem;">
                         <span class="d-none d-md-inline">[ UPDATE INTEL ]</span>
                         <span class="d-md-none">UPDATE</span>
                     </a>
@@ -451,7 +451,7 @@
                         <span class="d-md-none">SKETCH</span>
                     </div>
                     {% if user.is_authenticated %}
-                    <a href="{% url 'siteintel:hand_map_edit' location.id %}" class="btn btn-outline-warning btn-sm mono py-0" style="font-size: 0.65rem;">
+                    <a href="{% url 'siteintel:hand_map_edit' location.id %}" class="btn btn-warning btn-sm mono py-0 text-dark" style="font-size: 0.65rem;">
                         <span class="d-none d-md-inline">{% if personal_hand_map %}[ EDIT_SKETCH ]{% else %}[ ADD_SKETCH ]{% endif %}</span>
                         <span class="d-md-none">{% if personal_hand_map %}EDIT{% else %}ADD{% endif %}</span>
                     </a>
