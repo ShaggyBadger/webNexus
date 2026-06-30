@@ -2,7 +2,6 @@ from django.urls import path
 from .views import (
     closest_store_api,
     delivery_form,
-    delivery_submit,
     CalculateTankAPIView,
     EstimationHealthAPIView,
     StoreTanksAPIView,
@@ -26,7 +25,6 @@ urlpatterns = [
     ),
     # Page views
     path("delivery/", delivery_form, name="delivery_form"),
-    path("delivery/submit/", delivery_submit, name="delivery_submit"),
     path(
         "api/calculate-tank/", CalculateTankAPIView.as_view(), name="calculate_tank_api"
     ),

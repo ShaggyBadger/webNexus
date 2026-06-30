@@ -61,9 +61,9 @@ function tankGaugeApp() {
       }
 
       if (!response.ok) {
-        throw new Error(data?.error || fallbackMessage);
+        throw new Error(this.extractErrorMessage(data, fallbackMessage));
       }
-      return data;
+      return this.extractSuccessData(data);
     },
 
     async apiPost(url, payload, fallbackMessage) {
@@ -84,9 +84,32 @@ function tankGaugeApp() {
       }
 
       if (!response.ok) {
-        throw new Error(data?.error || fallbackMessage);
+        throw new Error(this.extractErrorMessage(data, fallbackMessage));
+      }
+      return this.extractSuccessData(data);
+    },
+
+    extractSuccessData(data) {
+      if (data && data.status === "success" && data.data !== undefined) {
+        return data.data;
       }
       return data;
+    },
+
+    extractErrorMessage(data, fallbackMessage) {
+      if (!data) {
+        return fallbackMessage;
+      }
+
+      if (typeof data.error === "string") {
+        return data.error;
+      }
+
+      if (data.error && typeof data.error.message === "string") {
+        return data.error.message;
+      }
+
+      return fallbackMessage;
     },
 
     async fetchStoreTanks() {

@@ -154,7 +154,8 @@ export const IntelSelector = {
 
                 fetch(`${url}?lat=${lat}&lon=${lon}`)
                     .then(response => response.json())
-                    .then(data => {
+                    .then(raw => {
+                        const data = (raw && raw.status === "success" && raw.data) ? raw.data : raw;
                         resultsContainer.innerHTML = '';
                         if (data.results && data.results.length > 0) {
                             this.renderResults(data.results, resultsContainer, true);

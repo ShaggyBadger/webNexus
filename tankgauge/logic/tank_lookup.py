@@ -50,12 +50,18 @@ def get_store_and_preset_status(store_id):
     Maps to Store #6949, which serves as the canonical baseline for standard 7-Eleven sites.
     """
     if store_id == "7-11_STD":
-        logger.info("PRESET_ACQUISITION: Using Store #6949 as 7-11 Standard Preset")
+        logger.info(
+            "PRESET_ACQUISITION",
+            extra={"store_num": 6949, "reason_code": "preset_7_11_std"},
+        )
         return Store.objects.filter(store_num=6949).first(), True
 
     store = get_store_by_any_id(store_id)
     if not store:
-        logger.warning(f"LOOKUP_FAILED: No store found for identifier '{store_id}'")
+        logger.warning(
+            "LOOKUP_FAILED",
+            extra={"store_id": store_id, "reason_code": "store_not_found"},
+        )
 
     return store, False
 
@@ -86,7 +92,14 @@ def get_tank_mapping(store, fuel_type, tank_index=None):
                 if mapping:
                     _increment_mapping_metric("strict_match")
                     logger.debug(
-                        f"MAPPING_FOUND_STRICT: reason_code=strict_match store={store.store_num} fuel={search_fuel} tank_index={val} mapping_id={mapping.id}"
+                        "MAPPING_FOUND_STRICT",
+                        extra={
+                            "reason_code": "strict_match",
+                            "store_num": store.store_num,
+                            "fuel_type": search_fuel,
+                            "tank_index": val,
+                            "mapping_id": mapping.id,
+                        },
                     )
                     return mapping
         except (ValueError, TypeError):
@@ -102,16 +115,37 @@ def get_tank_mapping(store, fuel_type, tank_index=None):
         if tank_index is not None:
             _increment_mapping_metric("fallback_no_exact_index_match")
             logger.warning(
-                f"MAPPING_FALLBACK: reason_code=fallback_no_exact_index_match store={store.store_num} fuel={search_fuel} requested_tank_index={tank_index} mapping_id={mapping.id} mapping_tank_index={mapping.tank_index}"
+                "MAPPING_FALLBACK",
+                extra={
+                    "reason_code": "fallback_no_exact_index_match",
+                    "store_num": store.store_num,
+                    "fuel_type": search_fuel,
+                    "requested_tank_index": tank_index,
+                    "mapping_id": mapping.id,
+                    "mapping_tank_index": mapping.tank_index,
+                },
             )
         else:
             _increment_mapping_metric("fallback_no_index_provided")
             logger.debug(
-                f"MAPPING_FOUND_LEGACY: reason_code=fallback_no_index_provided store={store.store_num} fuel={search_fuel} mapping_id={mapping.id} mapping_tank_index={mapping.tank_index}"
+                "MAPPING_FOUND_LEGACY",
+                extra={
+                    "reason_code": "fallback_no_index_provided",
+                    "store_num": store.store_num,
+                    "fuel_type": search_fuel,
+                    "mapping_id": mapping.id,
+                    "mapping_tank_index": mapping.tank_index,
+                },
             )
     else:
         logger.warning(
-            f"MAPPING_MISSING: No tank defined for Store #{store.store_num} {fuel_type} (searched for: {search_fuel})"
+            "MAPPING_MISSING",
+            extra={
+                "reason_code": "mapping_not_found",
+                "store_num": store.store_num,
+                "fuel_type_requested": fuel_type,
+                "fuel_type_canonical": search_fuel,
+            },
         )
 
     return mapping
@@ -133,6 +167,12 @@ def get_all_tank_mappings(store, fuel_type):
     )
 
     logger.debug(
-        f"MANIFOLD_SCAN: Found {len(mappings)} tanks for Store #{store.store_num} {fuel_type}"
+        "MANIFOLD_SCAN",
+        extra={
+            "reason_code": "all_mappings_lookup",
+            "store_num": store.store_num,
+            "fuel_type": search_fuel,
+            "mapping_count": len(mappings),
+        },
     )
     return mappings

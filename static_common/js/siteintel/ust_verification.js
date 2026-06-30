@@ -79,12 +79,10 @@ const USTVerification = {
         form.reset();
         
         if (this.activePermit) {
-            form.elements['permit_number'].value = this.activePermit.permit_number || '';
             // Input type="month" expects YYYY-MM
             if (this.activePermit.expiration_date) {
                 form.elements['expiration_date'].value = this.activePermit.expiration_date.substring(0, 7);
             }
-            form.elements['issue_date'].value = this.activePermit.issue_date || '';
         }
         
         this.updateModal.show();
@@ -118,7 +116,10 @@ const USTVerification = {
     async submitUpdate() {
         const form = document.getElementById('ust-update-form');
         const formData = new FormData(form);
-        const data = Object.fromEntries(formData.entries());
+        const data = {
+            expiration_date: formData.get('expiration_date'),
+            verification_notes: formData.get('verification_notes') || '',
+        };
 
         try {
             const response = await fetch(`/siteintel/api/stores/${this.activeTarget.id}/ust-permit/`, {

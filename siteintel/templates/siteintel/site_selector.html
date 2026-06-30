@@ -3,8 +3,20 @@
 
 {% block title %}SITE SELECTOR | {{ SITE_NAME }}{% endblock %}
 
+{% block extra_head %}
+<style>
+    [x-cloak] { display: none !important; }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container py-4">
+<div
+    class="container py-4"
+    x-data="siteSelectorApp()"
+    data-proximity-url="{% url 'tankgauge:closest_store_api' %}"
+    data-lookup-url="{% url 'siteintel:api_site_lookup' %}"
+    data-proposal-url="{% url 'siteintel:proposal_create' %}"
+>
     <div class="row justify-content-center">
         <div class="col-12 col-md-8 col-lg-6">
             <div class="mb-5 text-center px-2">
@@ -15,14 +27,13 @@
                 </div>
             </div>
 
-            <!-- Search Form -->
-            <form id="site-selector-form" class="mb-4 px-2" autocomplete="off" data-proximity-url="{% url 'tankgauge:closest_store_api' %}">
+            <form class="mb-4 px-2" autocomplete="off" @submit.prevent="runManualSearch()">
                 <div class="d-grid mb-3">
-                    <button type="button" id="proximity-scan-button" class="btn btn-outline-primary btn-sm mono py-2">
-                        [ SCAN FOR NEARBY STORES ]
+                    <button type="button" class="btn btn-outline-primary btn-sm mono py-2" @click="scanNearbyStores()" :disabled="loadingGps">
+                        <span x-show="!loadingGps">[ SCAN FOR NEARBY STORES ]</span>
+                        <span x-show="loadingGps" x-cloak>[ SCANNING... ]</span>
                     </button>
-                    <div id="proximity-status" class="mono text-muted-custom smaller text-center mt-2 d-none" style="font-size: 0.6rem;">
-                        ACQUIRING GPS LOCK...
+                    <div class="mono text-muted-custom smaller text-center mt-2" style="font-size: 0.6rem;" x-show="gpsStatus" x-text="gpsStatus" x-cloak>
                     </div>
                 </div>
 
@@ -34,15 +45,18 @@
 
                 <label for="site-lookup-input" class="mono text-primary small mb-2 d-block">MANUAL ID ENTRY:</label>
                 <div class="input-group">
-                    <input type="text" 
-                           id="site-lookup-input" 
-                           class="form-control tactical-input mono" 
-                           placeholder="SCANNING ID..."
-                           inputmode="numeric"
-                           pattern="[0-9]*"
-                           data-lookup-url="{% url 'siteintel:api_site_lookup' %}"
-                           autocomplete="off">
-                    <button type="submit" id="search-button" class="btn btn-primary mono">[ SEARCH ]</button>
+                    <input
+                        type="text"
+                        id="site-lookup-input"
+                        class="form-control tactical-input mono"
+                        placeholder="SCANNING ID..."
+                        inputmode="numeric"
+                        pattern="[0-9]*"
+                        autocomplete="off"
+                        x-model="query"
+                        @input.debounce.300ms="runManualSearch()"
+                    >
+                    <button type="submit" class="btn btn-primary mono" :disabled="loadingSearch">[ SEARCH ]</button>
                 </div>
                 <div class="d-grid mt-3">
                     <a href="{% url 'siteintel:proposal_create' %}" class="btn btn-outline-warning btn-sm mono py-2">
@@ -54,9 +68,30 @@
                 </div>
             </form>
 
-            <!-- Results Container -->
-            <div id="site-lookup-results" class="mt-4 px-2">
-                <!-- Dynamically populated by intel_selector.js -->
+            <div class="mt-3 px-2" x-show="loadingSearch" x-cloak>
+                <div class="text-center text-primary mono py-3">[ SCANNING_STREAMS... ]</div>
+            </div>
+
+            <div class="mt-4 px-2" x-show="showResultsPanel" x-cloak>
+                <div class="mono text-muted-custom small mb-2" x-text="panelLabel"></div>
+                <template x-for="site in results" :key="`${site.store_pk || site.id}-${site.store_num}`">
+                    <div class="selector-item p-3 mb-2 border border-secondary bg-dark-custom mono" style="cursor:pointer;" @click="openSite(site)">
+                        <div class="badge bg-primary text-dark float-end" x-show="site.distance_display" x-text="site.distance_display"></div>
+                        <div class="text-primary fw-bold" x-text="siteTitle(site)"></div>
+                        <div class="small text-muted-custom" x-text="siteSubtitle(site)"></div>
+                    </div>
+                </template>
+
+                <div class="text-center py-3" x-show="!results.length && canPropose" x-cloak>
+                    <div class="text-muted-custom mono mb-3">[ NO_MATCHES_FOUND ]</div>
+                    <div class="d-grid">
+                        <a :href="proposalHref" class="btn btn-outline-primary btn-sm mono">[ INITIATE PROPOSAL ]</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-3 px-2" x-show="errorMessage" x-cloak>
+                <div class="text-center text-danger mono py-2" x-text="errorMessage"></div>
             </div>
 
             <div class="mt-5 pt-4 border-top border-secondary text-center px-2">
@@ -71,5 +106,6 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script type="module" src="{% static 'js/siteintel/intel_main.js' %}"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<script src="{% static 'js/siteintel/site_selector_alpine.js' %}"></script>
 {% endblock %}

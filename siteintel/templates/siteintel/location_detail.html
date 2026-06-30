@@ -82,11 +82,34 @@
     .leaflet-tooltip-top:before, .leaflet-tooltip-bottom:before, .leaflet-tooltip-left:before, .leaflet-tooltip-right:before {
         border: none !important;
     }
+    [x-cloak] {
+        display: none !important;
+    }
+    .tank-config-btn {
+        width: 100%;
+        background: transparent;
+        color: inherit;
+        text-align: left;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+    }
+    .tank-config-btn:hover {
+        border-color: var(--primary-color) !important;
+        background: rgba(255, 184, 108, 0.05);
+    }
+    .tank-config-btn.active {
+        border-color: var(--primary-color) !important;
+        box-shadow: 0 0 0 1px rgba(255, 184, 108, 0.35);
+        background: rgba(255, 184, 108, 0.08);
+    }
+    .tank-chart-wrap {
+        height: 280px;
+        position: relative;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container py-4">
+<div class="container py-4" x-data="siteLocationDetailApp()" x-init="init()" data-initial-intel-mode="{{ intel_mode }}">
     <!-- Header Section -->
     <div class="mb-4 px-2">
         <div class="d-flex justify-content-between align-items-start">
@@ -193,11 +216,16 @@
                                     {% endif %}
                                 </div>
                             </div>
-                            <div class="col-12 mt-2 d-flex gap-2">
-                                <button class="btn btn-primary btn-sm mono py-0" style="font-size: 0.6rem; letter-spacing: 1px;" onclick="USTVerification.showConfirmModal({{ store.id }})">
+                            <div class="col-12 mt-2 d-grid gap-2">
+                                <button
+                                    class="btn btn-primary btn-sm mono py-1 px-3 text-nowrap"
+                                    style="font-size: 0.62rem; letter-spacing: 1px;"
+                                    onclick="USTVerification.showConfirmModal({{ store.id }})"
+                                    {% if not ust_permit %}disabled title="SYNC permit data first"{% endif %}
+                                >
                                     [ CONFIRM_ON_SITE ]
                                 </button>
-                                <button class="btn btn-outline-warning btn-sm mono py-0" style="font-size: 0.6rem; letter-spacing: 1px;" onclick="USTVerification.showUpdateModal({{ store.id }})">
+                                <button class="btn btn-warning btn-sm mono py-1 px-3 text-nowrap" style="font-size: 0.62rem; letter-spacing: 1px;" onclick="USTVerification.showUpdateModal({{ store.id }})">
                                     [ SYNC_COMPLIANCE_DATA ]
                                 </button>
                             </div>
@@ -262,19 +290,84 @@
                 <!-- Specialized Configuration Subsections -->
                 {% if store and tanks %}
                 <div class="mt-4 pt-3 border-top border-secondary">
-                    <div class="mono text-muted-custom smaller mb-3" style="font-size: 0.6rem; letter-spacing: 1px;">// TANK_CONFIGURATION</div>
+                    <div class="mono text-muted-custom smaller mb-3" style="font-size: 0.6rem; letter-spacing: 1px;">// TANK_CONFIGURATION (CLICK TO PROFILE)</div>
                     <div class="row g-2">
                         {% for tank in tanks %}
                         <div class="col-12 col-md-6">
-                            <div class="border border-secondary p-2 d-flex justify-content-between align-items-center">
-                                <div class="mono small">
-                                    <span class="text-primary fw-bold">T{{ tank.tank_index }}</span> 
+                            <button
+                                type="button"
+                                class="border border-secondary p-2 d-flex justify-content-between align-items-center tank-config-btn mono"
+                                data-tank-id="{{ tank.id }}"
+                                data-tank-index="{{ tank.tank_index|default_if_none:'' }}"
+                                data-fuel-type="{{ tank.fuel_type|upper|escapejs }}"
+                                data-capacity="{{ tank.tank_type.capacity|default_if_none:'' }}"
+                                data-max-depth="{{ tank.tank_type.max_depth|default_if_none:'' }}"
+                                data-model="{{ tank.tank_type.name|default:'UNKNOWN'|escapejs }}"
+                                :class="{ 'active': selectedTank && selectedTank.id === {{ tank.id }} }"
+                                @click="selectTank({
+                                    id: {{ tank.id }},
+                                    tankIndex: {{ tank.tank_index|default_if_none:'null' }},
+                                    fuelType: '{{ tank.fuel_type|upper|escapejs }}',
+                                    capacity: {{ tank.tank_type.capacity|default_if_none:'null' }},
+                                    maxDepth: {{ tank.tank_type.max_depth|default_if_none:'null' }},
+                                    model: '{{ tank.tank_type.name|default:'UNKNOWN'|escapejs }}'
+                                })"
+                            >
+                                <div class="small">
+                                    <span class="text-primary fw-bold">T{{ tank.tank_index }}</span>
                                     <span class="ms-2">{{ tank.fuel_type|upper }}</span>
                                 </div>
-                                <span class="tank-badge mono">{{ tank.tank_type.capacity }}G</span>
-                            </div>
+                                <span class="tank-badge mono">{{ tank.tank_type.capacity|default:'--' }}G</span>
+                            </button>
                         </div>
                         {% endfor %}
+                    </div>
+
+                    <div class="mt-3 border border-secondary p-3" x-show="selectedTank" x-cloak>
+                        <div class="d-flex justify-content-between align-items-center mb-2 mono">
+                            <div class="text-primary">
+                                [ TANK_PROFILE :: <span x-text="tankDisplayTitle"></span> ]
+                            </div>
+                            <div class="small text-muted-custom" x-text="tankProfileData ? 'INTEL_SYNCED' : 'AWAITING_DATA'"></div>
+                        </div>
+
+                        <div class="mono small text-muted-custom mb-2" x-show="tankProfileLoading" x-cloak>LOADING_TANK_TELEMETRY...</div>
+                        <div class="mono small text-tactical-danger mb-2" x-show="tankProfileError" x-text="tankProfileError" x-cloak></div>
+
+                        <div class="tank-chart-wrap mb-3" x-show="tankProfileData && !tankProfileLoading" x-cloak>
+                            <canvas x-ref="tankProfileChart"></canvas>
+                        </div>
+
+                        <div class="table-responsive" x-show="tankProfileData && !tankProfileLoading" x-cloak>
+                            <table class="table table-sm table-dark table-bordered mono align-middle mb-0" style="font-size: 0.68rem;">
+                                <tbody>
+                                    <tr>
+                                        <th class="text-muted-custom" style="width: 45%;">MAX_DEPTH</th>
+                                        <td x-text="formatMetric(tankStats.maxDepth, 'in')"></td>
+                                    </tr>
+                                    <tr>
+                                        <th class="text-muted-custom">MAX_GALLONS</th>
+                                        <td x-text="formatMetric(tankStats.maxGallons, 'gal')"></td>
+                                    </tr>
+                                    <tr>
+                                        <th class="text-muted-custom">NINETY_PERCENT_LIMIT</th>
+                                        <td x-text="formatMetric(tankStats.ninetyPercentGallons, 'gal')"></td>
+                                    </tr>
+                                    <tr>
+                                        <th class="text-muted-custom">VEEDER_ROOT_ENTRIES</th>
+                                        <td x-text="tankStats.veederEntries"></td>
+                                    </tr>
+                                    <tr>
+                                        <th class="text-muted-custom">OFFICIAL_POINTS</th>
+                                        <td x-text="tankStats.officialPoints"></td>
+                                    </tr>
+                                    <tr>
+                                        <th class="text-muted-custom">GENERATED_POINTS</th>
+                                        <td x-text="tankStats.generatedPoints"></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
                 {% endif %}
@@ -309,9 +402,9 @@
                         
                         {% if user.is_authenticated %}
                         <!-- Tactical Layer Selector -->
-                        <select id="intel-layer-selector" class="form-select form-select-sm mono bg-dark-custom text-primary border-secondary py-0" style="width: auto; font-size: 0.65rem; height: 1.5rem;">
-                            <option value="PERSONAL" {% if intel_mode == 'PERSONAL' %}selected{% endif %}>USER_LAYER</option>
-                            <option value="DEFAULT" {% if intel_mode == 'DEFAULT' %}selected{% endif %}>SHARED_LAYER</option>
+                        <select class="form-select form-select-sm mono bg-dark-custom text-primary border-secondary py-0" style="width: auto; font-size: 0.65rem; height: 1.5rem;" x-model="intelLayer">
+                            <option value="PERSONAL">USER_LAYER</option>
+                            <option value="DEFAULT">SHARED_LAYER</option>
                         </select>
                         {% else %}
                         <span class="intel-status-badge status-default ms-1">SHARED</span>
@@ -327,7 +420,7 @@
                 </div>
                 
                 <!-- Personal Layer Container -->
-                <div id="intel-personal-container" class="note-container mono small {% if intel_mode != 'PERSONAL' %}d-none{% endif %}">
+                <div id="intel-personal-container" class="note-container mono small" x-show="intelLayer === 'PERSONAL'">
                     {% if personal_intel %}
                         {{ personal_intel.notes|markdown }}
                     {% else %}
@@ -336,7 +429,7 @@
                 </div>
 
                 <!-- Shared Layer Container -->
-                <div id="intel-shared-container" class="note-container mono small {% if intel_mode != 'DEFAULT' and intel_mode != 'PUBLIC' %}d-none{% endif %}" style="border-left-color: var(--muted-text-color);">
+                <div id="intel-shared-container" class="note-container mono small" x-show="intelLayer !== 'PERSONAL'" style="border-left-color: var(--muted-text-color);">
                     {% if default_intel %}
                         {{ default_intel.notes|markdown }}
                     {% else %}
@@ -344,15 +437,7 @@
                     {% endif %}
                 </div>
                 
-                <div id="intel-layer-hint" class="mt-2 mono text-muted-custom" style="font-size: 0.6rem;">
-                    {% if intel_mode == 'PERSONAL' %}
-                    * YOU ARE VIEWING YOUR PRIVATE OBSERVATIONS.
-                    {% elif intel_mode == 'DEFAULT' %}
-                    * VIEWING SHARED LAYER. CREATE YOUR OWN TO OVERRIDE.
-                    {% else %}
-                    * AUTHENTICATION REQUIRED TO VIEW PERSONAL LAYERS.
-                    {% endif %}
-                </div>
+                <div id="intel-layer-hint" class="mt-2 mono text-muted-custom" style="font-size: 0.6rem;" x-text="intelHint"></div>
             </div>
         </div>
 
@@ -399,7 +484,7 @@
                 <div class="modal-dialog modal-fullscreen">
                     <div class="modal-content bg-dark-custom">
                         <div class="modal-body p-0 d-flex align-items-center justify-content-center">
-                            <img src="" class="img-fluid" id="modal-sketch-img" alt="Full Screen Sketch">
+                            <img src="" class="img-fluid" id="modal-sketch-img" x-ref="modalSketchImg" alt="Full Screen Sketch">
                             <!-- Move close button to top-left to avoid logout conflict and clear 32px navbar -->
                             <button type="button" class="btn-close btn-close-white position-absolute start-0 m-3" data-bs-dismiss="modal" aria-label="Close" style="z-index: 2000; top: 40px;"></button>
                         </div>
@@ -415,9 +500,9 @@
                  data-overlay="{{ location.tactical_overlay|default:'' }}">
                 <!-- Tactical Mode Toggle -->
                 <div class="map-mode-toggle mono">
-                    <div class="btn-group btn-group-sm p-1" style="background: rgba(18, 20, 23, 0.8); border: 1px solid var(--navbar-border);">
-                        <button type="button" class="btn btn-outline-primary active" id="btn-map-standard" style="font-size: 0.6rem;">STD</button>
-                        <button type="button" class="btn btn-outline-primary" id="btn-map-dark" style="font-size: 0.6rem;">DARK</button>
+                        <div class="btn-group btn-group-sm p-1" style="background: rgba(18, 20, 23, 0.8); border: 1px solid var(--navbar-border);">
+                        <button type="button" id="btn-map-standard" class="btn btn-outline-primary" style="font-size: 0.6rem;" :class="{ 'active': mapMode === 'STANDARD' }" @click="setMapMode('STANDARD')">STD</button>
+                        <button type="button" id="btn-map-dark" class="btn btn-outline-primary" style="font-size: 0.6rem;" :class="{ 'active': mapMode === 'DARK' }" @click="setMapMode('DARK')">DARK</button>
                     </div>
                 </div>
             </div>
@@ -438,17 +523,8 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<script src="{% static 'js/siteintel/location_detail_page.js' %}"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="{% static 'js/siteintel/ust_verification.js' %}"></script>
-<script type="module" src="{% static 'js/siteintel/intel_main.js' %}"></script>
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const sketchModal = document.getElementById('sketchModal');
-        const modalImg = document.getElementById('modal-sketch-img');
-        
-        sketchModal.addEventListener('show.bs.modal', function (event) {
-            const trigger = event.relatedTarget;
-            modalImg.src = trigger.src;
-        });
-    });
-</script>
 {% endblock %}

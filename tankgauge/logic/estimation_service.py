@@ -44,7 +44,14 @@ class EstimationService:
         Returns the created TankEstimation record if successful, else None.
         """
         logger.info(
-            f"ESTIMATION_START: Tank {tank_mapping.id} (Store {tank_mapping.store.store_num})"
+            "ESTIMATION_START",
+            extra={
+                "tank_mapping_id": tank_mapping.id,
+                "store_num": tank_mapping.store.store_num,
+                "fuel_type": tank_mapping.fuel_type,
+                "tank_index": tank_mapping.tank_index,
+                "reason_code": "mapped_estimation_start",
+            },
         )
 
         # 1. ACQUIRE RAW DATA
@@ -56,7 +63,11 @@ class EstimationService:
 
         if not readings.exists():
             logger.warning(
-                f"ESTIMATION_FAILED: No Veeder readings found for Tank {tank_mapping.id}"
+                "ESTIMATION_FAILED",
+                extra={
+                    "tank_mapping_id": tank_mapping.id,
+                    "reason_code": "no_veeder_readings",
+                },
             )
             return None
 
@@ -71,7 +82,11 @@ class EstimationService:
 
         if total_capacity <= 0:
             logger.error(
-                f"ESTIMATION_FAILED: Could not determine total capacity for Tank {tank_mapping.id}"
+                "ESTIMATION_FAILED",
+                extra={
+                    "tank_mapping_id": tank_mapping.id,
+                    "reason_code": "capacity_unresolved",
+                },
             )
             return None
 
@@ -81,7 +96,11 @@ class EstimationService:
         # 4. EVALUATE CONFIDENCE GATES (Thresholds)
         if not self._passes_confidence_gates(observations):
             logger.warning(
-                f"ESTIMATION_FAILED: Tank {tank_mapping.id} failed confidence gates."
+                "ESTIMATION_FAILED",
+                extra={
+                    "tank_mapping_id": tank_mapping.id,
+                    "reason_code": "confidence_gates_failed",
+                },
             )
             return None
 
@@ -90,7 +109,12 @@ class EstimationService:
 
         if result.get("status") != "SUCCESS":
             logger.error(
-                f"ESTIMATION_FAILED: GeometryEngine failed: {result.get('message')}"
+                "ESTIMATION_FAILED",
+                extra={
+                    "tank_mapping_id": tank_mapping.id,
+                    "reason_code": "geometry_engine_failure",
+                    "message": result.get("message"),
+                },
             )
             return None
 
@@ -124,7 +148,13 @@ class EstimationService:
             )
 
         logger.info(
-            f"ESTIMATION_COMPLETE: Created TankEstimation {estimation.id} (Confidence: {estimation.confidence})"
+            "ESTIMATION_COMPLETE",
+            extra={
+                "tank_mapping_id": tank_mapping.id,
+                "estimation_id": estimation.id,
+                "confidence": estimation.confidence,
+                "reason_code": "mapped_estimation_complete",
+            },
         )
         return estimation
 
@@ -157,7 +187,13 @@ class EstimationService:
         # 2. EVALUATE CONFIDENCE GATES
         if not self._passes_confidence_gates(observations):
             logger.warning(
-                f"ESTIMATION_FAILED: Virtual Tank (Store {store.store_num}, Tank {tank_index}) failed confidence gates."
+                "ESTIMATION_FAILED",
+                extra={
+                    "store_num": store.store_num,
+                    "tank_index": tank_index,
+                    "fuel_type": fuel_key,
+                    "reason_code": "virtual_confidence_gates_failed",
+                },
             )
             return None
 
@@ -166,7 +202,14 @@ class EstimationService:
 
         if result.get("status") != "SUCCESS":
             logger.error(
-                f"ESTIMATION_FAILED: GeometryEngine failed: {result.get('message')}"
+                "ESTIMATION_FAILED",
+                extra={
+                    "store_num": store.store_num,
+                    "tank_index": tank_index,
+                    "fuel_type": fuel_key,
+                    "reason_code": "geometry_engine_failure",
+                    "message": result.get("message"),
+                },
             )
             return None
 
@@ -208,7 +251,15 @@ class EstimationService:
             )
 
         logger.info(
-            f"ESTIMATION_COMPLETE: Created VirtualTankEstimation {estimation.id} (Confidence: {estimation.confidence})"
+            "ESTIMATION_COMPLETE",
+            extra={
+                "store_num": store.store_num,
+                "tank_index": tank_index,
+                "fuel_type": fuel_key,
+                "estimation_id": estimation.id,
+                "confidence": estimation.confidence,
+                "reason_code": "virtual_estimation_complete",
+            },
         )
         return estimation
 
@@ -239,14 +290,26 @@ class EstimationService:
         """Checks if the data quantity and quality meet the minimum thresholds."""
         count = len(observations)
         if count < MIN_READINGS:
-            logger.debug(f"GATE_FAILED: Only {count} readings (Min: {MIN_READINGS})")
+            logger.debug(
+                "ESTIMATION_GATE_FAILED",
+                extra={
+                    "reason_code": "insufficient_readings",
+                    "reading_count": count,
+                    "min_required": MIN_READINGS,
+                },
+            )
             return False
 
         heights = [o[0] for o in observations]
         spread = max(heights) - min(heights)
         if spread < MIN_HEIGHT_SPREAD:
             logger.debug(
-                f"GATE_FAILED: Height spread {spread}in (Min: {MIN_HEIGHT_SPREAD}in)"
+                "ESTIMATION_GATE_FAILED",
+                extra={
+                    "reason_code": "insufficient_height_spread",
+                    "height_spread_inches": spread,
+                    "min_required_inches": MIN_HEIGHT_SPREAD,
+                },
             )
             return False
 
@@ -261,7 +324,8 @@ class EstimationService:
         """
         if not _generated_chart_materialization_enabled():
             logger.info(
-                "CHART_GENERATION_SKIPPED: Generated chart materialization is disabled."
+                "CHART_GENERATION_SKIPPED",
+                extra={"reason_code": "materialization_disabled"},
             )
             return
 
@@ -309,5 +373,10 @@ class EstimationService:
             TankChart.objects.bulk_create(chart_entries)
 
         logger.info(
-            f"CHART_GENERATED: Created {len(chart_entries)} entries for {tank_name}"
+            "CHART_GENERATED",
+            extra={
+                "tank_name": tank_name,
+                "entry_count": len(chart_entries),
+                "reason_code": "materialized_from_estimation",
+            },
         )

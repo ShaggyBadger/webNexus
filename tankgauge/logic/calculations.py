@@ -55,7 +55,15 @@ def perform_tank_calc(
         tank_type = tank_mapping.tank_type
         fuel_type = tank_mapping.fuel_type
         logger.info(
-            f"CALC_START: TankMapping {tank_mapping.id} ({fuel_type}) @ {current_inches} in + {delivery_gallons}G delivery"
+            "CALC_START",
+            extra={
+                "tank_mapping_id": tank_mapping.id,
+                "store_num": tank_mapping.store.store_num,
+                "fuel_type": fuel_type,
+                "current_inches": current_inches,
+                "delivery_gallons": delivery_gallons,
+                "reason_code": "mapped_tank",
+            },
         )
         mode, source_meta = determine_operating_mode(tank_mapping)
     else:
@@ -64,7 +72,15 @@ def perform_tank_calc(
         store_id = virtual_meta.get("store_id")
         tank_index = virtual_meta.get("tank_index")
         logger.info(
-            f"CALC_START_VIRTUAL: Store {store_id} Tank {tank_index} ({fuel_type})"
+            "CALC_START_VIRTUAL",
+            extra={
+                "store_id": store_id,
+                "tank_index": tank_index,
+                "fuel_type": fuel_type,
+                "current_inches": current_inches,
+                "delivery_gallons": delivery_gallons,
+                "reason_code": "virtual_tank",
+            },
         )
         mode, source_meta = determine_virtual_operating_mode(
             store_id, fuel_type, tank_index
@@ -76,6 +92,14 @@ def perform_tank_calc(
         )
         if source_meta and source_meta.get("message"):
             unavailable_msg = source_meta["message"]
+        logger.warning(
+            "CALC_UNAVAILABLE",
+            extra={
+                "fuel_type": fuel_type,
+                "reason_code": "mode_unavailable",
+                "unavailable_message": unavailable_msg,
+            },
+        )
         return {
             "status": "UNAVAILABLE",
             "message": unavailable_msg,
@@ -127,7 +151,16 @@ def perform_tank_calc(
     }
 
     logger.info(
-        f"CALC_COMPLETE: Mode {mode} | Initial {int(initial_gallons)}G -> Final {int(final_gallons)}G"
+        "CALC_COMPLETE",
+        extra={
+            "fuel_type": fuel_type,
+            "mode": mode,
+            "data_source": source_meta.get("name") if source_meta else None,
+            "initial_gallons": int(initial_gallons),
+            "final_gallons": int(final_gallons),
+            "delivery_gallons": int(delivery_gallons),
+            "reason_code": "calculation_complete",
+        },
     )
     return result
 
@@ -145,7 +178,12 @@ def determine_operating_mode(tank_mapping, force_source=None):
     """
     priority = _get_mode_priority()
     logger.debug(
-        f"OPERATING_MODE: Priority={priority} for TankMapping {tank_mapping.id}"
+        "OPERATING_MODE_RESOLUTION_START",
+        extra={
+            "tank_mapping_id": tank_mapping.id,
+            "priority": priority,
+            "reason_code": "resolve_mode",
+        },
     )
 
     # --- Resolve available sources without committing to either yet ---
@@ -204,7 +242,13 @@ def determine_operating_mode(tank_mapping, force_source=None):
 
     if result:
         logger.debug(
-            f"OPERATING_MODE: Resolved to {result[0]} (source: {result[1].get('name')})"
+            "OPERATING_MODE_RESOLVED",
+            extra={
+                "tank_mapping_id": tank_mapping.id,
+                "mode": result[0],
+                "source_name": result[1].get("name"),
+                "reason_code": "mode_resolved",
+            },
         )
         return result
 

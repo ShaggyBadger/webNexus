@@ -127,9 +127,10 @@ const TacticalGPS = {
       );
       if (response.ok) {
         const rawData = await response.json();
+        const payload = (rawData && rawData.status === "success" && rawData.data) ? rawData.data : rawData;
         
         // Handle the new list-based response format
-        const data = (rawData.results && rawData.results.length > 0) ? rawData.results[0] : null;
+        const data = (payload.results && payload.results.length > 0) ? payload.results[0] : null;
         
         if (!data) {
             console.warn("No proximal targets identified.");
