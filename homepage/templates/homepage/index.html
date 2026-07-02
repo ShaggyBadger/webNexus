@@ -1,69 +1,20 @@
-{% extends 'base.html' %} {% load static %} {% block title %}webNexus // HQ{% endblock %} {% block extra_head %}
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}webNexus // HQ{% endblock %}
+
+{% block extra_head %}
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 <link rel="stylesheet" href="{% static 'css/tactical_effects.css' %}" />
-<style>
-  :root {
-    --status-online: #50fa7b;
-    --status-standby: #ffb86c;
-  }
+<link rel="stylesheet" href="{% static 'homepage/css/index.css' %}" />
+{% endblock %}
 
-  .eagle-logo {
-    height: 50px;
-    filter: drop-shadow(0 0 10px rgba(64, 146, 255, 0.3));
-  }
-
-  .op-status {
-    font-size: 0.75rem;
-    letter-spacing: 2px;
-    color: var(--status-online);
-  }
-
-  .tactical-card {
-    background-color: #1c1f23;
-    border: 1px solid var(--navbar-border);
-    border-left: 4px solid var(--primary-color);
-    padding: 1rem;
-    padding-left: 1.5rem;
-    border-radius: 0;
-    transition: background-color 0.2s ease;
-  }
-
-  .tactical-card:active {
-    background-color: #2c3036;
-    transform: scale(0.98);
-  }
-
-  .card-icon {
-    color: var(--primary-color);
-    font-size: 2.5rem;
-  }
-
-  .btn-tactical {
-    border-radius: 0;
-    padding: 1rem;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-  }
-
-  /* Mobile First Adjustments */
-  @media (max-width: 576px) {
-    .display-5 {
-      font-size: 1.75rem;
-    }
-  }
-
-  .timestamp {
-    font-size: 0.7rem;
-    color: var(--muted-text-color);
-  }
-</style>
-{% endblock %} {% block content %}
-<!-- Tactical UI Overlays -->
+{% block content %}
 <div class="tactical-grid"></div>
 <div class="scanline"></div>
 <div class="flicker"></div>
 
-<div class="container-fluid px-3 pt-4">
-  <!-- Tactical Header -->
+<div class="container-fluid px-3 pt-4" x-data="homepageHub()" x-init="init()">
   <header class="mb-5">
     <div class="d-flex align-items-center mb-3">
       <img
@@ -73,7 +24,7 @@
       />
       <div>
         <div class="op-status mono">
-          ● SYSTEM ONLINE // <span id="tactical-clock">00:00:00</span>
+          ● SYSTEM ONLINE // <span x-text="clockLabel">00:00:00L</span>
         </div>
         <h1 class="display-5 fw-bold mb-0 mono">{{ SITE_NAME|upper }}</h1>
       </div>
@@ -83,58 +34,35 @@
       <div class="timestamp mono">
         VER: <span class="text-primary">{{ VERSION }}</span>
       </div>
-      {% include 'homepage/components/tactical_loc.html' %} 
+      {% include 'homepage/components/tactical_loc.html' %}
       {% include 'homepage/components/system_status.html' %}
     </div>
   </header>
 
-  <!-- Large Layout Spacer -->
-  <div style="height: 60px"></div>
+  <div class="command-grid-intro mb-3">
+    <p class="mono text-muted-custom small mb-0">Select a mission module to begin.</p>
+  </div>
 
-  <!-- Section Divider -->
   <div class="d-flex align-items-center mb-4">
     <div class="flex-grow-1 border-bottom border-secondary opacity-25"></div>
-    <div class="mx-3 mono text-muted-custom small" style="letter-spacing: 3px">
-      [ COMMAND_GRID ]
-    </div>
+    <div class="mx-3 mono text-muted-custom small command-grid-label">[ COMMAND_GRID ]</div>
     <div class="flex-grow-1 border-bottom border-secondary opacity-25"></div>
   </div>
 
-  <!-- Main Command Grid -->
   <div class="row g-4">
-    <!-- TankGauge Module -->
     {% include 'homepage/components/app_tankgauge.html' %}
-    
-    <!-- Fuel Rack Module (Authenticated Only) -->
     {% include 'homepage/components/app_fuelracks.html' %}
-
-    <!-- FieldIntel Module (Publicly Accessible) -->
     {% include 'homepage/components/app_fieldintel.html' %}
-
-    <!-- Mission Logs Module (New) -->
     {% include 'homepage/components/app_missionlog.html' %}
-
-    <!-- Intel Vault / DMS Module -->
     {% include 'homepage/components/app_dms.html' %}
-
-    <!-- ATG Telemetry Module -->
     {% if user.is_authenticated %}
       {% include 'homepage/components/app_atg.html' %}
     {% endif %}
   </div>
 </div>
-{% endblock %} {% block extra_scripts %}
+{% endblock %}
+
+{% block extra_scripts %}
 <script src="{% static 'js/siteintel/rack_manager.js' %}"></script>
-<script>
-  function updateClock() {
-    const now = new Date();
-    const hh = String(now.getHours()).padStart(2, "0");
-    const mm = String(now.getMinutes()).padStart(2, "0");
-    const ss = String(now.getSeconds()).padStart(2, "0");
-    const clockElement = document.getElementById("tactical-clock");
-    if (clockElement) clockElement.innerText = `${hh}:${mm}:${ss}L`;
-  }
-  setInterval(updateClock, 1000);
-  updateClock();
-</script>
+<script src="{% static 'homepage/js/homepage_shell.js' %}"></script>
 {% endblock %}

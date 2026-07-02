@@ -106,6 +106,10 @@ class DocumentSerializer(serializers.ModelSerializer):
         """
         Return metadata of the generic linked content object (Store, Location, etc.)
         """
+        # GenericForeignKey expansion can trigger additional queries in list endpoints,
+        # so it is opt-in and enabled for detail responses only.
+        if not self.context.get("include_linked_object", False):
+            return None
         if obj.content_object:
             return {
                 "model": obj.content_type.model,
@@ -149,3 +153,25 @@ class DocumentUpdateSerializer(serializers.ModelSerializer):
             instance.tags.set(tags)
 
         return instance
+
+
+class FinalizeUploadRequestSerializer(serializers.Serializer):
+    """
+    Validates finalize upload request payload before service execution.
+    """
+
+    temp_id = serializers.CharField(max_length=26)
+    title = serializers.CharField(max_length=255)
+    description = serializers.CharField(required=False, allow_blank=True, default="")
+    category = serializers.IntegerField(required=False, allow_null=True)
+    collections = serializers.ListField(
+        child=serializers.CharField(), required=False, default=list
+    )
+    content_type = serializers.ChoiceField(
+        choices=["location", "store"], required=False, allow_null=True
+    )
+    object_id = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    is_public = serializers.BooleanField(required=False, default=False)
+    tags = serializers.ListField(
+        child=serializers.CharField(), required=False, default=list
+    )

@@ -33,6 +33,8 @@ class DocumentSearchService:
         if queryset is None:
             queryset = Document.objects.all()
 
+        queryset = cls.optimize_queryset(queryset)
+
         # Enforce public visibility constraint
         if is_public_only:
             queryset = queryset.filter(is_public=True)
@@ -109,3 +111,14 @@ class DocumentSearchService:
             queryset = queryset.filter(location_q | store_q)
 
         return queryset.distinct()
+
+    @staticmethod
+    def optimize_queryset(queryset: QuerySet) -> QuerySet:
+        """
+        Apply common relational loading hints used by list/detail views.
+        """
+        return queryset.select_related(
+            "category",
+            "uploaded_by",
+            "content_type",
+        ).prefetch_related("tags", "collections")

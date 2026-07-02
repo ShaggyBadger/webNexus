@@ -101,6 +101,8 @@ const RackManager = {
         const text = document.getElementById('rack-status-text');
         const btn = document.getElementById('rack-checkin-btn');
 
+        btn.classList.remove('is-danger', 'is-success');
+
         // STATE: No data available
         if (!this.racks.length) {
             display.innerText = "NO RACKS REGISTERED IN SECTOR";
@@ -156,14 +158,14 @@ const RackManager = {
             console.warn("RACK_MANAGER: Proximity warning triggered.");
             this.proximityConfirmed = true;
             btn.innerText = "OUT OF RANGE - PROCEED?";
-            btn.classList.replace('btn-outline-warning', 'btn-danger');
+            btn.classList.add('is-danger');
             
             // AUTO_RESET: Clear confirmation after 5 seconds of inactivity
             if (this.confirmTimeout) clearTimeout(this.confirmTimeout);
             this.confirmTimeout = setTimeout(() => {
                 this.proximityConfirmed = false;
                 btn.innerText = originalText;
-                btn.classList.replace('btn-danger', 'btn-outline-warning');
+                btn.classList.remove('is-danger');
             }, 5000);
             return;
         }
@@ -198,11 +200,11 @@ const RackManager = {
                 
                 // Visual feedback
                 btn.innerText = "CHECK-IN SUCCESS";
-                btn.classList.replace('btn-outline-warning', 'btn-success');
-                btn.classList.replace('btn-danger', 'btn-success'); // Ensure red is removed if it was there
+                btn.classList.remove('is-danger');
+                btn.classList.add('is-success');
                 
                 setTimeout(() => {
-                    btn.classList.replace('btn-success', 'btn-outline-warning');
+                    btn.classList.remove('is-success');
                     btn.innerText = originalText;
                     btn.disabled = false;
                 }, 3000);
@@ -212,7 +214,8 @@ const RackManager = {
         } catch (error) {
             console.error("RACK_MANAGER: Check-in error", error);
             btn.innerText = "ERROR - RETRY";
-            btn.classList.replace('btn-danger', 'btn-outline-warning');
+            btn.classList.remove('is-success');
+            btn.classList.add('is-danger');
             btn.disabled = false;
         }
     },

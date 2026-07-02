@@ -1,6 +1,6 @@
 from rest_framework.views import exception_handler
-from rest_framework.response import Response
-from django.utils import timezone
+
+from dms.api_contract import build_error_payload
 
 
 def dms_exception_handler(exc, context):
@@ -12,6 +12,7 @@ def dms_exception_handler(exc, context):
     if response is not None:
         err_details = response.data
         message = "An error occurred."
+        request = context.get("request")
 
         if isinstance(err_details, dict):
             if "detail" in err_details:
@@ -26,22 +27,15 @@ def dms_exception_handler(exc, context):
         elif isinstance(err_details, list):
             message = ", ".join(str(item) for item in err_details)
 
-        # Standardize structure
-        response.data = {
-            "status": "error",
-            "data": None,
-            "meta": {
-                "version": "1.0",
-                "timestamp": timezone.now().isoformat(),
-            },
-            "error": {
-                "code": getattr(exc, "default_code", "api_error"),
-                "message": str(message),
-                "details": (
-                    err_details
-                    if isinstance(err_details, dict)
-                    else {"non_field_errors": err_details}
-                ),
-            },
-        }
+        details = (
+            err_details
+            if isinstance(err_details, dict)
+            else {"non_field_errors": err_details}
+        )
+        response.data = build_error_payload(
+            request=request,
+            code=getattr(exc, "default_code", "api_error"),
+            message=str(message),
+            details=details,
+        )
     return response

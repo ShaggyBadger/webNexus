@@ -18,7 +18,13 @@ function tankGaugeApp() {
       chart: false,
     },
     error: null,
+    info: null,
     csrfToken: document.querySelector('meta[name="csrf-token"]')?.content || "",
+
+    get canFetchStore() {
+      const raw = `${this.storeNumber ?? ""}`.trim();
+      return raw.length > 0;
+    },
 
     get canCalculate() {
       return (
@@ -26,6 +32,24 @@ function tankGaugeApp() {
         this.inputs.deliveryGallons !== "" &&
         this.inputs.currentInches !== ""
       );
+    },
+
+    get prefersReducedMotion() {
+      return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    },
+
+    scrollToStep(stepRef) {
+      this.$nextTick(() => {
+        const target = this.$refs[stepRef];
+        if (!target) {
+          return;
+        }
+
+        target.scrollIntoView({
+          behavior: this.prefersReducedMotion ? "auto" : "smooth",
+          block: "start",
+        });
+      });
     },
 
     resetStoreState() {
@@ -42,6 +66,19 @@ function tankGaugeApp() {
       this.results = null;
       this.chartData = null;
       this.destroyChart();
+    },
+
+    clearMessages() {
+      this.error = null;
+      this.info = null;
+    },
+
+    changeStore() {
+      this.storeNumber = "";
+      this.clearMessages();
+      this.resetStoreState();
+      this.scrollToStep("storeStepCard");
+      this.$nextTick(() => this.$refs.storeNumberInput?.focus());
     },
 
     destroyChart() {
@@ -113,17 +150,20 @@ function tankGaugeApp() {
     },
 
     async fetchStoreTanks() {
-      if (!this.storeNumber || this.loading.store) {
+      if (!this.canFetchStore || this.loading.store) {
         return;
       }
 
       this.loading.store = true;
-      this.error = null;
+      this.clearMessages();
       this.resetStoreState();
+      this.info = "Loading store data...";
 
       try {
+        const normalizedStoreNumber = `${this.storeNumber}`.trim();
+        this.storeNumber = normalizedStoreNumber;
         const data = await this.apiGet(
-          `/tankgauge/api/stores/${this.storeNumber}/tanks/`,
+          `/tankgauge/api/stores/${normalizedStoreNumber}/tanks/`,
           "Store not found or unavailable.",
         );
         this.storeData = data.store;
@@ -135,12 +175,21 @@ function tankGaugeApp() {
 
         if (this.tanks.length === 0) {
           this.error = "No tanks are mapped for this store.";
+          this.info = null;
           return;
         }
 
+        this.info = `Store #${this.storeData.store_num} loaded. Select a tank to continue.`;
         this.step = 2;
+        this.scrollToStep("tankStepCard");
+
+        if (this.tanks.length === 1) {
+          this.info = "One tank found. Auto-selected for faster entry.";
+          await this.selectTank(this.tanks[0]);
+        }
       } catch (error) {
         this.error = error.message;
+        this.info = null;
       } finally {
         this.loading.store = false;
       }
@@ -152,7 +201,8 @@ function tankGaugeApp() {
         return;
       }
 
-      this.error = null;
+      this.clearMessages();
+      this.info = "Detecting your location...";
       navigator.geolocation.getCurrentPosition(
         async (position) => {
           this.loading.store = true;
@@ -172,12 +222,14 @@ function tankGaugeApp() {
             await this.fetchStoreTanks();
           } catch (error) {
             this.error = error.message;
+            this.info = null;
           } finally {
             this.loading.store = false;
           }
         },
         () => {
           this.error = "Geolocation permission denied or unavailable.";
+          this.info = null;
         },
       );
     },
@@ -186,6 +238,9 @@ function tankGaugeApp() {
       this.selectedTank = tank;
       this.step = 3;
       this.results = null;
+      this.info = `Tank ${tank.tank_index || "?"} selected. Enter delivery telemetry.`;
+      this.scrollToStep("inputStepCard");
+      this.$nextTick(() => this.$refs.deliveryGallonsInput?.focus());
       await this.fetchChartData();
     },
 
@@ -195,7 +250,8 @@ function tankGaugeApp() {
       }
 
       this.loading.calculate = true;
-      this.error = null;
+      this.clearMessages();
+      this.info = "Running telemetry calculation...";
 
       try {
         const payload = {
@@ -213,8 +269,11 @@ function tankGaugeApp() {
           "Calculation failed.",
         );
         this.step = 4;
+        this.info = "Calculation complete. Review results and warning banner.";
+        this.scrollToStep("resultsStepCard");
       } catch (error) {
         this.error = error.message;
+        this.info = null;
       } finally {
         this.loading.calculate = false;
       }

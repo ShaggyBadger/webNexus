@@ -1,4 +1,5 @@
 import hashlib
+import logging
 import os
 from datetime import timedelta
 from django.utils import timezone
@@ -12,10 +13,21 @@ import ulid
 from dms.models import TemporaryUpload, Document, Category, Collection, Tag
 
 
+logger = logging.getLogger(__name__)
+
+
 class DocumentUploadService:
     """
     Service to handle raw uploads (Phase A) and finalizing uploads (Phase B).
     """
+
+    MAX_UPLOAD_SIZE_BYTES = 50 * 1024 * 1024
+    ALLOWED_MIME_TYPES = {
+        "application/pdf",
+        "text/csv",
+        "application/vnd.ms-excel",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    }
 
     @staticmethod
     def calculate_sha256(file_obj) -> str:
@@ -36,6 +48,16 @@ class DocumentUploadService:
         Phase A: Handle raw file upload, perform MIME verification, calculate SHA256,
         and save to media/temp/ as a TemporaryUpload.
         """
+        if uploaded_file.size > cls.MAX_UPLOAD_SIZE_BYTES:
+            logger.warning(
+                "dms.raw_upload.rejected_size user_id=%s file_name=%s size_bytes=%s max_size_bytes=%s",
+                getattr(user, "id", None),
+                uploaded_file.name,
+                uploaded_file.size,
+                cls.MAX_UPLOAD_SIZE_BYTES,
+            )
+            raise ValueError("File exceeds maximum allowed size of 50MB.")
+
         # 1. Read first block for MIME inspection
         uploaded_file.seek(0)
         header_data = uploaded_file.read(2048)
@@ -43,6 +65,16 @@ class DocumentUploadService:
 
         # 2. Inspect MIME via python-magic
         detected_mime = magic.from_buffer(header_data, mime=True)
+        if detected_mime not in cls.ALLOWED_MIME_TYPES:
+            logger.warning(
+                "dms.raw_upload.rejected_mime user_id=%s file_name=%s mime_type=%s",
+                getattr(user, "id", None),
+                uploaded_file.name,
+                detected_mime,
+            )
+            raise ValueError(
+                f"Unsupported file type: {detected_mime}. Allowed types: PDF, CSV, XLS, XLSX."
+            )
 
         # 3. Calculate SHA256 checksum
         sha256_hash = cls.calculate_sha256(uploaded_file)
@@ -51,6 +83,13 @@ class DocumentUploadService:
         is_duplicate = Document.objects.filter(
             sha256=sha256_hash, status="ACTIVE"
         ).exists()
+        if is_duplicate:
+            logger.info(
+                "dms.raw_upload.duplicate_detected user_id=%s file_name=%s sha256=%s",
+                getattr(user, "id", None),
+                uploaded_file.name,
+                sha256_hash,
+            )
 
         # 5. Generate Temporary ULID
         temp_ulid = ulid.ulid()
@@ -72,6 +111,15 @@ class DocumentUploadService:
             expires_at=expires_at,
             sha256=sha256_hash,
             original_filename=uploaded_file.name,
+        )
+
+        logger.info(
+            "dms.raw_upload.accepted user_id=%s temp_id=%s file_name=%s mime_type=%s size_bytes=%s",
+            getattr(user, "id", None),
+            temp_upload.id,
+            uploaded_file.name,
+            detected_mime,
+            uploaded_file.size,
         )
 
         return {
@@ -106,6 +154,11 @@ class DocumentUploadService:
         try:
             temp_upload = TemporaryUpload.objects.get(id=temp_id)
         except TemporaryUpload.DoesNotExist:
+            logger.warning(
+                "dms.finalize_upload.temp_missing user_id=%s temp_id=%s",
+                getattr(user, "id", None),
+                temp_id,
+            )
             raise ValueError("Temporary upload not found or has expired.")
 
         # Check expiration
@@ -114,6 +167,11 @@ class DocumentUploadService:
             if default_storage.exists(temp_upload.file.name):
                 default_storage.delete(temp_upload.file.name)
             temp_upload.delete()
+            logger.warning(
+                "dms.finalize_upload.temp_expired user_id=%s temp_id=%s",
+                getattr(user, "id", None),
+                temp_id,
+            )
             raise ValueError("Temporary upload has expired.")
 
         # 2. Get category if provided
@@ -122,6 +180,12 @@ class DocumentUploadService:
             try:
                 category = Category.objects.get(id=category_id, active=True)
             except Category.DoesNotExist:
+                logger.warning(
+                    "dms.finalize_upload.invalid_category user_id=%s temp_id=%s category_id=%s",
+                    getattr(user, "id", None),
+                    temp_id,
+                    category_id,
+                )
                 raise ValueError("Specified active Category does not exist.")
 
         # 3. Get collections and tags if provided
@@ -145,6 +209,12 @@ class DocumentUploadService:
         # Open the temp file
         temp_file_path = temp_upload.file.name
         if not default_storage.exists(temp_file_path):
+            logger.error(
+                "dms.finalize_upload.temp_file_missing user_id=%s temp_id=%s temp_file_path=%s",
+                getattr(user, "id", None),
+                temp_id,
+                temp_file_path,
+            )
             raise FileNotFoundError("Temporary file does not exist in storage.")
 
         # Use transaction to ensure both DB creation and storage operations succeed
@@ -185,5 +255,14 @@ class DocumentUploadService:
             # Remove temporary upload DB record & file
             default_storage.delete(temp_file_path)
             temp_upload.delete()
+
+        logger.info(
+            "dms.finalize_upload.completed user_id=%s temp_id=%s document_id=%s file_path=%s is_public=%s",
+            getattr(user, "id", None),
+            temp_id,
+            document.id,
+            document.file_path,
+            document.is_public,
+        )
 
         return document

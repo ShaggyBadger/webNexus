@@ -2,6 +2,7 @@ import os
 import shutil
 import tempfile
 from datetime import timedelta
+from unittest.mock import patch
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -117,6 +118,20 @@ class DMSTestCase(APITestCase):
         # TemporaryUpload database entry and temporary file should be gone
         self.assertFalse(TemporaryUpload.objects.filter(id=temp_upload.id).exists())
 
+    def test_upload_service_rejects_oversized_file(self):
+        with patch.object(DocumentUploadService, "MAX_UPLOAD_SIZE_BYTES", 10):
+            with self.assertRaisesMessage(
+                ValueError, "File exceeds maximum allowed size of 50MB."
+            ):
+                DocumentUploadService.handle_raw_upload(self.test_file, self.staff_user)
+
+    def test_upload_service_rejects_unsupported_mime_type(self):
+        bad_file = SimpleUploadedFile(
+            "notes.txt", b"plain text payload", content_type="text/plain"
+        )
+        with self.assertRaisesMessage(ValueError, "Unsupported file type"):
+            DocumentUploadService.handle_raw_upload(bad_file, self.staff_user)
+
     def test_download_service(self):
         # First ingest and finalize document
         raw_result = DocumentUploadService.handle_raw_upload(
@@ -130,7 +145,9 @@ class DMSTestCase(APITestCase):
         )
 
         # Perform download
-        file_obj, filename, mime_type = DocumentDownloadService.prepare_download(doc.id)
+        file_obj, filename, mime_type = DocumentDownloadService.prepare_download(
+            doc.id, self.staff_user
+        )
 
         self.assertEqual(filename, "test_guide.pdf")
         self.assertEqual(mime_type, "application/pdf")
@@ -215,6 +232,7 @@ class DMSTestCase(APITestCase):
             "description": "Initial onboarding overview",
             "category": self.category_safety.id,
             "collections": [self.collection_public.id],
+            "is_public": True,
         }
         response = self.client.post(
             reverse("dms:api_finalize_upload"), payload, format="json"
@@ -231,6 +249,34 @@ class DMSTestCase(APITestCase):
             response.headers["Content-Disposition"],
             'attachment; filename="test_guide.pdf"',
         )
+
+    def test_private_document_download_denied_for_standard_user(self):
+        raw_result = DocumentUploadService.handle_raw_upload(
+            self.test_file, self.staff_user
+        )
+        doc = DocumentUploadService.finalize_upload(
+            temp_id=raw_result["temp_id"],
+            user=self.staff_user,
+            title="Private Internal SOP",
+            is_public=False,
+        )
+
+        self.client.force_login(self.standard_user)
+        response = self.client.get(reverse("dms:document_download", args=[doc.id]))
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+        doc.refresh_from_db()
+        self.assertEqual(doc.download_count, 0)
+
+    def test_api_raw_upload_rejects_unsupported_mime(self):
+        self.client.force_login(self.staff_user)
+        bad_file = SimpleUploadedFile(
+            "notes.txt", b"plain text payload", content_type="text/plain"
+        )
+        response = self.client.post(reverse("dms:api_raw_upload"), {"file": bad_file})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["status"], "error")
+        self.assertEqual(response.data["error"]["code"], "upload_validation_error")
 
     def test_api_metadata_update_permissions(self):
         # Ingest and finalize doc
@@ -444,3 +490,52 @@ class DMSTestCase(APITestCase):
         # Verify the serializer includes it
         self.assertIsNotNone(response.data["data"]["linked_object"])
         self.assertEqual(response.data["data"]["linked_object"]["name"], str(store))
+
+    def test_dashboard_paginates_documents(self):
+        self.client.force_login(self.staff_user)
+
+        for index in range(11):
+            raw_result = DocumentUploadService.handle_raw_upload(
+                SimpleUploadedFile(
+                    f"bulk_{index}.pdf",
+                    self.file_content,
+                    content_type="application/pdf",
+                ),
+                self.staff_user,
+            )
+            DocumentUploadService.finalize_upload(
+                temp_id=raw_result["temp_id"],
+                user=self.staff_user,
+                title=f"Bulk Doc {index}",
+                is_public=True,
+            )
+
+        response = self.client.get(reverse("dms:dashboard"))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.context["documents_page"].paginator.per_page, 10)
+        self.assertEqual(len(response.context["documents"]), 10)
+
+    def test_api_documents_list_does_not_expand_linked_object(self):
+        self.client.force_login(self.staff_user)
+
+        store = Store.objects.create(store_num=1001, store_name="Linked Store 1001")
+        raw_result = DocumentUploadService.handle_raw_upload(
+            self.test_file, self.staff_user
+        )
+        linked_doc = DocumentUploadService.finalize_upload(
+            temp_id=raw_result["temp_id"],
+            user=self.staff_user,
+            title="Linked Doc",
+            is_public=True,
+        )
+        linked_doc.content_type = ContentType.objects.get_for_model(Store)
+        linked_doc.object_id = str(store.id)
+        linked_doc.save(update_fields=["content_type", "object_id"])
+
+        response = self.client.get(reverse("dms:api_documents"))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        linked_payload = next(
+            item for item in response.data["data"] if item["id"] == linked_doc.id
+        )
+        self.assertIsNone(linked_payload["linked_object"])

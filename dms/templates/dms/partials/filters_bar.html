@@ -1,0 +1,39 @@
+<div class="card card-tactical mb-4">
+    <div class="card-header card-tactical-header">[ FILTER & QUERY CONTROL BAR ]</div>
+    <div class="card-body">
+        <form method="GET" action="." class="row g-2">
+            <div class="col-md-4">
+                <div class="input-group">
+                    <span class="input-group-text bg-transparent border-secondary text-muted-custom"><i class="fa-solid fa-magnifying-glass"></i></span>
+                    <input type="text" name="q" value="{{ request.GET.q|default:'' }}" class="form-control form-control-tactical" placeholder="Search title or description...">
+                </div>
+            </div>
+            <div class="col-6 col-md-2">
+                <select name="category" class="form-select form-select-tactical">
+                    <option value="">All Categories</option>
+                    {% for cat in categories %}
+                        <option value="{{ cat.id }}" {% if request.GET.category == cat.id|stringformat:"s" %}selected{% endif %}>{{ cat.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <select name="collection" class="form-select form-select-tactical">
+                    <option value="">All Collections</option>
+                    {% for col in collections %}
+                        <option value="{{ col.id }}" {% if request.GET.collection == col.id %}selected{% endif %}>{{ col.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+               <input type="text" name="tag_slug" value="{{ request.GET.tag_slug|default:'' }}" class="form-control form-control-tactical" placeholder="Tag (e.g. propane)">
+            </div>
+            <div class="col-6 col-md-2">
+               <input type="text" name="state" value="{{ request.GET.state|default:'' }}" class="form-control form-control-tactical" placeholder="State (e.g. NC, VA)">
+            </div>
+
+            <div class="col-6 col-md-2 d-grid">
+                <button type="submit" class="btn btn-tactical btn-tactical-primary touch-target">Apply Filter</button>
+            </div>
+        </form>
+    </div>
+</div>

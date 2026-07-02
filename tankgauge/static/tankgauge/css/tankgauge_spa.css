@@ -7,6 +7,31 @@
   color: #f8f9fa;
 }
 
+.tankgauge-spa [x-cloak] {
+  display: none !important;
+}
+
+.tankgauge-spa .flow-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.tankgauge-spa .flow-step {
+  border: 1px solid #2a2e33;
+  background: #121417;
+  color: #a0aec0;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.72rem;
+  padding: 0.25rem 0.55rem;
+  border-radius: 3px;
+}
+
+.tankgauge-spa .flow-step.active {
+  border-color: #ffb86c;
+  color: #ffb86c;
+}
+
 .tankgauge-spa .tactical-card.active {
   border-color: #ffb86c;
 }
@@ -32,6 +57,22 @@
   border-color: #ffb86c;
   outline: 2px solid #ffb86c;
   outline-offset: 2px;
+}
+
+.tankgauge-spa .store-entry-shell {
+  max-width: 420px;
+}
+
+.tankgauge-spa .store-number-input {
+  min-height: 48px;
+  font-size: 1rem;
+}
+
+.tankgauge-spa .store-action-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  max-width: 420px;
 }
 
 .tankgauge-spa .btn-tactical-primary,

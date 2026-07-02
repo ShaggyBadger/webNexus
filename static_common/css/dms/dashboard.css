@@ -1,0 +1,134 @@
+[x-cloak] {
+    display: none !important;
+}
+
+body {
+    background-color: #0f111a;
+    color: #e2e4f0;
+}
+
+.card-tactical {
+    background-color: #161a24;
+    border: 1px solid #283046;
+    border-radius: 4px;
+}
+
+.card-tactical-header {
+    background-color: #1e2433;
+    border-bottom: 1px solid #283046;
+    font-family: "JetBrains Mono", monospace;
+    color: var(--accent-color, #ffb86c);
+    font-size: 0.85rem;
+    letter-spacing: 1px;
+}
+
+.btn-tactical {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.75rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    border-radius: 2px;
+    transition: all 0.2s ease;
+}
+
+.btn-tactical-primary {
+    background-color: transparent;
+    color: #ffb86c;
+    border: 1px solid #ffb86c;
+}
+
+.btn-tactical-primary:hover:not(:disabled) {
+    background-color: #ffb86c;
+    color: #0f111a;
+}
+
+.btn-tactical-secondary {
+    background-color: transparent;
+    color: #a0aec0;
+    border: 1px solid #4a5568;
+}
+
+.btn-tactical-secondary:hover:not(:disabled) {
+    background-color: #4a5568;
+    color: #fff;
+}
+
+.btn-tactical-danger {
+    background-color: transparent;
+    color: #ff5555;
+    border: 1px solid #ff5555;
+}
+
+.btn-tactical-danger:hover:not(:disabled) {
+    background-color: #ff5555;
+    color: #fff;
+}
+
+.touch-target {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.form-control-tactical {
+    background-color: #0a0c10;
+    border: 1px solid #283046;
+    color: #e2e4f0;
+    border-radius: 2px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.85rem;
+}
+
+.form-control-tactical:focus {
+    background-color: #0a0c10;
+    border-color: #ffb86c;
+    color: #e2e4f0;
+    box-shadow: 0 0 0 0.15rem rgba(255, 184, 108, 0.25);
+}
+
+.form-select-tactical {
+    background-color: #0a0c10;
+    border: 1px solid #283046;
+    color: #e2e4f0;
+    border-radius: 2px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.85rem;
+}
+
+.form-select-tactical:focus {
+    background-color: #0a0c10;
+    border-color: #ffb86c;
+    color: #e2e4f0;
+    box-shadow: 0 0 0 0.15rem rgba(255, 184, 108, 0.25);
+}
+
+.upload-zone {
+    border: 2px dashed #4a5568;
+    background-color: #0a0c10;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.upload-zone.dragover {
+    border-color: #ffb86c;
+    background-color: rgba(255, 184, 108, 0.05);
+}
+
+.document-card {
+    transition: border-color 0.2s ease;
+}
+
+.document-card:hover {
+    border-color: #ffb86c;
+}
+
+.meta-tag {
+    font-size: 0.65rem;
+    font-family: "JetBrains Mono", monospace;
+    padding: 2px 6px;
+    background-color: #1e2433;
+    border: 1px solid #283046;
+    color: #a0aec0;
+    border-radius: 2px;
+}

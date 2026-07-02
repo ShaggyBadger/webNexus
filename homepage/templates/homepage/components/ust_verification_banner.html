@@ -1,9 +1,9 @@
 {% load static %}
 <!-- UST Verification Banner (Hidden by default, triggered via JS GPS Pulse) -->
 <div id="ust-verification-banner" class="container-fluid px-3 mb-4 d-none">
-    <div id="ust-banner-card" class="tactical-card border-left-3" style="border-left-width: 6px !important;">
+    <div id="ust-banner-card" class="tactical-card border-left-3 ust-banner-card">
         <div class="d-flex justify-content-between align-items-center">
-            <div style="min-width: 0;">
+            <div class="ust-banner-text-wrap">
                 <div class="mono small text-muted-custom mb-1">
                     📍 PROXIMITY_ALERT // TARGET: <span id="ust-target-name" class="text-white">---</span>
                 </div>
@@ -14,7 +14,7 @@
                 <button id="ust-confirm-btn" class="btn btn-tactical btn-primary btn-sm mono">
                     [ CONFIRM VALID ]
                 </button>
-                <button id="ust-update-btn" class="btn btn-tactical btn-warning btn-sm mono text-dark">
+                <button id="ust-update-btn" class="btn btn-sm mono fw-bold command-app-cta command-app-cta-primary">
                     [ UPDATE ]
                 </button>
             </div>

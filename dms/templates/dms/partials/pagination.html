@@ -1,0 +1,30 @@
+{% if documents_page.paginator.num_pages > 1 %}
+<div class="p-3 border-top border-secondary">
+    <form method="get" class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <input type="hidden" name="q" value="{{ request.GET.q|default:'' }}">
+        <input type="hidden" name="category" value="{{ request.GET.category|default:'' }}">
+        <input type="hidden" name="collection" value="{{ request.GET.collection|default:'' }}">
+        <input type="hidden" name="tag_slug" value="{{ request.GET.tag_slug|default:'' }}">
+        <input type="hidden" name="state" value="{{ request.GET.state|default:'' }}">
+        <input type="hidden" name="status" value="{{ request.GET.status|default:'' }}">
+
+        <div class="small mono text-muted-custom">
+            Page {{ documents_page.number }} of {{ documents_page.paginator.num_pages }}
+        </div>
+
+        <div class="btn-group">
+            {% if documents_page.has_previous %}
+                <button type="submit" class="btn btn-sm btn-tactical btn-tactical-secondary" name="page" value="{{ documents_page.previous_page_number }}">Prev</button>
+            {% else %}
+                <button type="button" class="btn btn-sm btn-tactical btn-tactical-secondary" disabled>Prev</button>
+            {% endif %}
+
+            {% if documents_page.has_next %}
+                <button type="submit" class="btn btn-sm btn-tactical btn-tactical-secondary" name="page" value="{{ documents_page.next_page_number }}">Next</button>
+            {% else %}
+                <button type="button" class="btn btn-sm btn-tactical btn-tactical-secondary" disabled>Next</button>
+            {% endif %}
+        </div>
+    </form>
+</div>
+{% endif %}

@@ -1,0 +1,84 @@
+<div>
+    {% for doc in documents %}
+        <div class="p-3 border-bottom border-secondary document-card" id="docCard_{{ doc.id }}">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+                <h5 class="h6 mb-0 text-white font-weight-bold">
+                    {{ doc.title }}
+                    {% if not doc.is_public %}
+                        <i class="fa-solid fa-lock text-muted-custom ms-1" title="Private/Staff-Only"></i>
+                    {% endif %}
+                </h5>
+                <span class="badge bg-dark border border-secondary text-muted-custom small mono">v{{ doc.version }}</span>
+            </div>
+            <p class="text-muted-custom small mb-2">{{ doc.description|default:"No description provided" }}</p>
+
+            <div class="d-flex flex-wrap gap-1 mb-3">
+                {% if doc.category %}
+                    <span class="meta-tag"><i class="fa-solid fa-tag me-1"></i>{{ doc.category.name }}</span>
+                {% endif %}
+                {% for tag in doc.tags.all %}
+                    <span class="meta-tag bg-dark text-tactical-warning border-tactical-warning"><i class="fa-solid fa-hashtag me-1"></i>{{ tag.name }}</span>
+                {% endfor %}
+                <span class="meta-tag"><i class="fa-solid fa-hard-drive me-1"></i>{{ doc.file_size|filesizeformat }}</span>
+                {% if doc.content_type_id and doc.object_id %}
+                    <span class="meta-tag text-tactical-warning">
+                        <i class="fa-solid fa-link me-1"></i>{{ doc.content_type.model|upper }} #{{ doc.object_id }}
+                    </span>
+                {% endif %}
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <span class="text-muted-custom font-family-monospace" style="font-size: 0.65rem;">
+                    {{ doc.uploaded_at|date:"Y-m-d H:i" }} // {{ doc.uploaded_by.username }}
+                </span>
+                <div class="btn-group">
+                    <a href="{% url 'dms:document_download' doc.id %}" class="btn btn-sm btn-tactical btn-tactical-primary px-3 touch-target">
+                        <i class="fa-solid fa-download me-1"></i> Get
+                    </a>
+                    {% if user.is_staff or user.is_superuser %}
+                        <button class="btn btn-sm btn-tactical btn-tactical-secondary px-2 touch-target" @click="toggleEdit('{{ doc.id }}')">
+                            <i class="fa-solid fa-pen"></i>
+                        </button>
+                        <button class="btn btn-sm btn-tactical btn-tactical-danger px-2 touch-target" @click="toggleDelete('{{ doc.id }}')">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="edit-form-block mt-3 p-2 border border-warning rounded" x-show="isEditOpen('{{ doc.id }}')" x-cloak>
+                <div class="mb-2">
+                    <label class="form-label font-family-monospace small text-warning">Edit Title</label>
+                    <input type="text" class="form-control form-control-tactical edit-title-input" value="{{ doc.title }}">
+                </div>
+                <div class="mb-2">
+                   <label class="form-label font-family-monospace small text-warning">Edit Description</label>
+                   <textarea class="form-control form-control-tactical edit-desc-input" rows="2">{{ doc.description|default:'' }}</textarea>
+                </div>
+                <div class="mb-2">
+                   <label class="form-label font-family-monospace small text-warning">Edit Tags</label>
+                   <input type="text" class="form-control form-control-tactical edit-tags-input" value="{% for t in doc.tags.all %}{{ t.name }}{% if not forloop.last %}, {% endif %}{% endfor %}">
+                </div>
+                <div class="mb-3">
+                   <div class="form-check form-switch">
+                       <input class="form-check-input edit-is-public-input" type="checkbox" {% if doc.is_public %}checked{% endif %}>
+                       <label class="form-check-label font-family-monospace text-warning small">Public Visibility</label>
+                   </div>
+                </div>
+
+                <div class="d-flex justify-content-end gap-1">
+                    <button class="btn btn-sm btn-tactical btn-tactical-secondary" @click="closeEdit('{{ doc.id }}')">Cancel</button>
+                    <button class="btn btn-sm btn-tactical btn-tactical-primary" @click="saveEdit('{{ doc.id }}', $event)">Save Changes</button>
+                </div>
+            </div>
+
+            <div class="delete-confirm-block mt-3 p-3 border border-danger bg-dark rounded" x-show="isDeleteOpen('{{ doc.id }}')" x-cloak>
+                <p class="small text-danger mb-2 font-family-monospace"><i class="fa-solid fa-triangle-exclamation"></i> ARREST ACTION: Are you sure you want to soft-delete/archive this document? Metadata will remain, physical file will move to trash.</p>
+                <div class="d-flex justify-content-end gap-1">
+                    <button class="btn btn-sm btn-tactical btn-tactical-secondary" @click="closeDelete('{{ doc.id }}')">Cancel</button>
+                    <button class="btn btn-sm btn-tactical btn-tactical-danger" @click="confirmDelete('{{ doc.id }}')">Confirm Soft-Delete</button>
+                </div>
+            </div>
+        </div>
+    {% endfor %}
+</div>

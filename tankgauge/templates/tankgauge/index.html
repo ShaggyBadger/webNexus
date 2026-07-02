@@ -14,15 +14,47 @@
 <div class="container mt-4 tankgauge-spa" x-data="tankGaugeApp()">
     <h1 class="mb-4 mono fw-bold" style="color: var(--status-amber);">TANK_GAUGE // TELEMETRY_CONSOLE</h1>
 
-    <div class="tactical-card" x-show="step >= 1">
+    <div class="flow-steps mb-3">
+        <span class="flow-step" :class="step >= 1 ? 'active' : ''">1. Store</span>
+        <span class="flow-step" :class="step >= 2 ? 'active' : ''">2. Tank</span>
+        <span class="flow-step" :class="step >= 3 ? 'active' : ''">3. Input</span>
+        <span class="flow-step" :class="step >= 4 ? 'active' : ''">4. Results</span>
+    </div>
+
+    <div x-show="info" class="mb-3 p-2 border border-warning rounded text-warning mono small" x-text="info"></div>
+
+    <div class="tactical-card" x-show="step >= 1" x-ref="storeStepCard">
         <h2 class="h5 mono text-tactical-warning mb-3">01 // SELECT_STORE</h2>
-        <div class="d-flex flex-wrap gap-2 mb-3">
-            <input type="number" class="form-control tactical-input flex-grow-1" style="max-width: 200px;" x-model="storeNumber" placeholder="Enter Store #">
-            <button class="btn btn-primary btn-tactical-olive mono fw-bold" @click="fetchStoreTanks()" :disabled="loading.store">
-                INITIALIZE DATA_FETCH_SEQUENCE
+        <div class="store-entry-shell mb-3">
+            <label for="store-number-input" class="form-label mono text-muted-custom mb-2">ENTER STORE NUMBER</label>
+            <input
+                id="store-number-input"
+                x-ref="storeNumberInput"
+                type="number"
+                inputmode="numeric"
+                class="form-control tactical-input store-number-input"
+                x-model="storeNumber"
+                @keydown.enter.prevent="fetchStoreTanks()"
+                placeholder="Example: 1234"
+                aria-label="Store number"
+            >
+            <p class="mono small text-muted-custom mb-0 mt-2">Type a store number, then tap "Load Store Tanks".</p>
+        </div>
+        <div class="store-action-stack mb-3">
+            <button class="btn btn-primary btn-tactical-olive mono fw-bold w-100" @click="fetchStoreTanks()" :disabled="loading.store || !canFetchStore">
+                <span x-show="!loading.store">LOAD STORE TANKS</span>
+                <span x-show="loading.store">LOADING...</span>
             </button>
-            <button class="btn btn-primary btn-tactical-amber mono fw-bold" @click="fetchClosestStore()" :disabled="loading.store">
+            <button class="btn btn-primary btn-tactical-amber mono fw-bold w-100" @click="fetchClosestStore()" :disabled="loading.store">
                 GPS // CLOSEST_STORE
+            </button>
+            <button
+                class="btn btn-tactical-secondary mono fw-bold w-100"
+                x-show="storeData"
+                @click="changeStore()"
+                x-cloak
+            >
+                CHANGE STORE
             </button>
         </div>
         <div x-show="error" class="text-tactical-danger mt-2 mono fw-bold" x-text="error"></div>
@@ -31,8 +63,9 @@
         </div>
     </div>
 
-    <div class="tactical-card" x-show="step >= 2" x-transition>
+    <div class="tactical-card" x-show="step >= 2" x-transition x-ref="tankStepCard">
         <h2 class="h5 mono text-tactical-warning mb-3">02 // SELECT_TARGET_TANK</h2>
+        <p class="mono small text-muted-custom mb-2">Tap one tank to continue to telemetry input.</p>
         <div class="d-flex flex-column gap-2">
             <template x-for="tank in tanks" :key="tank.id">
                 <label class="btn btn-tactical-secondary text-start mono p-3 d-flex align-items-center gap-3 w-100"
@@ -44,7 +77,7 @@
         </div>
     </div>
 
-    <div class="tactical-card" x-show="step >= 3" x-transition>
+    <div class="tactical-card" x-show="step >= 3" x-transition x-ref="inputStepCard">
         <h2 class="h5 mono text-tactical-warning mb-3">03 // INPUT_DELIVERY_TELEMETRY</h2>
 
         <div class="mb-3 p-2 bg-dark rounded border border-secondary mono">
@@ -55,12 +88,16 @@
         <div class="row g-3 mb-3">
             <div class="col-12 col-md-6">
                 <label class="form-label mono text-muted-custom">GROSS_GALLONS_DELIVERED</label>
-                <input type="number" class="form-control tactical-input" x-model="inputs.deliveryGallons">
+                <input type="number" class="form-control tactical-input" x-model="inputs.deliveryGallons" x-ref="deliveryGallonsInput">
             </div>
             <div class="col-12 col-md-6">
                 <label class="form-label mono text-muted-custom">CURRENT_MEASURED_INCHES</label>
                 <input type="number" step="any" class="form-control tactical-input" x-model="inputs.currentInches">
             </div>
+        </div>
+
+        <div class="mono small text-muted-custom mb-3" x-show="!canCalculate" x-cloak>
+            Enter both delivery gallons and current inches to enable calculation.
         </div>
 
         <button class="btn btn-primary btn-tactical-olive mono fw-bold w-100" @click="calculateTelemetry()" :disabled="loading.calculate || !canCalculate">
@@ -69,7 +106,7 @@
         </button>
     </div>
 
-    <div class="tactical-card" x-show="step >= 4" x-transition>
+    <div class="tactical-card" x-show="step >= 4" x-transition x-ref="resultsStepCard">
         <h2 class="h5 mono text-tactical-warning mb-3">04 // TELEMETRY_RESULTS</h2>
         <template x-if="results">
             <div class="row g-3 mono">
@@ -105,7 +142,7 @@ END INCH     <span x-text="results.final_inches"></span>"</div>
         </template>
     </div>
 
-    <div class="tactical-card" x-show="step >= 3" x-transition>
+    <div class="tactical-card" x-show="step >= 3" x-transition x-ref="chartStepCard">
         <h2 class="h5 mono text-tactical-warning mb-3">05 // TANK_CHART_VISUALIZATION</h2>
         <div x-show="loading.chart" class="text-muted-custom mono">LOADING_CHART_DATA...</div>
         <div class="chart-wrap" x-show="!loading.chart">

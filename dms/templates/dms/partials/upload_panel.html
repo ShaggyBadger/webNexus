@@ -1,0 +1,101 @@
+<div class="card card-tactical mb-4" x-show="uploadOpen" x-cloak>
+    <div class="card-header card-tactical-header d-flex justify-content-between align-items-center">
+        <span>[ PHASE A: RAW FILE INGESTION ]</span>
+        <button type="button" class="btn-close btn-close-white btn-sm" @click="closeUploadPanel()" aria-label="Close"></button>
+    </div>
+    <div class="card-body">
+        <div x-show="upload.phase === 'raw'" x-cloak>
+            <div
+                class="upload-zone rounded p-4 text-center"
+                @click="$refs.fileInput.click()"
+                @dragover.prevent="$event.currentTarget.classList.add('dragover')"
+                @dragleave="$event.currentTarget.classList.remove('dragover')"
+                @drop.prevent="$event.currentTarget.classList.remove('dragover'); onDrop($event)"
+            >
+                <i class="fa-solid fa-cloud-arrow-up fa-2x text-muted-custom mb-3"></i>
+                <p class="mb-2 font-family-monospace text-white small">DRAG & DROP FILE OR CLICK TO INGEST</p>
+                <p class="text-muted-custom small mb-0">PDF, Excel (XLSX), Tank Charts, CSV (Max 50MB)</p>
+                <input type="file" class="d-none" x-ref="fileInput" @change="onFileChange($event)">
+            </div>
+            <div class="mt-3" x-show="upload.inProgress" x-cloak>
+                <div class="d-flex justify-content-between text-muted-custom small font-family-monospace mb-1">
+                    <span>Uploading file...</span>
+                    <span x-text="upload.progressPercent + '%'">0%</span>
+                </div>
+                <div class="progress rounded-0" style="height: 6px; background-color: #0f111a;">
+                    <div class="progress-bar bg-warning" role="progressbar" :style="`width: ${upload.progressPercent}%;`"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-2 pt-3 border-top border-secondary" x-show="upload.phase === 'finalize'" x-cloak>
+            <h6 class="font-family-monospace text-tactical-warning mb-3">[ PHASE B: METADATA & LINKAGE FINALIZATION ]</h6>
+            <form @submit.prevent="submitFinalize()">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label for="docTitle" class="form-label font-family-monospace text-muted-custom small">Document Title *</label>
+                        <input type="text" class="form-control form-control-tactical" id="docTitle" x-model="upload.form.title" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="docCategory" class="form-label font-family-monospace text-muted-custom small">Category</label>
+                        <select class="form-select form-select-tactical" id="docCategory" x-model="upload.form.category">
+                            <option value="">-- UNASSIGNED --</option>
+                            {% for category in categories %}
+                                <option value="{{ category.id }}">{{ category.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-12">
+                        <label for="docDesc" class="form-label font-family-monospace text-muted-custom small">Description / Notes</label>
+                        <textarea class="form-control form-control-tactical" id="docDesc" rows="2" placeholder="Describe scope, revision, or contents..." x-model="upload.form.description"></textarea>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label font-family-monospace text-muted-custom small">Link to Collections</label>
+                        <div class="border border-secondary p-2 rounded" style="max-height: 100px; overflow-y: auto; background-color: #0a0c10;">
+                            {% for col in collections %}
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="collections" value="{{ col.id }}" id="col_{{ col.id }}" x-model="upload.form.collections">
+                                    <label class="form-check-label font-family-monospace small text-white" for="col_{{ col.id }}">
+                                        {{ col.name }}
+                                    </label>
+                                </div>
+                            {% empty %}
+                                <span class="text-muted-custom small font-family-monospace">No collections available</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label font-family-monospace text-muted-custom small">Contextual Linkage (GKey)</label>
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <select class="form-select form-select-tactical" id="linkContentType" x-model="upload.form.contentType">
+                                    <option value="">-- NO LINK --</option>
+                                    <option value="location">Location (SiteIntel)</option>
+                                    <option value="store">Store (TankGauge)</option>
+                                </select>
+                            </div>
+                            <div class="col-6">
+                                <input type="text" class="form-control form-control-tactical" id="linkObjectId" placeholder="Object ID (e.g. Store #)" x-model="upload.form.objectId">
+                            </div>
+                        </div>
+                        <span class="text-muted-custom" style="font-size: 0.65rem;">Associate doc with site or store record.</span>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="docTags" class="form-label font-family-monospace text-muted-custom small">Tags (Comma Separated)</label>
+                        <input type="text" class="form-control form-control-tactical" id="docTags" placeholder="e.g. winter, training, compliance" x-model="upload.form.tags">
+                    </div>
+                    <div class="col-md-6 pt-md-4">
+                        <div class="form-check form-switch mt-2">
+                            <input class="form-check-input" type="checkbox" id="docIsPublic" x-model="upload.form.isPublic">
+                            <label class="form-check-label font-family-monospace text-white small" for="docIsPublic">Public Visibility (Visible to standard users)</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="d-flex justify-content-end mt-4 gap-2">
+                    <button type="button" class="btn btn-tactical btn-tactical-secondary touch-target" @click="resetUploadPanel()">Cancel</button>
+                    <button type="submit" class="btn btn-tactical btn-tactical-primary touch-target">Commit to DB</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
