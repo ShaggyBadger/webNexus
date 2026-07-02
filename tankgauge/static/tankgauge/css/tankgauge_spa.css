@@ -53,10 +53,33 @@
   font-family: "JetBrains Mono", monospace;
 }
 
+.tankgauge-spa .tactical-input.input-attention {
+  border-color: #ffb86c;
+  box-shadow: 0 0 0 3px rgba(255, 184, 108, 0.2);
+  animation: input-attention-pulse 1.6s ease-in-out infinite;
+}
+
 .tankgauge-spa .tactical-input:focus {
   border-color: #ffb86c;
   outline: 2px solid #ffb86c;
   outline-offset: 2px;
+}
+
+@keyframes input-attention-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 2px rgba(255, 184, 108, 0.18);
+  }
+
+  50% {
+    box-shadow: 0 0 0 5px rgba(255, 184, 108, 0.26);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tankgauge-spa .tactical-input.input-attention {
+    animation: none;
+  }
 }
 
 .tankgauge-spa .store-entry-shell {
