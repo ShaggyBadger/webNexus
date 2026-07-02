@@ -219,6 +219,7 @@ function tankGaugeApp() {
             }
 
             this.storeNumber = data.results[0].store_num;
+            this.loading.store = false;
             await this.fetchStoreTanks();
           } catch (error) {
             this.error = error.message;

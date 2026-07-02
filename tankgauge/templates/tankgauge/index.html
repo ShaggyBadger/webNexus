@@ -33,7 +33,7 @@
                 type="number"
                 inputmode="numeric"
                 class="form-control tactical-input store-number-input"
-                :class="{ 'input-attention': step === 1 && !storeData && !storeNumber && !loading.store }"
+                :class="{ 'input-attention': step === 1 && !storeData && !loading.store }"
                 x-model="storeNumber"
                 @keydown.enter.prevent="fetchStoreTanks()"
                 placeholder="Example: 1234"
