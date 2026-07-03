@@ -1,5 +1,6 @@
 import json
 from datetime import timedelta
+from decimal import Decimal
 
 from django.contrib.auth.models import User
 from django.test import TestCase
@@ -113,3 +114,55 @@ class MissionLogShellAccessTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "[ MISSIONLOG CONSOLE ]")
+
+
+class PostTripPayloadHandlingTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="payloaduser", password="pass12345"
+        )
+        self.client.force_login(self.user)
+
+    def test_post_trip_create_keeps_blank_start_end_miles_empty(self):
+        response = self.client.post(
+            reverse("missionlog:post_trip_create"),
+            data=json.dumps(
+                {
+                    "shift_start": timezone.now().isoformat(),
+                    "is_completed": False,
+                    "start_miles": "",
+                    "end_miles": "",
+                    "total_miles": "",
+                    "deliveries": [],
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        mission = Mission.objects.get(id=response.json()["data"]["mission"]["id"])
+        self.assertIsNone(mission.start_miles)
+        self.assertIsNone(mission.end_miles)
+
+    def test_post_trip_create_persists_three_decimal_truck_fuel_values(self):
+        response = self.client.post(
+            reverse("missionlog:post_trip_create"),
+            data=json.dumps(
+                {
+                    "shift_start": timezone.now().isoformat(),
+                    "is_completed": False,
+                    "deliveries": [],
+                    "truck_fuel": {
+                        "gallons": "40.125",
+                        "price_per_gallon": "3.219",
+                    },
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        mission = Mission.objects.get(id=response.json()["data"]["mission"]["id"])
+        fuel_log = mission.fuel_logs.get()
+        self.assertEqual(fuel_log.gallons, Decimal("40.125"))
+        self.assertEqual(fuel_log.price_per_gallon, Decimal("3.219"))

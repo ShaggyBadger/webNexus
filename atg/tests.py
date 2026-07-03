@@ -11,7 +11,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from tankgauge.models import Store, StoreTankMapping, TankType
+from tankgauge.models import Store, StoreTankMapping, TankEstimation, TankType
 from missionlog.models import FuelType
 from .models import VeederTicket, VeederReading
 from .services import VeederUploadService
@@ -323,6 +323,41 @@ class VeederAPITestCase(APITestCase):
         self.assertEqual(
             payload["known_tanks"][0]["verification_status"],
             "unverified_mapping",
+        )
+
+    def test_store_tank_profile_prefers_veeder_estimation_capacity(self):
+        tank_type = TankType.objects.create(name="8k96", capacity=8000, max_depth=96)
+        mapping = StoreTankMapping.objects.create(
+            store=self.store,
+            tank_type=tank_type,
+            fuel_type="regular",
+            tank_index=1,
+        )
+        TankEstimation.objects.create(
+            tank_mapping=mapping,
+            radius=30.0,
+            length=100.0,
+            confidence=0.9,
+            mean_error=5.0,
+            max_error=8.0,
+            sample_count=5,
+            algorithm_version="v1",
+            diagnostics={"capacity": 9000.0},
+            is_active=True,
+        )
+
+        url = reverse(
+            "atg:store_tank_profile_api",
+            kwargs={"store_num": self.store.store_num},
+        )
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = response.json()
+        self.assertEqual(payload["known_tanks"][0]["baseline_capacity"], 9000)
+        self.assertEqual(
+            payload["known_tanks"][0]["baseline_source"],
+            "veeder_estimation",
         )
 
     def test_ticket_list_and_retrieve(self):

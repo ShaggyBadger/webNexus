@@ -9,7 +9,7 @@ from dms.api.views import (
     FinalizeUploadView,
     DocumentDownloadView,
 )
-from dms.views import DashboardView
+from dms.views import DashboardView, DocumentMetadataEditView, DocumentUploadView
 
 app_name = "dms"
 
@@ -22,6 +22,12 @@ urlpatterns = [
         DocumentDownloadView.as_view(),
         name="document_download",
     ),
+    path(
+        "documents/<str:ulid>/edit/",
+        DocumentMetadataEditView.as_view(),
+        name="document_edit",
+    ),
+    path("upload/", DocumentUploadView.as_view(), name="upload_page"),
     # API endpoints (primary v1 paths)
     path("api/v1/categories/", CategoryListView.as_view(), name="api_categories"),
     path("api/v1/tags/", TagListView.as_view(), name="api_tags"),

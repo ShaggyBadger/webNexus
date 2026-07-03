@@ -26,7 +26,7 @@ class DocumentListCreateView(APIView, StandardAPIResponseMixin):
     List documents with server-side pagination, filtering, and search.
     """
 
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
 
     def get(self, request) -> Response:
         search_query = request.query_params.get("q")
@@ -41,8 +41,12 @@ class DocumentListCreateView(APIView, StandardAPIResponseMixin):
         tag_slug = request.query_params.get("tag_slug")
         state_filter = request.query_params.get("state")
 
-        is_public_only = not (request.user.is_staff or request.user.is_superuser)
-        if is_public_only:
+        is_staff_user = bool(
+            request.user.is_authenticated
+            and (request.user.is_staff or request.user.is_superuser)
+        )
+        is_public_only = not request.user.is_authenticated
+        if not is_staff_user:
             status_filter = "ACTIVE"
 
         queryset = DocumentSearchService.search_documents(
@@ -86,7 +90,7 @@ class DocumentDetailView(APIView, StandardAPIResponseMixin):
     DELETE /api/v1/documents/<ulid>/ -> Soft-delete/Archive document (Staff/Admin only)
     """
 
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
 
     def get_permissions(self):
         if self.request.method in ["PATCH", "DELETE"]:
@@ -98,9 +102,14 @@ class DocumentDetailView(APIView, StandardAPIResponseMixin):
             document = DocumentSearchService.optimize_queryset(Document.objects).get(
                 id=ulid
             )
-            if not (self.request.user.is_staff or self.request.user.is_superuser):
-                if document.status != "ACTIVE" or not document.is_public:
-                    raise Http404("Document not found.")
+            is_staff_user = bool(
+                self.request.user.is_authenticated
+                and (self.request.user.is_staff or self.request.user.is_superuser)
+            )
+            if not is_staff_user and document.status != "ACTIVE":
+                raise Http404("Document not found.")
+            if not self.request.user.is_authenticated and not document.is_public:
+                raise Http404("Document not found.")
             return document
         except Document.DoesNotExist:
             raise Http404("Document not found.")
@@ -207,7 +216,7 @@ class DocumentDownloadView(APIView):
     Routed download endpoint: verifies permissions, increments count, serves file.
     """
 
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
 
     def get(self, request, ulid: str) -> FileResponse:
         try:

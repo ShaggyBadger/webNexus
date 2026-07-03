@@ -7,7 +7,7 @@ from rest_framework.views import APIView
 from ...logic.calculations import perform_tank_calc
 from ...logic.tank_lookup import get_store_and_preset_status, get_tank_mapping
 from ...models import StoreTankMapping
-from ...serializers import CalcRequestSerializer, CalcResponseSerializer
+from ...serializers import CalcRequestSerializer
 from .error_contract import drf_error_response, drf_success_response
 
 logger = logging.getLogger("tankgauge")
@@ -125,16 +125,9 @@ class CalculateTankAPIView(APIView):
                     "tank_index": tank_index,
                     "final_gallons": final_gallons,
                     "data_source": result.get("data_source"),
+                    "preferred_mode": result.get("preferred_mode"),
                 },
             )
-
-            response_serializer = CalcResponseSerializer(data=result)
-            if response_serializer.is_valid():
-                return drf_success_response(
-                    data=response_serializer.validated_data,
-                    status_code=status.HTTP_200_OK,
-                )
-
             return drf_success_response(data=result, status_code=status.HTTP_200_OK)
         except Exception as exc:
             logger.error(

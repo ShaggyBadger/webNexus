@@ -2,6 +2,7 @@
   --status-online: #50fa7b;
   --status-standby: #ffb86c;
   --homepage-action-blue: #2f80ed;
+  --homepage-action-amber: #ffb86c;
 }
 
 .eagle-logo {
@@ -57,6 +58,24 @@
   font-size: 0.6rem;
 }
 
+.command-app-tag {
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  padding: 0.25rem 0.45rem;
+}
+
+.command-app-tag-core {
+  background-color: rgba(47, 128, 237, 0.2);
+  color: #90c2ff;
+  border: 1px solid rgba(47, 128, 237, 0.45);
+}
+
+.command-app-tag-specialty {
+  background-color: rgba(255, 184, 108, 0.2);
+  color: #ffd8ab;
+  border: 1px solid rgba(255, 184, 108, 0.55);
+}
+
 .command-app-cta {
   min-height: 44px;
   display: flex;
@@ -71,17 +90,19 @@
 }
 
 .command-app-cta-amber {
-  background-color: var(--homepage-action-blue);
-  border: 1px solid var(--homepage-action-blue);
-  color: #f8f9fa;
+  background-color: var(--homepage-action-amber);
+  border: 1px solid var(--homepage-action-amber);
+  color: #121417;
 }
 
+.command-app-cta-primary.is-danger,
 .command-app-cta-amber.is-danger {
   background-color: #e94560;
   border-color: #e94560;
   color: #f8f9fa;
 }
 
+.command-app-cta-primary.is-success,
 .command-app-cta-amber.is-success {
   background-color: #8da35d;
   border-color: #8da35d;
@@ -120,5 +141,23 @@
 @media (max-width: 576px) {
   .display-5 {
     font-size: 1.75rem;
+  }
+
+  .command-grid-intro {
+    margin-top: 0.5rem;
+    margin-bottom: 0.9rem;
+  }
+
+  .command-app-card .card-body {
+    padding: 1rem 0.9rem;
+  }
+
+  .command-app-tag {
+    font-size: 0.54rem;
+    padding: 0.2rem 0.35rem;
+  }
+
+  .command-app-cta {
+    min-height: 48px;
   }
 }

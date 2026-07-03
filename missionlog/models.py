@@ -235,10 +235,10 @@ class TruckFuelLog(models.Model):
         help_text="Parent shift mission.",
     )
     gallons = models.DecimalField(
-        max_digits=10, decimal_places=2, help_text="Truck fuel gallons pumped."
+        max_digits=10, decimal_places=3, help_text="Truck fuel gallons pumped."
     )
     price_per_gallon = models.DecimalField(
-        max_digits=10, decimal_places=2, help_text="Pump cost per gallon."
+        max_digits=10, decimal_places=3, help_text="Pump cost per gallon."
     )
     timestamp = models.DateTimeField(
         auto_now_add=True, help_text="System logged timestamp."

@@ -36,39 +36,13 @@
                         <i class="fa-solid fa-download me-1"></i> Get
                     </a>
                     {% if user.is_staff or user.is_superuser %}
-                        <button class="btn btn-sm btn-tactical btn-tactical-secondary px-2 touch-target" @click="toggleEdit('{{ doc.id }}')">
+                        <a href="{% url 'dms:document_edit' doc.id %}" class="btn btn-sm btn-tactical btn-tactical-secondary px-2 touch-target">
                             <i class="fa-solid fa-pen"></i>
-                        </button>
+                        </a>
                         <button class="btn btn-sm btn-tactical btn-tactical-danger px-2 touch-target" @click="toggleDelete('{{ doc.id }}')">
                             <i class="fa-solid fa-trash-can"></i>
                         </button>
                     {% endif %}
-                </div>
-            </div>
-
-            <div class="edit-form-block mt-3 p-2 border border-warning rounded" x-show="isEditOpen('{{ doc.id }}')" x-cloak>
-                <div class="mb-2">
-                    <label class="form-label font-family-monospace small text-warning">Edit Title</label>
-                    <input type="text" class="form-control form-control-tactical edit-title-input" value="{{ doc.title }}">
-                </div>
-                <div class="mb-2">
-                   <label class="form-label font-family-monospace small text-warning">Edit Description</label>
-                   <textarea class="form-control form-control-tactical edit-desc-input" rows="2">{{ doc.description|default:'' }}</textarea>
-                </div>
-                <div class="mb-2">
-                   <label class="form-label font-family-monospace small text-warning">Edit Tags</label>
-                   <input type="text" class="form-control form-control-tactical edit-tags-input" value="{% for t in doc.tags.all %}{{ t.name }}{% if not forloop.last %}, {% endif %}{% endfor %}">
-                </div>
-                <div class="mb-3">
-                   <div class="form-check form-switch">
-                       <input class="form-check-input edit-is-public-input" type="checkbox" {% if doc.is_public %}checked{% endif %}>
-                       <label class="form-check-label font-family-monospace text-warning small">Public Visibility</label>
-                   </div>
-                </div>
-
-                <div class="d-flex justify-content-end gap-1">
-                    <button class="btn btn-sm btn-tactical btn-tactical-secondary" @click="closeEdit('{{ doc.id }}')">Cancel</button>
-                    <button class="btn btn-sm btn-tactical btn-tactical-primary" @click="saveEdit('{{ doc.id }}', $event)">Save Changes</button>
                 </div>
             </div>
 

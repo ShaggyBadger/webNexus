@@ -7,7 +7,7 @@ class CalcRequestSerializer(serializers.Serializer):
     tank_id = serializers.CharField(required=False, allow_blank=True)
     tank_index = serializers.IntegerField(required=False, allow_null=True)
     current_inches = serializers.FloatField(required=True, min_value=0)
-    delivery_gallons = serializers.IntegerField(required=True, min_value=0)
+    delivery_gallons = serializers.FloatField(required=True, min_value=0)
 
 
 class CalcResponseSerializer(serializers.Serializer):

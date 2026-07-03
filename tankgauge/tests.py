@@ -139,7 +139,11 @@ class ConfidenceGateTests(TestCase):
 
 class EstimationAndApiTests(APITestCase):
     def setUp(self):
-        self.store = Store.objects.create(store_num=36073, store_name="Test Store")
+        self.store = Store.objects.create(
+            store_num=36073,
+            riso_num=936073,
+            store_name="Test Store",
+        )
         self.tank_type = TankType.objects.create(
             name="10K", capacity=10000, max_depth=120
         )
@@ -150,6 +154,13 @@ class EstimationAndApiTests(APITestCase):
             tank_index=1,
         )
         self.fuel_type = FuelType.objects.create(name="Diesel")
+        TankChart.objects.create(
+            tank_type=self.tank_type,
+            inches=20,
+            gallons=2000,
+            tank_name="10K",
+            is_official=True,
+        )
 
         ticket = VeederTicket.objects.create(store=self.store)
         for i in range(3):
@@ -233,6 +244,9 @@ class EstimationAndApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["status"], "success")
         self.assertEqual(response.data["data"]["status"], "SUCCESS")
+        self.assertEqual(response.data["data"]["preferred_mode"], "MATHEMATICAL")
+        self.assertIsNotNone(response.data["data"]["profiles"]["mathematical"])
+        self.assertIsNotNone(response.data["data"]["profiles"]["official"])
 
     def test_api_calc_success_without_auth(self):
         url = reverse("tankgauge:calculate_tank_api")
@@ -493,7 +507,11 @@ class AdminSyncButtonTests(TestCase):
 
 class StoreChartApiTests(TestCase):
     def setUp(self):
-        self.store = Store.objects.create(store_num=8111, store_name="API Store")
+        self.store = Store.objects.create(
+            store_num=8111,
+            riso_num=98111,
+            store_name="API Store",
+        )
         self.tank_type = TankType.objects.create(
             name="API Tank", capacity=10000, max_depth=120
         )
@@ -537,6 +555,20 @@ class StoreChartApiTests(TestCase):
         self.assertIn("message", payload["error"])
         self.assertIn("details", payload["error"])
         self.assertIn("trace_id", payload["error"])
+
+    def test_store_tanks_api_accepts_riso_number(self):
+        response = self.client.get(
+            reverse(
+                "tankgauge:store_tanks_api",
+                kwargs={"store_num": self.store.riso_num},
+            )
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = response.json()
+        self.assertEqual(payload["status"], "success")
+        self.assertEqual(payload["data"]["store"]["store_num"], self.store.store_num)
+        self.assertEqual(payload["data"]["store"]["riso_num"], self.store.riso_num)
 
     def test_tank_chart_data_api_returns_official_generated_and_scatter_series(self):
         TankChart.objects.create(

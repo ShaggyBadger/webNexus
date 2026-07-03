@@ -11,7 +11,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="container mt-4 tankgauge-spa" x-data="tankGaugeApp()">
+<div class="container mt-4 tankgauge-spa" x-data="tankGaugeApp()" x-init="init()">
     <h1 class="mb-4 mono fw-bold" style="color: var(--status-amber);">TANK_GAUGE // TELEMETRY_CONSOLE</h1>
 
     <div class="flow-steps mb-3">
@@ -26,7 +26,7 @@
     <div class="tactical-card" x-show="step >= 1" x-ref="storeStepCard">
         <h2 class="h5 mono text-tactical-warning mb-3">01 // SELECT_STORE</h2>
         <div class="store-entry-shell mb-3">
-            <label for="store-number-input" class="form-label mono text-muted-custom mb-2">ENTER STORE NUMBER</label>
+            <label for="store-number-input" class="form-label mono text-muted-custom mb-2">ENTER STORE OR RISO NUMBER</label>
             <input
                 id="store-number-input"
                 x-ref="storeNumberInput"
@@ -37,9 +37,9 @@
                 x-model="storeNumber"
                 @keydown.enter.prevent="fetchStoreTanks()"
                 placeholder="Example: 1234"
-                aria-label="Store number"
+                aria-label="Store or RISO number"
             >
-            <p class="mono small text-muted-custom mb-0 mt-2">Type a store number, then tap "Load Store Tanks".</p>
+            <p class="mono small text-muted-custom mb-0 mt-2">Type a store or RISO number, then tap "Load Store Tanks".</p>
         </div>
         <div class="store-action-stack mb-3">
             <button class="btn btn-primary btn-tactical-olive mono fw-bold w-100" @click="fetchStoreTanks()" :disabled="loading.store || !canFetchStore">
@@ -69,8 +69,10 @@
         <p class="mono small text-muted-custom mb-2">Tap one tank to continue to telemetry input.</p>
         <div class="d-flex flex-column gap-2">
             <template x-for="tank in tanks" :key="tank.id">
-                <label class="btn btn-tactical-secondary text-start mono p-3 d-flex align-items-center gap-3 w-100"
-                       :class="{ 'active btn-tactical-amber': selectedTank?.id === tank.id }">
+                <label
+                    class="tank-option btn text-start mono p-3 d-flex align-items-center gap-3 w-100"
+                    :class="selectedTank?.id === tank.id ? 'tank-option-selected' : 'tank-option-idle'"
+                >
                     <input type="radio" class="d-none" name="tankSelect" :value="tank.id" @change="selectTank(tank)">
                     <span x-text="(tank.tank_index ? 'Tank ' + tank.tank_index + ': ' : '') + tank.fuel_type.toUpperCase() + ' (' + (tank.capacity ? tank.capacity + ' Gal Max' : 'Unknown Capacity') + ')' "></span>
                 </label>
@@ -89,11 +91,11 @@
         <div class="row g-3 mb-3">
             <div class="col-12 col-md-6">
                 <label class="form-label mono text-muted-custom">GROSS_GALLONS_DELIVERED</label>
-                <input type="number" class="form-control tactical-input" x-model="inputs.deliveryGallons" x-ref="deliveryGallonsInput">
+                <input type="number" step="any" inputmode="decimal" class="form-control tactical-input" x-model="inputs.deliveryGallons" x-ref="deliveryGallonsInput">
             </div>
             <div class="col-12 col-md-6">
                 <label class="form-label mono text-muted-custom">CURRENT_MEASURED_INCHES</label>
-                <input type="number" step="any" class="form-control tactical-input" x-model="inputs.currentInches">
+                <input type="number" step="any" inputmode="decimal" class="form-control tactical-input" x-model="inputs.currentInches">
             </div>
         </div>
 
@@ -110,35 +112,64 @@
     <div class="tactical-card" x-show="step >= 4" x-transition x-ref="resultsStepCard">
         <h2 class="h5 mono text-tactical-warning mb-3">04 // TELEMETRY_RESULTS</h2>
         <template x-if="results">
-            <div class="row g-3 mono">
-                <div class="col-12 col-md-6">
-                    <div class="p-3 border border-secondary rounded h-100" style="background-color: #121417;">
-                        <h6 class="text-muted-custom">STARTING_TELEMETRY</h6>
-                        <div class="fs-4" x-text="results.initial_gallons + ' Gal'"></div>
-                        <div class="text-muted-custom" x-text="results.initial_inches + ' Inches'"></div>
-                    </div>
-                </div>
-                <div class="col-12 col-md-6">
-                    <div class="p-3 border border-secondary rounded h-100" style="background-color: #121417;">
-                        <h6 class="text-muted-custom">ESTIMATED_ENDING_TELEMETRY</h6>
-                        <div class="fs-4 text-tactical-warning" x-text="results.final_gallons + ' Gal'"></div>
-                        <div class="text-muted-custom" x-text="results.final_inches + ' Inches'"></div>
-                    </div>
-                </div>
-                <div class="col-12 mt-3">
-                    <div class="p-3 border rounded mb-3" :class="(results.final_gallons > results.ninety_limit) ? 'border-danger bg-danger text-white' : 'border-success bg-success text-dark'">
-                        <strong>ULLAGE_REMAINING: </strong> <span x-text="results.avail_90 + ' Gal'"></span>
-                        <div x-show="results.final_gallons > results.ninety_limit" class="mt-2 fw-bold">
+            <div>
+                <template x-if="results.status === 'SUCCESS'">
+                    <div class="mono">
+                        <div class="result-toggle mb-3" x-show="hasMultipleProfiles" x-cloak>
+                            <button
+                                type="button"
+                                class="btn mono fw-bold"
+                                :class="activeProfileKey === 'mathematical' ? 'btn-tactical-amber' : 'btn-tactical-secondary'"
+                                @click="activeProfileKey = 'mathematical'"
+                                :disabled="!results?.profiles?.mathematical"
+                            >VEEDER MATH</button>
+                            <button
+                                type="button"
+                                class="btn mono fw-bold"
+                                :class="activeProfileKey === 'official' ? 'btn-tactical-amber' : 'btn-tactical-secondary'"
+                                @click="activeProfileKey = 'official'"
+                                :disabled="!results?.profiles?.official"
+                            >OFFICIAL CHART</button>
+                        </div>
+
+                        <div class="result-panel">
+                            <div class="result-grid">
+                                <div class="result-item">
+                                    <div class="result-label">CURRENT GALLONS</div>
+                                    <div class="result-value" x-text="activeProfile?.initial_gallons + ' Gal'"></div>
+                                </div>
+                                <div class="result-item">
+                                    <div class="result-label">90% WILL HOLD</div>
+                                    <div class="result-value" x-text="activeProfile?.fillable_to_90 + ' Gal'"></div>
+                                </div>
+                                <div class="result-item">
+                                    <div class="result-label">EST. END GALLONS</div>
+                                    <div class="result-value" x-text="activeProfile?.estimated_ending_gallons + ' Gal'"></div>
+                                </div>
+                                <div class="result-item">
+                                    <div class="result-label">EST. END INCHES</div>
+                                    <div class="result-value" x-text="activeProfile?.estimated_ending_inches + ' in'"></div>
+                                </div>
+                            </div>
+
+                            <div class="result-source text-muted-custom" x-show="activeProfile" x-cloak>
+                                SOURCE: <span x-text="activeProfile?.data_source"></span>
+                            </div>
+                        </div>
+
+                        <div
+                            class="result-warning mt-3"
+                            x-show="activeProfile?.no_fit_warning"
+                            x-cloak
+                        >
                             WARNING: 90% SAFE FILL CAPACITY EXCEEDED
                         </div>
                     </div>
+                </template>
 
-                    <div class="p-3 border border-secondary rounded user-select-all font-monospace" style="background-color: #121417; color: #f8f9fa; white-space: pre-wrap;">[ DELIVERY_TICKET_INTEL ]
-START GAL    <span x-text="results.initial_gallons"></span> G
-90% HOLD     <span x-text="results.ninety_limit"></span> G
-END GAL      <span x-text="results.final_gallons"></span> G
-END INCH     <span x-text="results.final_inches"></span>"</div>
-                </div>
+                <template x-if="results.status !== 'SUCCESS'">
+                    <div class="result-warning" x-text="results.message || 'Calculation unavailable for this tank.'"></div>
+                </template>
             </div>
         </template>
     </div>

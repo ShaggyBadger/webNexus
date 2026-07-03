@@ -174,3 +174,112 @@
   height: 400px;
   width: 100%;
 }
+
+.tankgauge-spa .tank-option {
+  border-width: 2px;
+  min-height: 52px;
+}
+
+.tankgauge-spa .tank-option-idle {
+  background-color: #1c1f23;
+  border-color: #2a2e33;
+  color: #f8f9fa;
+}
+
+.tankgauge-spa .tank-option-selected {
+  background-color: rgba(255, 184, 108, 0.2);
+  border-color: #ffb86c;
+  color: #ffdfb7;
+  box-shadow: 0 0 0 2px rgba(255, 184, 108, 0.35);
+}
+
+.tankgauge-spa .result-toggle {
+  display: inline-flex;
+  gap: 0.4rem;
+  padding: 0.35rem;
+  border: 1px solid #2a2e33;
+  background-color: #121417;
+}
+
+.tankgauge-spa .result-toggle .btn {
+  min-height: 48px;
+  padding: 0.5rem 0.9rem;
+}
+
+.tankgauge-spa .result-panel {
+  border: 1px solid #2a2e33;
+  background-color: #121417;
+  padding: 1rem;
+}
+
+.tankgauge-spa .result-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+.tankgauge-spa .result-item {
+  border: 1px solid #2a2e33;
+  padding: 0.7rem;
+  background-color: #1c1f23;
+  min-height: 88px;
+}
+
+.tankgauge-spa .result-label {
+  color: #a0aec0;
+  font-size: 0.72rem;
+  margin-bottom: 0.3rem;
+}
+
+.tankgauge-spa .result-value {
+  color: #f8f9fa;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.tankgauge-spa .result-source {
+  margin-top: 0.75rem;
+  font-size: 0.8rem;
+}
+
+.tankgauge-spa .result-warning {
+  border: 1px solid #e94560;
+  color: #f8f9fa;
+  background-color: rgba(233, 69, 96, 0.2);
+  padding: 0.65rem;
+  font-weight: 700;
+}
+
+@media (max-width: 767px) {
+  .tankgauge-spa .result-toggle {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+    gap: 0.5rem;
+    padding: 0.45rem;
+  }
+
+  .tankgauge-spa .result-toggle .btn {
+    width: 100%;
+    min-height: 50px;
+    font-size: 0.82rem;
+  }
+
+  .tankgauge-spa .result-panel {
+    padding: 0.85rem;
+  }
+
+  .tankgauge-spa .result-grid {
+    grid-template-columns: 1fr;
+    gap: 0.65rem;
+  }
+
+  .tankgauge-spa .result-item {
+    min-height: 0;
+    padding: 0.65rem;
+  }
+
+  .tankgauge-spa .result-value {
+    font-size: 1.05rem;
+  }
+}

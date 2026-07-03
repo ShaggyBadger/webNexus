@@ -7,7 +7,12 @@ from rest_framework import viewsets, permissions, status, serializers
 from rest_framework.response import Response
 from missionlog.models import FuelType
 from tankgauge.logic.utils import canonicalize_fuel
-from tankgauge.models import Store, StoreTankMapping
+from tankgauge.models import (
+    Store,
+    StoreTankMapping,
+    TankEstimation,
+    VirtualTankEstimation,
+)
 from ..models import VeederTicket, VeederReading
 from ..serializers import (
     VeederTicketSerializer,
@@ -147,6 +152,22 @@ class StoreTankProfileAPIView(APIView):
 
     permission_classes = [permissions.IsAuthenticated]
 
+    @staticmethod
+    def _capacity_from_estimation(estimation):
+        if not estimation:
+            return None
+
+        diagnostics = estimation.diagnostics or {}
+        if diagnostics.get("capacity"):
+            return float(diagnostics["capacity"])
+
+        radius_inches = float(estimation.radius or 0)
+        length_inches = float(estimation.length or 0)
+        if radius_inches <= 0 or length_inches <= 0:
+            return None
+
+        return (3.141592653589793 * (radius_inches**2) * length_inches) / 231.0
+
     def get(self, request, store_num):
         try:
             store = Store.objects.get(store_num=store_num)
@@ -194,7 +215,23 @@ class StoreTankProfileAPIView(APIView):
                 else None
             )
             history_capacity = median(implied_caps) if implied_caps else None
-            baseline_capacity = mapped_capacity or history_capacity
+            active_estimation = TankEstimation.objects.filter(
+                tank_mapping=mapping,
+                is_active=True,
+            ).first()
+            estimation_capacity = self._capacity_from_estimation(active_estimation)
+
+            baseline_capacity = (
+                estimation_capacity or history_capacity or mapped_capacity
+            )
+            if estimation_capacity:
+                baseline_source = "veeder_estimation"
+            elif history_capacity:
+                baseline_source = "veeder_history"
+            elif mapped_capacity:
+                baseline_source = "mapped_capacity"
+            else:
+                baseline_source = None
             fuel_obj = fuel_lookup.get(fuel_key)
 
             known_tanks.append(
@@ -215,6 +252,7 @@ class StoreTankProfileAPIView(APIView):
                     "baseline_capacity": (
                         int(round(baseline_capacity)) if baseline_capacity else None
                     ),
+                    "baseline_source": baseline_source,
                     "readings_count": len(implied_caps),
                     "locked_identity": len(implied_caps) > 0,
                     "verification_status": (
@@ -250,6 +288,17 @@ class StoreTankProfileAPIView(APIView):
                 continue
 
             fuel_obj = fuel_lookup.get(fuel_key)
+            active_virtual_estimation = VirtualTankEstimation.objects.filter(
+                store=store,
+                fuel_type=fuel_key,
+                tank_index=tank_index,
+                is_active=True,
+            ).first()
+            estimation_capacity = self._capacity_from_estimation(
+                active_virtual_estimation
+            )
+            history_capacity = group["avg_capacity"]
+            baseline_capacity = estimation_capacity or history_capacity
             known_tanks.append(
                 {
                     "mapping_id": None,
@@ -262,9 +311,10 @@ class StoreTankProfileAPIView(APIView):
                     "tank_type_name": None,
                     "max_depth": None,
                     "baseline_capacity": (
-                        int(round(group["avg_capacity"]))
-                        if group["avg_capacity"]
-                        else None
+                        int(round(baseline_capacity)) if baseline_capacity else None
+                    ),
+                    "baseline_source": (
+                        "veeder_estimation" if estimation_capacity else "veeder_history"
                     ),
                     "readings_count": group["reading_count"],
                     "locked_identity": True,

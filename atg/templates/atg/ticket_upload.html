@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}ATG TICKET_UPLOAD | {{ SITE_NAME }}{% endblock %}
+{% block title %}ATG Ingest | {{ SITE_NAME }}{% endblock %}
 
 {% block extra_head %}
 <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
@@ -11,10 +11,10 @@
 {% block content %}
 {{ fuel_types|json_script:"fuel-types-data" }}
 
-<div class="container py-3" x-data="atgTicketUploadApp()">
+<div class="container py-3" x-data="atgTicketUploadApp()" x-init="init()">
     <div class="row justify-content-center">
         <div class="col-lg-9">
-            <h2 class="mono text-primary mb-3">[ ATG_TICKET_INGEST ]</h2>
+            <h2 class="mono text-primary mb-3">[ ATG INGEST ]</h2>
 
             <form @submit.prevent="submitTicket()">
                 {% csrf_token %}
@@ -102,6 +102,9 @@
                                 </div>
                                 <div class="mono small text-muted-custom mt-2" x-show="reading.baseline_capacity">
                                     BASELINE_CAPACITY <span x-text="reading.baseline_capacity"></span> GAL // EXPECTED_ULLAGE <span x-text="reading.expected_ullage ?? '--'"></span>
+                                </div>
+                                <div class="mono small text-muted-custom" x-show="reading.baseline_source">
+                                    BASELINE_SOURCE <span x-text="reading.baseline_source"></span>
                                 </div>
                             </div>
                         </template>

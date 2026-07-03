@@ -10,6 +10,7 @@ function tankGaugeApp() {
       currentInches: "",
     },
     results: null,
+    activeProfileKey: null,
     chartData: null,
     chartInstance: null,
     loading: {
@@ -29,9 +30,23 @@ function tankGaugeApp() {
     get canCalculate() {
       return (
         !!this.selectedTank &&
-        this.inputs.deliveryGallons !== "" &&
-        this.inputs.currentInches !== ""
+        `${this.inputs.deliveryGallons}`.trim() !== "" &&
+        `${this.inputs.currentInches}`.trim() !== ""
       );
+    },
+
+    get activeProfile() {
+      if (!this.results || !this.results.profiles) {
+        return null;
+      }
+      return this.results.profiles[this.activeProfileKey] || null;
+    },
+
+    get hasMultipleProfiles() {
+      if (!this.results || !this.results.profiles) {
+        return false;
+      }
+      return Boolean(this.results.profiles.official && this.results.profiles.mathematical);
     },
 
     get prefersReducedMotion() {
@@ -64,8 +79,13 @@ function tankGaugeApp() {
       this.inputs.deliveryGallons = "";
       this.inputs.currentInches = "";
       this.results = null;
+      this.activeProfileKey = null;
       this.chartData = null;
       this.destroyChart();
+    },
+
+    init() {
+      this.fetchClosestStore();
     },
 
     clearMessages() {
@@ -179,7 +199,8 @@ function tankGaugeApp() {
           return;
         }
 
-        this.info = `Store #${this.storeData.store_num} loaded. Select a tank to continue.`;
+        const primaryId = this.storeData.store_num || this.storeData.riso_num;
+        this.info = `Store ${primaryId} loaded. Select a tank to continue.`;
         this.step = 2;
         this.scrollToStep("tankStepCard");
 
@@ -236,9 +257,15 @@ function tankGaugeApp() {
     },
 
     async selectTank(tank) {
+      const switchingTanks = this.selectedTank && this.selectedTank.id !== tank.id;
+      if (switchingTanks) {
+        this.inputs.deliveryGallons = "";
+        this.inputs.currentInches = "";
+        this.results = null;
+        this.activeProfileKey = null;
+      }
       this.selectedTank = tank;
       this.step = 3;
-      this.results = null;
       this.info = `Tank ${tank.tank_index || "?"} selected. Enter delivery telemetry.`;
       this.scrollToStep("inputStepCard");
       this.$nextTick(() => this.$refs.deliveryGallonsInput?.focus());
@@ -269,8 +296,16 @@ function tankGaugeApp() {
           payload,
           "Calculation failed.",
         );
+        if (this.results.status === "SUCCESS") {
+          this.activeProfileKey =
+            this.results.preferred_mode === "MATHEMATICAL"
+              ? "mathematical"
+              : "official";
+        } else {
+          this.activeProfileKey = null;
+        }
         this.step = 4;
-        this.info = "Calculation complete. Review results and warning banner.";
+        this.info = "Calculation complete. Review tank fill projection.";
         this.scrollToStep("resultsStepCard");
       } catch (error) {
         this.error = error.message;

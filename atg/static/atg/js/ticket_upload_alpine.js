@@ -24,6 +24,7 @@ function atgTicketUploadApp() {
       if (fuelScript?.textContent) {
         this.fuelTypes = JSON.parse(fuelScript.textContent);
       }
+      this.preloadNearestStore();
     },
 
     get hasStore() {
@@ -94,9 +95,58 @@ function atgTicketUploadApp() {
 
     clearStore() {
       this.selectedStore = null;
+      this.searchQuery = "";
+      this.searchResults = [];
       this.knownReadings = [];
       this.manualReadings = [];
       this.step = 1;
+    },
+
+    async preloadNearestStore() {
+      if (!navigator.geolocation) {
+        return;
+      }
+
+      this.showStatus("Detecting nearest store...", "info");
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          try {
+            const lat = position.coords.latitude;
+            const lon = position.coords.longitude;
+            const response = await fetch(
+              `/tankgauge/api/closest-store/?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`,
+            );
+            if (!response.ok) {
+              throw new Error("Unable to detect nearest store.");
+            }
+
+            const payload = await response.json();
+            const closest = payload?.results?.[0];
+            if (!closest?.store_pk) {
+              throw new Error("No nearby store available.");
+            }
+
+            await this.chooseStore({
+              store_pk: closest.store_pk,
+              store_num: closest.store_num,
+              name: closest.store_name,
+              city: closest.city,
+              state: closest.state,
+            });
+            this.showStatus("Nearest store preloaded. Change if needed.", "success");
+          } catch (error) {
+            this.clearStatus();
+          }
+        },
+        () => {
+          this.clearStatus();
+        },
+        {
+          maximumAge: 60000,
+          timeout: 10000,
+          enableHighAccuracy: true,
+        },
+      );
     },
 
     async loadStoreProfile() {
@@ -123,6 +173,7 @@ function atgTicketUploadApp() {
           fuel_type_name: tank.fuel_type_name,
           locked_identity: !!tank.locked_identity,
           baseline_capacity: tank.baseline_capacity,
+          baseline_source: tank.baseline_source,
           max_depth: tank.max_depth,
           volume: "",
           height: "",

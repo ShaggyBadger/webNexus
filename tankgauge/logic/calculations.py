@@ -106,63 +106,141 @@ def perform_tank_calc(
             "mode": mode,
         }
 
-    initial_gallons, _ = get_volume_from_depth(
-        tank_mapping, current_inches, mode, source_meta
+    profiles = {}
+    for candidate_mode in (MODE_OFFICIAL, MODE_MATHEMATICAL):
+        profile = _calculate_profile_for_mode(
+            tank_mapping=tank_mapping,
+            current_inches=current_inches,
+            delivery_gallons=delivery_gallons,
+            virtual_meta=virtual_meta,
+            mode=candidate_mode,
+        )
+        if profile:
+            profiles[candidate_mode] = profile
+
+    if not profiles:
+        return {
+            "status": "UNAVAILABLE",
+            "message": "No tank chart or sufficient Veeder data exists for this tank.",
+            "mode": MODE_UNAVAILABLE,
+            "profiles": {},
+        }
+
+    preferred_mode = (
+        MODE_MATHEMATICAL if MODE_MATHEMATICAL in profiles else MODE_OFFICIAL
     )
-    final_gallons = initial_gallons + delivery_gallons
-    final_inches = get_depth_from_volume(tank_mapping, final_gallons, mode, source_meta)
-
-    # CAPACITY_RESOLUTION:
-    # Use TankType if available, otherwise source from estimate diagnostics or latest reading
-    capacity = 0
-    if tank_mapping and tank_mapping.tank_type:
-        capacity = tank_mapping.tank_type.capacity or 0
-    elif source_meta and "capacity" in source_meta:
-        capacity = source_meta["capacity"]
-
-    ninety_percent_limit = capacity * 0.9
-    avail_90 = max(0, ninety_percent_limit - initial_gallons)
-
-    max_depth = 0.0
-    if mode == MODE_MATHEMATICAL and source_meta and source_meta.get("estimation"):
-        max_depth = float(source_meta["estimation"].radius) * 2.0
-    elif tank_mapping and tank_mapping.tank_type:
-        max_depth = float(tank_mapping.tank_type.max_depth or 0)
-
-    # NO_FIT_WARNING: Triggered if the final volume exceeds the 90% safety threshold.
-    no_fit_warning = final_gallons > ninety_percent_limit
+    selected = profiles[preferred_mode]
 
     result = {
         "status": "SUCCESS",
         "fuel_type": fuel_type,
-        "mode": mode,
-        "data_source": source_meta.get("name") if source_meta else "CHART",
-        "confidence": source_meta.get("confidence") if source_meta else 1.0,
-        "initial_inches": current_inches,
-        "initial_gallons": int(initial_gallons),
-        "delivery_gallons": int(delivery_gallons),
-        "avail_90": int(avail_90),
-        "final_gallons": int(final_gallons),
-        "final_inches": final_inches,
-        "max_capacity": int(capacity),
-        "max_depth": round(max_depth, 2),
-        "ninety_limit": int(ninety_percent_limit),
-        "no_fit_warning": no_fit_warning,
+        "mode": preferred_mode,
+        "preferred_mode": preferred_mode,
+        "available_modes": list(profiles.keys()),
+        "profiles": {
+            "official": profiles.get(MODE_OFFICIAL),
+            "mathematical": profiles.get(MODE_MATHEMATICAL),
+        },
+        # Backward-compatible selected profile fields
+        "data_source": selected["data_source"],
+        "confidence": selected["confidence"],
+        "initial_inches": selected["initial_inches"],
+        "initial_gallons": selected["initial_gallons"],
+        "delivery_gallons": selected["delivery_gallons"],
+        "avail_90": selected["avail_90"],
+        "final_gallons": selected["final_gallons"],
+        "final_inches": selected["final_inches"],
+        "max_capacity": selected["max_capacity"],
+        "max_depth": selected["max_depth"],
+        "ninety_limit": selected["ninety_limit"],
+        "no_fit_warning": selected["no_fit_warning"],
     }
 
     logger.info(
         "CALC_COMPLETE",
         extra={
             "fuel_type": fuel_type,
-            "mode": mode,
-            "data_source": source_meta.get("name") if source_meta else None,
-            "initial_gallons": int(initial_gallons),
-            "final_gallons": int(final_gallons),
+            "mode": preferred_mode,
+            "data_source": selected["data_source"],
+            "initial_gallons": selected["initial_gallons"],
+            "final_gallons": selected["final_gallons"],
             "delivery_gallons": int(delivery_gallons),
             "reason_code": "calculation_complete",
         },
     )
     return result
+
+
+def _calculate_profile_for_mode(
+    *, tank_mapping, current_inches, delivery_gallons, virtual_meta, mode
+):
+    if tank_mapping:
+        resolved_mode, source_meta = determine_operating_mode(
+            tank_mapping,
+            force_source=mode,
+        )
+    else:
+        resolved_mode, source_meta = determine_virtual_operating_mode(
+            virtual_meta.get("store_id"),
+            virtual_meta.get("fuel_type"),
+            virtual_meta.get("tank_index"),
+            force_source=mode,
+        )
+
+    if resolved_mode != mode or not source_meta:
+        return None
+
+    initial_gallons, _ = get_volume_from_depth(
+        tank_mapping,
+        current_inches,
+        mode,
+        source_meta,
+    )
+    final_gallons = initial_gallons + delivery_gallons
+    final_inches = get_depth_from_volume(
+        tank_mapping,
+        final_gallons,
+        mode,
+        source_meta,
+    )
+
+    capacity = 0
+    if tank_mapping and tank_mapping.tank_type:
+        capacity = tank_mapping.tank_type.capacity or 0
+    elif "capacity" in source_meta:
+        capacity = source_meta["capacity"]
+
+    ninety_percent_limit = capacity * 0.9
+    gallons_to_ninety = max(0, ninety_percent_limit - initial_gallons)
+
+    max_depth = 0.0
+    if mode == MODE_MATHEMATICAL and source_meta.get("estimation"):
+        max_depth = float(source_meta["estimation"].radius) * 2.0
+    elif tank_mapping and tank_mapping.tank_type:
+        max_depth = float(tank_mapping.tank_type.max_depth or 0)
+
+    no_fit_warning = final_gallons > ninety_percent_limit
+    estimated_ending_gallons = int(final_gallons)
+    estimated_ending_inches = final_inches
+    return {
+        "mode": mode,
+        "data_source": source_meta.get("name", mode),
+        "confidence": source_meta.get("confidence", 1.0),
+        "initial_inches": float(current_inches),
+        "initial_gallons": int(initial_gallons),
+        "delivery_gallons": int(delivery_gallons),
+        "fillable_to_90": int(gallons_to_ninety),
+        "estimated_ending_gallons": estimated_ending_gallons,
+        "estimated_ending_inches": estimated_ending_inches,
+        "max_capacity": int(capacity),
+        "max_depth": round(max_depth, 2),
+        "ninety_limit": int(ninety_percent_limit),
+        "no_fit_warning": no_fit_warning,
+        # Backward-compatible aliases
+        "avail_90": int(gallons_to_ninety),
+        "final_gallons": estimated_ending_gallons,
+        "final_inches": estimated_ending_inches,
+    }
 
 
 def determine_operating_mode(tank_mapping, force_source=None):
@@ -234,8 +312,13 @@ def determine_operating_mode(tank_mapping, force_source=None):
             }
         return None
 
-    # --- Apply priority order ---
-    if priority == "MATHEMATICAL_FIRST":
+    # --- Apply explicit source override when requested ---
+    if force_source == MODE_MATHEMATICAL:
+        result = _get_mathematical()
+    elif force_source == MODE_OFFICIAL:
+        result = _get_official()
+    # --- Otherwise apply configured priority order ---
+    elif priority == "MATHEMATICAL_FIRST":
         result = _get_mathematical() or _get_official()
     else:  # OFFICIAL_FIRST (default)
         result = _get_official() or _get_mathematical()
@@ -288,12 +371,17 @@ def determine_virtual_operating_mode(
     ).first()
 
     if estimation:
-        return MODE_MATHEMATICAL, {
-            "name": "MATHEMATICAL_ESTIMATE",
-            "confidence": estimation.confidence,
-            "estimation": estimation,
-            "capacity": float(latest.volume + latest.ullage),
-        }
+        mathematical_result = (
+            MODE_MATHEMATICAL,
+            {
+                "name": "MATHEMATICAL_ESTIMATE",
+                "confidence": estimation.confidence,
+                "estimation": estimation,
+                "capacity": float(latest.volume + latest.ullage),
+            },
+        )
+        if force_source in (None, MODE_MATHEMATICAL):
+            return mathematical_result
 
     # 3. Resolve/recompute persisted estimate from current evidence
     observations = [(float(r.height), float(r.volume)) for r in readings]
@@ -324,16 +412,22 @@ def determine_virtual_operating_mode(
     )
 
     if estimation:
-        return MODE_MATHEMATICAL, {
-            "name": "MATHEMATICAL_ESTIMATE",
-            "confidence": estimation.confidence,
-            "estimation": estimation,
-            "capacity": total_capacity,
-        }
+        mathematical_result = (
+            MODE_MATHEMATICAL,
+            {
+                "name": "MATHEMATICAL_ESTIMATE",
+                "confidence": estimation.confidence,
+                "estimation": estimation,
+                "capacity": total_capacity,
+            },
+        )
+        if force_source in (None, MODE_MATHEMATICAL):
+            return mathematical_result
 
     # 4. Fallback to existing generated chart
     if (
-        _generated_chart_fallback_enabled()
+        force_source in (None, MODE_OFFICIAL)
+        and _generated_chart_fallback_enabled()
         and TankChart.objects.filter(
             store=store, tank_index=tank_index, is_official=False
         ).exists()

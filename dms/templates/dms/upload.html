@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}DMS - Upload Document{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/dms/dashboard.css' %}">
+<style>
+    .upload-page .btn-close {
+        display: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div
+    class="container py-4 upload-page"
+    x-data="dmsUploadPageApp()"
+    x-init="init()"
+    data-raw-upload-url="{% url 'dms:api_raw_upload' %}"
+    data-finalize-upload-url="{% url 'dms:api_finalize_upload' %}"
+>
+    <div class="d-flex justify-content-between align-items-center mb-4 border-bottom border-secondary pb-3">
+        <div>
+            <h1 class="h3 font-family-monospace text-uppercase tracking-wider mb-0 text-white font-weight-bold">
+                <i class="fa-solid fa-cloud-arrow-up me-2 text-tactical-warning"></i>DMS // Upload Document
+            </h1>
+            <p class="text-muted-custom small mb-0 font-family-monospace mt-1">PHASED INGESTION + METADATA FINALIZATION</p>
+        </div>
+        <a href="{% url 'dms:dashboard' %}" class="btn btn-tactical btn-tactical-secondary touch-target">
+            <i class="fa-solid fa-arrow-left me-1"></i> Back to Dashboard
+        </a>
+    </div>
+
+    <div
+        class="alert font-family-monospace py-2 px-3 mb-4 rounded-0"
+        role="alert"
+        x-show="statusAlert.visible"
+        x-cloak
+        :class="alertClass()"
+    >
+        <span x-text="statusAlert.message"></span>
+    </div>
+
+    {% include 'dms/partials/upload_panel.html' %}
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<script src="{% static 'js/dms/dms_dashboard_upload.js' %}"></script>
+<script src="{% static 'js/dms/dms_upload_page.js' %}"></script>
+{% endblock %}

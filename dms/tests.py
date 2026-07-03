@@ -250,7 +250,7 @@ class DMSTestCase(APITestCase):
             'attachment; filename="test_guide.pdf"',
         )
 
-    def test_private_document_download_denied_for_standard_user(self):
+    def test_private_document_download_denied_for_anonymous_user(self):
         raw_result = DocumentUploadService.handle_raw_upload(
             self.test_file, self.staff_user
         )
@@ -261,12 +261,15 @@ class DMSTestCase(APITestCase):
             is_public=False,
         )
 
-        self.client.force_login(self.standard_user)
         response = self.client.get(reverse("dms:document_download", args=[doc.id]))
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
         doc.refresh_from_db()
         self.assertEqual(doc.download_count, 0)
+
+        self.client.force_login(self.standard_user)
+        response = self.client.get(reverse("dms:document_download", args=[doc.id]))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_api_raw_upload_rejects_unsupported_mime(self):
         self.client.force_login(self.staff_user)
@@ -306,6 +309,69 @@ class DMSTestCase(APITestCase):
         self.assertEqual(doc.title, "Updated Title")
         # Version should increment on update
         self.assertEqual(doc.version, 2)
+
+    def test_document_metadata_edit_view_updates_document(self):
+        raw_res = DocumentUploadService.handle_raw_upload(
+            self.test_file, self.staff_user
+        )
+        doc = DocumentUploadService.finalize_upload(
+            temp_id=raw_res["temp_id"],
+            user=self.staff_user,
+            title="Original Title",
+            is_public=False,
+        )
+
+        self.client.force_login(self.staff_user)
+        edit_url = reverse("dms:document_edit", args=[doc.id])
+
+        response = self.client.post(
+            edit_url,
+            {
+                "title": "Updated From Edit Page",
+                "description": "Updated notes",
+                "category": str(self.category_safety.id),
+                "collections": [str(self.collection_public.id)],
+                "tags": "Ops, Safety",
+                "is_public": "on",
+            },
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_302_FOUND)
+        self.assertEqual(response.url, reverse("dms:dashboard"))
+
+        doc.refresh_from_db()
+        self.assertEqual(doc.title, "Updated From Edit Page")
+        self.assertEqual(doc.description, "Updated notes")
+        self.assertEqual(doc.category, self.category_safety)
+        self.assertTrue(doc.is_public)
+        self.assertEqual(doc.version, 2)
+        self.assertTrue(doc.collections.filter(id=self.collection_public.id).exists())
+        self.assertTrue(doc.tags.filter(name="Ops").exists())
+        self.assertTrue(doc.tags.filter(name="Safety").exists())
+
+    def test_document_metadata_edit_view_requires_staff(self):
+        raw_res = DocumentUploadService.handle_raw_upload(
+            self.test_file, self.staff_user
+        )
+        doc = DocumentUploadService.finalize_upload(
+            temp_id=raw_res["temp_id"],
+            user=self.staff_user,
+            title="Private Metadata",
+        )
+
+        self.client.force_login(self.standard_user)
+        response = self.client.get(reverse("dms:document_edit", args=[doc.id]))
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_upload_page_requires_staff(self):
+        self.client.force_login(self.standard_user)
+        response = self.client.get(reverse("dms:upload_page"))
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_upload_page_renders_for_staff(self):
+        self.client.force_login(self.staff_user)
+        response = self.client.get(reverse("dms:upload_page"))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_soft_delete_flow(self):
         # Ingest and finalize doc
@@ -374,21 +440,35 @@ class DMSTestCase(APITestCase):
             is_public=False,
         )
 
-        # 1. Standard user list view -> should only see public doc
-        self.client.force_login(self.standard_user)
+        # 1. Anonymous list view -> should only see public doc
         response = self.client.get(reverse("dms:api_documents"))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         ids = [d["id"] for d in response.data["data"]]
         self.assertIn(doc_public.id, ids)
         self.assertNotIn(doc_private.id, ids)
 
-        # 2. Standard user detail view of private doc -> should 404
+        # 2. Standard user list view -> should see both
+        self.client.force_login(self.standard_user)
+        response = self.client.get(reverse("dms:api_documents"))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ids = [d["id"] for d in response.data["data"]]
+        self.assertIn(doc_public.id, ids)
+        self.assertIn(doc_private.id, ids)
+
+        # 3. Standard user detail view of private doc -> should be allowed
+        response = self.client.get(
+            reverse("dms:api_document_detail", args=[doc_private.id])
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # 4. Anonymous detail view of private doc -> should 404
+        self.client.logout()
         response = self.client.get(
             reverse("dms:api_document_detail", args=[doc_private.id])
         )
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
-        # 3. Staff user list view -> should see both
+        # 5. Staff user list view -> should see both
         self.client.force_login(self.staff_user)
         response = self.client.get(reverse("dms:api_documents"))
         ids = [d["id"] for d in response.data["data"]]
@@ -514,6 +594,33 @@ class DMSTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.context["documents_page"].paginator.per_page, 10)
         self.assertEqual(len(response.context["documents"]), 10)
+
+    def test_dashboard_allows_anonymous_and_hides_login_required_docs(self):
+        raw_public = DocumentUploadService.handle_raw_upload(
+            self.test_file, self.staff_user
+        )
+        public_doc = DocumentUploadService.finalize_upload(
+            temp_id=raw_public["temp_id"],
+            user=self.staff_user,
+            title="Public Dashboard Doc",
+            is_public=True,
+        )
+
+        raw_private = DocumentUploadService.handle_raw_upload(
+            self.test_file, self.staff_user
+        )
+        private_doc = DocumentUploadService.finalize_upload(
+            temp_id=raw_private["temp_id"],
+            user=self.staff_user,
+            title="Login Required Dashboard Doc",
+            is_public=False,
+        )
+
+        response = self.client.get(reverse("dms:dashboard"))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        docs = list(response.context["documents"])
+        self.assertIn(public_doc, docs)
+        self.assertNotIn(private_doc, docs)
 
     def test_api_documents_list_does_not_expand_linked_object(self):
         self.client.force_login(self.staff_user)

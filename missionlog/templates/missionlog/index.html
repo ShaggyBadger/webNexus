@@ -32,9 +32,17 @@
             <div class="mb-3">
                 <h1 class="mono h4 mb-2 text-primary">[ MISSIONLOG CONSOLE ]</h1>
                 <div class="d-flex flex-wrap gap-2">
-                    <button class="btn btn-outline-primary btn-sm mono" :class="{ 'active': view === 'active' }" @click="view='active'">ACTIVE</button>
-                    <button class="btn btn-outline-primary btn-sm mono" :class="{ 'active': view === 'history' }" @click="switchToHistory()">HISTORY</button>
-                    <a href="/" class="btn btn-outline-secondary btn-sm mono">[ EXIT ]</a>
+                    <button
+                        class="btn btn-sm mono"
+                        :class="view === 'active' ? 'btn-primary' : 'btn-secondary'"
+                        @click="view='active'"
+                    >ACTIVE</button>
+                    <button
+                        class="btn btn-sm mono"
+                        :class="view === 'history' ? 'btn-primary' : 'btn-secondary'"
+                        @click="switchToHistory()"
+                    >HISTORY</button>
+                    <a href="/" class="btn btn-secondary btn-sm mono">[ EXIT ]</a>
                 </div>
             </div>
 
@@ -58,7 +66,7 @@
             <div x-show="view === 'active'" x-cloak>
                 <div class="ml-card p-3 mb-3 mono" x-show="activeMission">
                     <div class="d-flex justify-content-between align-items-center">
-                        <div class="text-primary">[ RESUME_INCOMPLETE_MISSION ]</div>
+                        <div class="text-primary">[ RESUME MISSION ]</div>
                     </div>
                 </div>
 
@@ -72,29 +80,82 @@
 
                 <form class="ml-card p-3 mono" x-show="showEntryForm" x-cloak @submit.prevent="submitMission(false)">
                     <div class="row g-2">
-                        <div class="col-12 col-md-6">
+                        <div class="col-12 col-md-5">
                             <label class="form-label small text-muted-custom">SHIFT_START</label>
                             <input type="datetime-local" class="form-control ml-input mono" x-model="form.shift_start" required>
                         </div>
+                    </div>
+
+                    <div class="border-top border-secondary mt-3 pt-3">
+                        <div class="text-primary mb-2">DELIVERIES</div>
+
+                        <template x-for="(delivery, dIdx) in form.deliveries" :key="'delivery-' + dIdx">
+                            <div class="border border-secondary p-2 mb-2">
+                                <div class="row g-2 align-items-end">
+                                    <div class="col-12 col-md-4">
+                                        <label class="form-label small text-muted-custom">STORE_NUM_OR_RISO</label>
+                                        <input type="text" inputmode="numeric" class="form-control ml-input mono" x-model="delivery.store_number_or_riso" @input="validateStore(dIdx)">
+                                    </div>
+                                    <div class="col-12 col-md-5">
+                                        <div class="small" x-show="delivery.loading">VALIDATING...</div>
+                                        <div class="small text-tactical-success" x-show="delivery.storeValid === true" x-text="delivery.storeName"></div>
+                                        <div class="small text-tactical-danger" x-show="delivery.storeValid === false">STORE_NOT_FOUND</div>
+                                    </div>
+                                    <div class="col-12 col-md-3 d-grid">
+                                        <button type="button" class="btn btn-danger btn-sm mono" @click="removeDelivery(dIdx)">[ REMOVE ]</button>
+                                    </div>
+                                </div>
+
+                                <div class="mt-2">
+                                    <template x-for="(fuel, fIdx) in delivery.fuel_entries" :key="'fuel-' + dIdx + '-' + fIdx">
+                                        <div class="row g-2 align-items-end mb-2">
+                                            <div class="col-12 col-md-5">
+                                                <label class="form-label small text-muted-custom">FUEL_TYPE</label>
+                                                <select class="form-select ml-input mono" x-model="fuel.fuel_type_id">
+                                                    <template x-for="type in fuelTypes" :key="'type-' + type.id">
+                                                        <option :value="type.id" x-text="type.name"></option>
+                                                    </template>
+                                                </select>
+                                            </div>
+                                            <div class="col-12 col-md-5">
+                                                <label class="form-label small text-muted-custom">GALLONS</label>
+                                                <input type="number" step="any" inputmode="decimal" class="form-control ml-input mono" x-model="fuel.gallons">
+                                            </div>
+                                            <div class="col-12 col-md-2 d-grid">
+                                                <button type="button" class="btn btn-danger btn-sm mono" @click="removeFuelEntry(dIdx, fIdx)">X</button>
+                                            </div>
+                                        </div>
+                                    </template>
+                                    <button type="button" class="btn btn-secondary btn-sm mono" @click="addFuelEntry(dIdx)">[ + FUEL ]</button>
+                                </div>
+                            </div>
+                        </template>
+
+                        <div class="d-grid mt-2">
+                            <button type="button" class="btn btn-primary mono" @click="addDelivery()">[ + DELIVERY ]</button>
+                        </div>
+                    </div>
+
+                    <div class="row g-2 mt-1">
                         <div class="col-12 col-md-6">
                             <label class="form-label small text-muted-custom">HOURS_ON_DUTY</label>
-                            <input type="number" step="0.01" class="form-control ml-input mono" x-model="form.hours_on_duty">
+                            <input type="number" step="0.01" inputmode="decimal" class="form-control ml-input mono" x-model="form.hours_on_duty">
                         </div>
                         <div class="col-12 col-md-6">
                             <label class="form-label small text-muted-custom">HOURS_ON_DUTY_NOT_DRIVING</label>
-                            <input type="number" step="0.01" class="form-control ml-input mono" x-model="form.hours_on_duty_not_driving">
+                            <input type="number" step="0.01" inputmode="decimal" class="form-control ml-input mono" x-model="form.hours_on_duty_not_driving">
                         </div>
                         <div class="col-12 col-md-4">
                             <label class="form-label small text-muted-custom">START_MILES</label>
-                            <input type="number" class="form-control ml-input mono" x-model="form.start_miles" @input="onMileageInput()">
+                            <input type="number" step="1" inputmode="decimal" class="form-control ml-input mono" x-model="form.start_miles" @input="onMileageInput()">
                         </div>
                         <div class="col-12 col-md-4">
                             <label class="form-label small text-muted-custom">END_MILES</label>
-                            <input type="number" class="form-control ml-input mono" x-model="form.end_miles" @input="onMileageInput()">
+                            <input type="number" step="1" inputmode="decimal" class="form-control ml-input mono" x-model="form.end_miles" @input="onMileageInput()">
                         </div>
                         <div class="col-12 col-md-4">
                             <label class="form-label small text-muted-custom">TOTAL_MILES</label>
-                            <input type="number" class="form-control ml-input mono" x-model="form.total_miles" :readonly="autoCalculateTotalMiles">
+                            <input type="number" step="1" inputmode="decimal" class="form-control ml-input mono" x-model="form.total_miles" :readonly="autoCalculateTotalMiles">
                         </div>
                         <div class="col-12">
                             <div class="form-check form-switch mono small">
@@ -115,68 +176,19 @@
                         <div class="row g-2">
                             <div class="col-12 col-md-6">
                                 <label class="form-label small text-muted-custom">GALLONS</label>
-                                <input type="number" step="0.01" class="form-control ml-input mono" x-model="form.truck_fuel.gallons">
+                                <input type="number" step="0.001" inputmode="decimal" class="form-control ml-input mono" x-model="form.truck_fuel.gallons">
                             </div>
                             <div class="col-12 col-md-6">
                                 <label class="form-label small text-muted-custom">PRICE_PER_GALLON</label>
-                                <input type="number" step="0.01" class="form-control ml-input mono" x-model="form.truck_fuel.price_per_gallon">
+                                <input type="number" step="0.001" inputmode="decimal" class="form-control ml-input mono" x-model="form.truck_fuel.price_per_gallon">
                             </div>
                         </div>
-                    </div>
-
-                    <div class="border-top border-secondary mt-3 pt-3">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <div class="text-primary">DELIVERIES</div>
-                            <button type="button" class="btn btn-outline-primary btn-sm mono" @click="addDelivery()">[ + DELIVERY ]</button>
-                        </div>
-
-                        <template x-for="(delivery, dIdx) in form.deliveries" :key="'delivery-' + dIdx">
-                            <div class="border border-secondary p-2 mb-2">
-                                <div class="row g-2 align-items-end">
-                                    <div class="col-12 col-md-4">
-                                        <label class="form-label small text-muted-custom">STORE_NUM_OR_RISO</label>
-                                        <input type="text" class="form-control ml-input mono" x-model="delivery.store_number_or_riso" @input="validateStore(dIdx)">
-                                    </div>
-                                    <div class="col-12 col-md-5">
-                                        <div class="small" x-show="delivery.loading">VALIDATING...</div>
-                                        <div class="small text-tactical-success" x-show="delivery.storeValid === true" x-text="delivery.storeName"></div>
-                                        <div class="small text-tactical-danger" x-show="delivery.storeValid === false">STORE_NOT_FOUND</div>
-                                    </div>
-                                    <div class="col-12 col-md-3 d-grid">
-                                        <button type="button" class="btn btn-outline-danger btn-sm mono" @click="removeDelivery(dIdx)">[ REMOVE ]</button>
-                                    </div>
-                                </div>
-
-                                <div class="mt-2">
-                                    <template x-for="(fuel, fIdx) in delivery.fuel_entries" :key="'fuel-' + dIdx + '-' + fIdx">
-                                        <div class="row g-2 align-items-end mb-2">
-                                            <div class="col-12 col-md-5">
-                                                <label class="form-label small text-muted-custom">FUEL_TYPE</label>
-                                                <select class="form-select ml-input mono" x-model="fuel.fuel_type_id">
-                                                    <template x-for="type in fuelTypes" :key="'type-' + type.id">
-                                                        <option :value="type.id" x-text="type.name"></option>
-                                                    </template>
-                                                </select>
-                                            </div>
-                                            <div class="col-12 col-md-5">
-                                                <label class="form-label small text-muted-custom">GALLONS</label>
-                                                <input type="number" class="form-control ml-input mono" x-model="fuel.gallons">
-                                            </div>
-                                            <div class="col-12 col-md-2 d-grid">
-                                                <button type="button" class="btn btn-outline-danger btn-sm mono" @click="removeFuelEntry(dIdx, fIdx)">X</button>
-                                            </div>
-                                        </div>
-                                    </template>
-                                    <button type="button" class="btn btn-outline-secondary btn-sm mono" @click="addFuelEntry(dIdx)">[ + FUEL ]</button>
-                                </div>
-                            </div>
-                        </template>
                     </div>
 
                     <div class="d-flex flex-wrap gap-2 mt-3">
                         <button type="submit" class="btn btn-primary mono" :disabled="submitting">[ SAVE_PROGRESS ]</button>
                         <button type="button" class="btn btn-warning text-dark mono" @click="submitMission(true)" :disabled="submitting">[ COMPLETE_SHIFT ]</button>
-                        <button type="button" class="btn btn-outline-secondary mono" @click="refreshActiveMission()">[ REFRESH ]</button>
+                        <button type="button" class="btn btn-secondary mono" @click="refreshActiveMission()">[ REFRESH ]</button>
                     </div>
                 </form>
             </div>
@@ -184,8 +196,8 @@
             <div x-show="view === 'history'" x-cloak>
                 <div class="ml-card p-3 mono">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <div class="text-primary">[ MISSION_HISTORY ]</div>
-                        <button class="btn btn-outline-secondary btn-sm mono" @click="loadMissionHistory()">[ REFRESH ]</button>
+                        <div class="text-primary">[ HISTORY ]</div>
+                        <button class="btn btn-secondary btn-sm mono" @click="loadMissionHistory()">[ REFRESH ]</button>
                     </div>
                     <div class="table-responsive">
                         <table class="table table-sm table-dark table-bordered align-middle mb-0 mono" style="font-size: 0.72rem;">

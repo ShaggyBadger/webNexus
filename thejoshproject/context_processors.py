@@ -25,7 +25,10 @@ def global_config(request):
     # 2. COMPILE_OPERATIONAL_PARAMETERS: Centralized UI and System configurations
     return {
         # Core Identity
-        "SITE_NAME": "WebNexus",
+        "SITE_NAME": "THE JOSH PROJECT: DRIVER OPS EDITION",
+        "SITE_TAB_NAME": "DriverOps",
+        "OFFICIAL_PORTAL_SUBLINE": "Official Portal - thejoshproject.xyz",
+        "SPOKEN_INSTRUCTION": "Go to thejoshproject dot xyz, Driver Ops Edition.",
         "VERSION": settings.APP_VERSION,
         # Tactical Color Palette (Profile-neutral constants)
         "PRIMARY_COLOR": "#ffb86c",

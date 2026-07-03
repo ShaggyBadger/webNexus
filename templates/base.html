@@ -14,7 +14,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#121417">
-    <meta name="apple-mobile-web-app-title" content="WebNexus">
+    <meta name="apple-mobile-web-app-title" content="TJP Driver Ops">
 
     <!-- Favicon & Mobile App Icon -->
     <link rel="icon" type="image/png" href="{% static 'images/swtoEagle.png' %}">
@@ -93,10 +93,14 @@
 
         .command-brand {
             font-family: 'JetBrains Mono', monospace;
-            font-size: 0.75rem;
-            letter-spacing: 2px;
+            font-size: 0.62rem;
+            letter-spacing: 0.06em;
             color: var(--muted-text-color);
             text-decoration: none;
+            max-width: 75vw;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .command-brand:hover {
@@ -142,11 +146,49 @@
         main {
             flex-grow: 1;
         }
+
+        .portal-identity-strip {
+            border-bottom: 1px solid var(--navbar-border);
+            background-color: #161a1e;
+            padding: 0.35rem 1rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem 1rem;
+            justify-content: space-between;
+        }
+
+        .portal-identity-subline,
+        .portal-identity-spoken {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.62rem;
+            letter-spacing: 0.08em;
+            color: var(--muted-text-color);
+        }
+
+        .portal-identity-subline {
+            color: var(--primary-color);
+        }
+
+        @media (max-width: 576px) {
+            .portal-identity-strip {
+                padding: 0.4rem 0.75rem;
+                gap: 0.3rem;
+            }
+
+            .portal-identity-subline,
+            .portal-identity-spoken {
+                width: 100%;
+                font-size: 0.58rem;
+            }
+        }
     </style>
     {% block extra_head %}{% endblock %}
 </head>
 <body>
     {% include 'components/navbar.html' %}
+    <div class="portal-identity-strip">
+        <span class="portal-identity-subline">{{ OFFICIAL_PORTAL_SUBLINE }}</span>
+    </div>
 
     <main>
         {% block content %}

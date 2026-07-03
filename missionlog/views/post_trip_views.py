@@ -2,6 +2,7 @@ import json
 import logging
 import uuid
 import random
+from decimal import Decimal, InvalidOperation
 from django.shortcuts import get_object_or_404
 from django.db import transaction
 from django.contrib.auth.decorators import login_required
@@ -19,6 +20,32 @@ from .mission_views import serialize_mission
 from .api_contract import json_error_response, json_success_response
 
 logger = logging.getLogger("webnexus")
+
+
+def _parse_optional_int(value):
+    if value is None or str(value).strip() == "":
+        return None
+    return int(value)
+
+
+def _parse_optional_decimal(value):
+    if value is None or str(value).strip() == "":
+        return None
+    try:
+        return Decimal(str(value))
+    except (InvalidOperation, ValueError, TypeError):
+        return None
+
+
+def _resolve_mileage_bounds(data):
+    start_miles = _parse_optional_int(data.get("start_miles"))
+    end_miles = _parse_optional_int(data.get("end_miles"))
+    total_miles = _parse_optional_int(data.get("total_miles"))
+
+    if start_miles is not None and total_miles is not None:
+        end_miles = start_miles + total_miles
+
+    return start_miles, end_miles
 
 
 @login_required
@@ -66,20 +93,7 @@ def post_trip_create(request):
             else:
                 hours_on_duty_not_driving = None
 
-            start_miles = data.get("start_miles")
-            total_miles = data.get("total_miles")
-
-            if start_miles is not None and str(start_miles).strip() != "":
-                start_miles = int(start_miles)
-            else:
-                start_miles = 0
-
-            if total_miles is not None and str(total_miles).strip() != "":
-                total_miles = int(total_miles)
-                end_miles = start_miles + total_miles
-            else:
-                total_miles = 0
-                end_miles = start_miles
+            start_miles, end_miles = _resolve_mileage_bounds(data)
 
             notes = data.get("notes", "")
             deliveries_data = data.get("deliveries", [])
@@ -128,13 +142,13 @@ def post_trip_create(request):
 
             # 2. Handle Truck Fuel (Single Entry for now)
             if truck_fuel:
-                gallons = truck_fuel.get("gallons")
-                price = truck_fuel.get("price_per_gallon")
-                if gallons and price:
+                gallons = _parse_optional_decimal(truck_fuel.get("gallons"))
+                price = _parse_optional_decimal(truck_fuel.get("price_per_gallon"))
+                if gallons is not None and price is not None:
                     TruckFuelLog.objects.create(
                         mission=mission,
-                        gallons=float(gallons),
-                        price_per_gallon=float(price),
+                        gallons=gallons,
+                        price_per_gallon=price,
                     )
 
             # 3. Create Overarching OrderNumber container with 007-AUTO prefix
@@ -288,20 +302,7 @@ def post_trip_update(request, pk):
             else:
                 hours_on_duty_not_driving = None
 
-            start_miles = data.get("start_miles")
-            total_miles = data.get("total_miles")
-
-            if start_miles is not None and str(start_miles).strip() != "":
-                start_miles = int(start_miles)
-            else:
-                start_miles = 0
-
-            if total_miles is not None and str(total_miles).strip() != "":
-                total_miles = int(total_miles)
-                end_miles = start_miles + total_miles
-            else:
-                total_miles = 0
-                end_miles = start_miles
+            start_miles, end_miles = _resolve_mileage_bounds(data)
 
             notes = data.get("notes", "")
             deliveries_data = data.get("deliveries", [])
@@ -321,13 +322,13 @@ def post_trip_update(request, pk):
             # Handle Truck Fuel (Single Entry logic: clear and recreate)
             mission.fuel_logs.all().delete()
             if truck_fuel:
-                gallons = truck_fuel.get("gallons")
-                price = truck_fuel.get("price_per_gallon")
-                if gallons and price:
+                gallons = _parse_optional_decimal(truck_fuel.get("gallons"))
+                price = _parse_optional_decimal(truck_fuel.get("price_per_gallon"))
+                if gallons is not None and price is not None:
                     TruckFuelLog.objects.create(
                         mission=mission,
-                        gallons=float(gallons),
-                        price_per_gallon=float(price),
+                        gallons=gallons,
+                        price_per_gallon=price,
                     )
 
             # Delete existing related OrderNumber containers to clear children cascadingly

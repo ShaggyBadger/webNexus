@@ -15,7 +15,7 @@ window.DMSUploadMixin = function DMSUploadMixin() {
         contentType: "",
         objectId: "",
         tags: "",
-        isPublic: true,
+        requiresLogin: false,
       },
     },
 
@@ -43,7 +43,7 @@ window.DMSUploadMixin = function DMSUploadMixin() {
         contentType: "",
         objectId: "",
         tags: "",
-        isPublic: true,
+        requiresLogin: false,
       };
       if (this.$refs.fileInput) {
         this.$refs.fileInput.value = "";
@@ -133,7 +133,7 @@ window.DMSUploadMixin = function DMSUploadMixin() {
         collections: this.upload.form.collections,
         content_type: this.upload.form.contentType || null,
         object_id: this.upload.form.objectId || null,
-        is_public: !!this.upload.form.isPublic,
+        is_public: !this.upload.form.requiresLogin,
         tags: this.upload.form.tags
           .split(",")
           .map((item) => item.trim())

@@ -1,0 +1,103 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}DMS - Edit Document Metadata{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/dms/dashboard.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 border-bottom border-secondary pb-3">
+        <div>
+            <h1 class="h3 font-family-monospace text-uppercase tracking-wider mb-0 text-white font-weight-bold">
+                <i class="fa-solid fa-pen-to-square me-2 text-tactical-warning"></i>DMS // Edit Metadata
+            </h1>
+            <p class="text-muted-custom small mb-0 font-family-monospace mt-1">{{ document.title }} // {{ document.original_filename }}</p>
+        </div>
+        <a href="{% url 'dms:dashboard' %}" class="btn btn-tactical btn-tactical-secondary touch-target">
+            <i class="fa-solid fa-arrow-left me-1"></i> Back to Dashboard
+        </a>
+    </div>
+
+    <div class="card card-tactical">
+        <div class="card-header card-tactical-header">
+            <span>[ DOCUMENT METADATA EDITOR ]</span>
+        </div>
+        <div class="card-body">
+            {% if error_message %}
+                <div class="alert alert-danger font-family-monospace py-2 px-3 rounded-0" role="alert">
+                    {{ error_message }}
+                </div>
+            {% endif %}
+
+            <form method="post">
+                {% csrf_token %}
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label for="docTitle" class="form-label font-family-monospace text-muted-custom small">Document Title *</label>
+                        <input type="text" class="form-control form-control-tactical" id="docTitle" name="title" value="{{ document.title }}" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="docCategory" class="form-label font-family-monospace text-muted-custom small">Category</label>
+                        <select class="form-select form-select-tactical" id="docCategory" name="category">
+                            <option value="">-- UNASSIGNED --</option>
+                            {% for category in categories %}
+                                <option value="{{ category.id }}" {% if document.category_id == category.id %}selected{% endif %}>{{ category.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-12">
+                        <label for="docDesc" class="form-label font-family-monospace text-muted-custom small">Description / Notes</label>
+                        <textarea class="form-control form-control-tactical" id="docDesc" name="description" rows="3">{{ document.description|default:'' }}</textarea>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label font-family-monospace text-muted-custom small">Collections</label>
+                        <div class="border border-secondary p-2 rounded" style="max-height: 140px; overflow-y: auto; background-color: #0a0c10;">
+                            {% for col in collections %}
+                                <div class="form-check">
+                                    <input
+                                        class="form-check-input"
+                                        type="checkbox"
+                                        name="collections"
+                                        value="{{ col.id }}"
+                                        id="col_{{ col.id }}"
+                                        {% if col in document.collections.all %}checked{% endif %}
+                                    >
+                                    <label class="form-check-label font-family-monospace small text-white" for="col_{{ col.id }}">
+                                        {{ col.name }}
+                                    </label>
+                                </div>
+                            {% empty %}
+                                <span class="text-muted-custom small font-family-monospace">No collections available</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="docTags" class="form-label font-family-monospace text-muted-custom small">Tags (Comma Separated)</label>
+                        <input
+                            type="text"
+                            class="form-control form-control-tactical"
+                            id="docTags"
+                            name="tags"
+                            value="{% for tag in document.tags.all %}{{ tag.name }}{% if not forloop.last %}, {% endif %}{% endfor %}"
+                        >
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-check form-switch mt-2">
+                            <input class="form-check-input" type="checkbox" id="docRequiresLogin" name="requires_login" {% if not document.is_public %}checked{% endif %}>
+                            <label class="form-check-label font-family-monospace text-white small" for="docRequiresLogin">Requires Login (Hide from public visitors)</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end mt-4 gap-2">
+                    <a href="{% url 'dms:dashboard' %}" class="btn btn-tactical btn-tactical-secondary touch-target">Cancel</a>
+                    <button type="submit" class="btn btn-tactical btn-tactical-primary touch-target">Save Metadata</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

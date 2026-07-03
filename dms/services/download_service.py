@@ -1,7 +1,6 @@
 import logging
 import os
 
-from django.contrib.auth.models import User
 from django.core.files.storage import default_storage
 from django.db import transaction
 
@@ -17,12 +16,15 @@ class DocumentDownloadService:
     """
 
     @classmethod
-    def prepare_download(cls, document_id: str, user: User) -> tuple:
+    def prepare_download(cls, document_id: str, user) -> tuple:
         """
         Retrieves a document, increments its download count within a transaction,
         and returns the file object and its original name/mime-type.
         """
-        is_staff_user = bool(user and (user.is_staff or user.is_superuser))
+        is_authenticated_user = bool(user and getattr(user, "is_authenticated", False))
+        is_staff_user = bool(
+            is_authenticated_user and (user.is_staff or user.is_superuser)
+        )
 
         with transaction.atomic():
             try:
@@ -41,7 +43,11 @@ class DocumentDownloadService:
                 )
                 raise ValueError("Document not found or is inactive.")
 
-            if not is_staff_user and not document.is_public:
+            if (
+                not is_staff_user
+                and not document.is_public
+                and not is_authenticated_user
+            ):
                 logger.warning(
                     "dms.download.access_denied document_id=%s user_id=%s",
                     document_id,

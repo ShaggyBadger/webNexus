@@ -95,7 +95,10 @@ def tactical_signup(request):
                 backend="accounts.logic.auth_backends.EmailOrUsernameBackend",
             )
             logger.info(f"ENLISTMENT_SUCCESS: New agent {user.email} initialized.")
-            messages.success(request, "ENLISTMENT SUCCESSFUL. Welcome to webNexus.")
+            messages.success(
+                request,
+                "ENLISTMENT SUCCESSFUL. Welcome to THE JOSH PROJECT: DRIVER OPS EDITION.",
+            )
             return redirect("homepage:homepage")
         else:
             logger.warning("ENLISTMENT_FAILED: Registration protocol validation error.")

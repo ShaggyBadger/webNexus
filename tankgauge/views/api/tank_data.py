@@ -6,7 +6,8 @@ from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
 
-from ...models import Store, StoreTankMapping, TankChart, TankEstimation
+from ...logic.store_lookup import get_store_by_any_id
+from ...models import StoreTankMapping, TankChart, TankEstimation
 from .error_contract import drf_error_response, drf_success_response
 
 logger = logging.getLogger("tankgauge")
@@ -28,9 +29,8 @@ class StoreTanksAPIView(APIView):
         }
 
     def get(self, request, store_num):
-        try:
-            store = Store.objects.get(store_num=store_num)
-        except Store.DoesNotExist:
+        store = get_store_by_any_id(store_num)
+        if not store:
             logger.warning(
                 "STORE_TANKS_NOT_FOUND",
                 extra={"store_num": store_num, "reason_code": "store_not_found"},
@@ -58,6 +58,7 @@ class StoreTanksAPIView(APIView):
             data={
                 "store": {
                     "store_num": store.store_num,
+                    "riso_num": store.riso_num,
                     "store_name": store.store_name,
                     "address": store.address,
                     "city": store.city,
