@@ -96,14 +96,25 @@ window.DMSUploadMixin = function DMSUploadMixin() {
       };
 
       xhr.onload = () => {
-        const response = JSON.parse(xhr.responseText || "{}");
-        if (xhr.status === 201 && response.status === "success") {
+        let response = {};
+        try {
+          response = JSON.parse(xhr.responseText || "{}");
+        } catch (error) {
+          response = {};
+        }
+
+        const responseData = response.data || response;
+        const tempId = responseData.temp_id || responseData.tempId || "";
+        const originalName = responseData.original_name || responseData.originalName || "";
+
+        if (xhr.status === 201 && tempId) {
+          this.upload.inProgress = false;
           this.showAlert(
             "PHASE A: Raw ingestion complete. Fill metadata to finalize.",
             "success",
           );
-          this.upload.tempId = response.data.temp_id;
-          const filename = response.data.original_name || "";
+          this.upload.tempId = tempId;
+          const filename = originalName;
           const extensionIndex = filename.lastIndexOf(".");
           this.upload.form.title =
             extensionIndex > 0 ? filename.substring(0, extensionIndex) : filename;
@@ -111,12 +122,17 @@ window.DMSUploadMixin = function DMSUploadMixin() {
           return;
         }
 
-        const errorMessage = response.error?.message || "Raw ingestion failed.";
+        this.upload.inProgress = false;
+        const errorMessage =
+          response.error?.message ||
+          response.message ||
+          `Raw ingestion failed (HTTP ${xhr.status}).`;
         this.showAlert(`PHASE A FAILED: ${errorMessage}`, "error");
         this.resetUploadPanel();
       };
 
       xhr.onerror = () => {
+        this.upload.inProgress = false;
         this.showAlert("Network connection error during raw ingestion.", "error");
         this.resetUploadPanel();
       };
