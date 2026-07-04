@@ -121,7 +121,7 @@ class DMSTestCase(APITestCase):
     def test_upload_service_rejects_oversized_file(self):
         with patch.object(DocumentUploadService, "MAX_UPLOAD_SIZE_BYTES", 10):
             with self.assertRaisesMessage(
-                ValueError, "File exceeds maximum allowed size of 50MB."
+                ValueError, "File exceeds maximum allowed size of 450MB."
             ):
                 DocumentUploadService.handle_raw_upload(self.test_file, self.staff_user)
 
