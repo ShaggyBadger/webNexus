@@ -1,5 +1,8 @@
 import logging
+
+import magic
 from django.db import transaction
+
 from ..models import VeederTicket, VeederReading
 from .auto_mapper import AutoMapperService
 from .reading_quality import validate_readings_for_store
@@ -8,11 +11,39 @@ logger = logging.getLogger("webnexus")
 
 
 class VeederUploadService:
-    """
-    OPERATIONAL SERVICE:
+    """OPERATIONAL SERVICE:
     Orchestrates the lifecycle of a Veeder Ticket acquisition.
     Handles the monolithic ingest of an image and its associated readings.
     """
+
+    QUICK_CAPTURE_MAX_UPLOAD_SIZE_BYTES = 12 * 1024 * 1024
+    QUICK_CAPTURE_ALLOWED_MIME_TYPES = {
+        "image/jpeg",
+        "image/png",
+        "image/webp",
+        "image/heic",
+    }
+
+    @classmethod
+    def validate_quick_capture_image(cls, uploaded_file) -> str:
+        """Validate quick-capture ticket image size and MIME type."""
+        if not uploaded_file:
+            raise ValueError("Ticket image is required.")
+
+        if uploaded_file.size > cls.QUICK_CAPTURE_MAX_UPLOAD_SIZE_BYTES:
+            raise ValueError("Ticket image exceeds maximum allowed size of 12MB.")
+
+        uploaded_file.seek(0)
+        header_data = uploaded_file.read(2048)
+        uploaded_file.seek(0)
+        detected_mime = magic.from_buffer(header_data, mime=True)
+
+        if detected_mime not in cls.QUICK_CAPTURE_ALLOWED_MIME_TYPES:
+            raise ValueError(
+                "Unsupported ticket image type. Allowed types: JPEG, PNG, WEBP, HEIC."
+            )
+
+        return detected_mime
 
     @staticmethod
     def process_ticket_submission(
@@ -138,5 +169,46 @@ class VeederUploadService:
         except Exception as e:
             logger.error(
                 f"ATG_INGEST_FAILED: Critical failure during ticket ingest: {str(e)}"
+            )
+            raise
+
+    @classmethod
+    def process_quick_capture_submission(
+        cls,
+        *,
+        user,
+        store,
+        image,
+        ticket_timestamp=None,
+        notes=None,
+    ):
+        """Create an image-first Veeder ticket for later structured review."""
+        cls.validate_quick_capture_image(image)
+
+        uploaded_by = user if getattr(user, "is_authenticated", False) else None
+
+        try:
+            with transaction.atomic():
+                ticket = VeederTicket.objects.create(
+                    store=store,
+                    image=image,
+                    ticket_timestamp=ticket_timestamp,
+                    notes=notes,
+                    uploaded_by=uploaded_by,
+                )
+
+            logger.info(
+                "ATG_QUICK_CAPTURE_ACCEPTED ticket_id=%s store_num=%s uploaded_by_id=%s",
+                ticket.id,
+                ticket.store.store_num if ticket.store else None,
+                uploaded_by.id if uploaded_by else None,
+            )
+            return ticket
+        except Exception as exc:
+            logger.error(
+                "ATG_QUICK_CAPTURE_FAILED store_num=%s uploaded_by_id=%s error=%s",
+                store.store_num if store else None,
+                uploaded_by.id if uploaded_by else None,
+                str(exc),
             )
             raise

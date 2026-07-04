@@ -250,6 +250,23 @@
   font-weight: 700;
 }
 
+.tankgauge-spa .quick-capture-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.tankgauge-spa .quick-capture-panel {
+  width: min(720px, 100%);
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+}
+
 @media (max-width: 767px) {
   .tankgauge-spa .result-toggle {
     display: grid;
@@ -281,5 +298,13 @@
 
   .tankgauge-spa .result-value {
     font-size: 1.05rem;
+  }
+
+  .tankgauge-spa .quick-capture-overlay {
+    padding: 0.5rem;
+  }
+
+  .tankgauge-spa .quick-capture-panel {
+    max-height: calc(100vh - 1rem);
   }
 }

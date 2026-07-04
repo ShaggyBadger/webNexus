@@ -6,6 +6,7 @@ from .views.api_views import (
     VeederStatsView,
     StoreViewSet,
     StoreTankProfileAPIView,
+    VeederQuickCaptureAPIView,
 )
 from .views.ticket_views import VeederUploadView
 from .views.dashboard_views import VeederListView, VeederDetailView
@@ -24,6 +25,11 @@ router.register(r"stores", StoreViewSet, basename="store")
 
 
 urlpatterns = [
+    path(
+        "api/v1/tickets/quick-capture/",
+        VeederQuickCaptureAPIView.as_view(),
+        name="ticket_quick_capture",
+    ),
     path("api/v1/", include(router.urls)),
     path("api/v1/stats/", VeederStatsView.as_view(), name="veeder_stats"),
     path(

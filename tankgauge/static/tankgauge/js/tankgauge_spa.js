@@ -21,6 +21,22 @@ function tankGaugeApp() {
     error: null,
     info: null,
     csrfToken: document.querySelector('meta[name="csrf-token"]')?.content || "",
+    quickCapture: {
+      open: false,
+      submitting: false,
+      statusType: "info",
+      statusMessage: "",
+      maxUploadSizeBytes: 12 * 1024 * 1024,
+      allowedMimeTypes: ["image/jpeg", "image/png", "image/webp", "image/heic"],
+      form: {
+        storeNum: "",
+        risoNum: "",
+        ticketTimestamp: "",
+        notes: "",
+        imageFile: null,
+        imageName: "",
+      },
+    },
 
     get canFetchStore() {
       const raw = `${this.storeNumber ?? ""}`.trim();
@@ -91,6 +107,146 @@ function tankGaugeApp() {
     clearMessages() {
       this.error = null;
       this.info = null;
+    },
+
+    openQuickCapture() {
+      this.quickCapture.open = true;
+      this.quickCapture.statusMessage = "";
+      this.quickCapture.statusType = "info";
+      this.quickCapture.form.ticketTimestamp = "";
+      this.quickCapture.form.notes = "";
+      this.quickCapture.form.imageFile = null;
+      this.quickCapture.form.imageName = "";
+      this.quickCapture.form.storeNum = `${this.storeData?.store_num ?? this.storeNumber ?? ""}`.trim();
+      this.quickCapture.form.risoNum = `${this.storeData?.riso_num ?? ""}`.trim();
+      this.$nextTick(() => this.$refs.quickCaptureStoreInput?.focus());
+    },
+
+    closeQuickCapture() {
+      this.quickCapture.open = false;
+      this.quickCapture.submitting = false;
+      this.quickCapture.statusMessage = "";
+      this.quickCapture.form.imageFile = null;
+      this.quickCapture.form.imageName = "";
+      if (this.$refs.quickCaptureImageInput) {
+        this.$refs.quickCaptureImageInput.value = "";
+      }
+    },
+
+    onQuickCaptureFileChange(event) {
+      const selectedFile = event.target?.files?.[0] || null;
+      this.quickCapture.form.imageFile = selectedFile;
+      this.quickCapture.form.imageName = selectedFile ? selectedFile.name : "";
+      this.quickCapture.statusMessage = "";
+    },
+
+    showQuickCaptureStatus(message, type = "info") {
+      this.quickCapture.statusMessage = message;
+      this.quickCapture.statusType = type;
+    },
+
+    quickCaptureStatusClass() {
+      if (this.quickCapture.statusType === "error") {
+        return "border-danger text-danger bg-danger bg-opacity-10";
+      }
+      if (this.quickCapture.statusType === "success") {
+        return "border-success text-success bg-success bg-opacity-10";
+      }
+      return "border-warning text-warning bg-warning bg-opacity-10";
+    },
+
+    validateQuickCaptureFile(file) {
+      if (!file) {
+        throw new Error("Ticket image is required.");
+      }
+
+      if (file.size > this.quickCapture.maxUploadSizeBytes) {
+        const maxMb = Math.floor(this.quickCapture.maxUploadSizeBytes / (1024 * 1024));
+        throw new Error(`Ticket image exceeds ${maxMb}MB. Compress and retry.`);
+      }
+
+      if (file.type && !this.quickCapture.allowedMimeTypes.includes(file.type)) {
+        throw new Error("Unsupported image type. Use JPEG, PNG, WEBP, or HEIC.");
+      }
+    },
+
+    async submitQuickCapture() {
+      if (this.quickCapture.submitting) {
+        return;
+      }
+
+      const file = this.quickCapture.form.imageFile;
+      try {
+        this.validateQuickCaptureFile(file);
+      } catch (error) {
+        this.showQuickCaptureStatus(error.message, "error");
+        return;
+      }
+
+      this.quickCapture.submitting = true;
+      this.showQuickCaptureStatus("Uploading ticket image...", "info");
+
+      const payload = new FormData();
+      payload.append("image", file);
+
+      const storeNum = `${this.quickCapture.form.storeNum ?? ""}`.trim();
+      const risoNum = `${this.quickCapture.form.risoNum ?? ""}`.trim();
+      const ticketTimestamp = `${this.quickCapture.form.ticketTimestamp ?? ""}`.trim();
+      const notes = `${this.quickCapture.form.notes ?? ""}`.trim();
+
+      if (storeNum) {
+        payload.append("store_num", storeNum);
+      }
+      if (risoNum) {
+        payload.append("riso_num", risoNum);
+      }
+      if (ticketTimestamp) {
+        payload.append("ticket_timestamp", ticketTimestamp);
+      }
+      if (notes) {
+        payload.append("notes", notes);
+      }
+
+      try {
+        const response = await fetch("/atg/api/v1/tickets/quick-capture/", {
+          method: "POST",
+          headers: {
+            "X-CSRFToken": this.csrfToken,
+          },
+          body: payload,
+        });
+
+        let raw = null;
+        try {
+          raw = await response.json();
+        } catch (error) {
+          raw = null;
+        }
+
+        if (!response.ok) {
+          throw new Error(this.extractErrorMessage(raw, "Unable to submit ticket image."));
+        }
+
+        const data = this.extractSuccessData(raw);
+        const ticketId = data?.ticket_id || "UNKNOWN";
+        this.showQuickCaptureStatus(`Ticket submitted. Queue ID: ${ticketId}`, "success");
+
+        if (this.$refs.quickCaptureImageInput) {
+          this.$refs.quickCaptureImageInput.value = "";
+        }
+        this.quickCapture.form.imageFile = null;
+        this.quickCapture.form.imageName = "";
+
+        window.setTimeout(() => {
+          if (this.quickCapture.open) {
+            this.closeQuickCapture();
+          }
+        }, 1400);
+      } catch (error) {
+        this.showQuickCaptureStatus(error.message, "error");
+      } finally {
+        this.quickCapture.submitting = false;
+      }
     },
 
     changeStore() {

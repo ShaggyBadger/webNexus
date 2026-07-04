@@ -431,6 +431,75 @@ class VeederAPITestCase(APITestCase):
         self.assertEqual(response.data["data"][0]["volume_gal"], 5000)
 
 
+class VeederQuickCaptureApiTests(APITestCase):
+    def setUp(self):
+        self.store = Store.objects.create(
+            store_num=101, riso_num=99101, store_name="Store 101"
+        )
+
+    def test_quick_capture_allows_anonymous_upload(self):
+        url = reverse("atg:ticket_quick_capture")
+        response = self.client.post(
+            url,
+            {
+                "store_num": "101",
+                "notes": "Quick capture ticket",
+                "image": get_test_image(),
+            },
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        payload = response.json()
+        self.assertEqual(payload["status"], "success")
+        ticket = VeederTicket.objects.get(id=payload["data"]["ticket_id"])
+        self.assertEqual(ticket.store, self.store)
+        self.assertIsNone(ticket.uploaded_by)
+        self.assertEqual(ticket.notes, "Quick capture ticket")
+        self.assertIsNotNone(ticket.image)
+
+    def test_quick_capture_resolves_store_by_riso_number(self):
+        url = reverse("atg:ticket_quick_capture")
+        response = self.client.post(
+            url,
+            {
+                "riso_num": "99101",
+                "image": get_test_image(),
+            },
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        ticket = VeederTicket.objects.get(id=response.json()["data"]["ticket_id"])
+        self.assertEqual(ticket.store, self.store)
+
+    def test_quick_capture_rejects_missing_image(self):
+        url = reverse("atg:ticket_quick_capture")
+        response = self.client.post(url, {"store_num": "101"}, format="multipart")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        payload = response.json()
+        self.assertEqual(payload["error"]["code"], "missing_image")
+
+    def test_quick_capture_rejects_oversize_image(self):
+        url = reverse("atg:ticket_quick_capture")
+        with patch.object(
+            VeederUploadService, "QUICK_CAPTURE_MAX_UPLOAD_SIZE_BYTES", 10
+        ):
+            response = self.client.post(
+                url,
+                {
+                    "store_num": "101",
+                    "image": get_test_image(),
+                },
+                format="multipart",
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        payload = response.json()
+        self.assertEqual(payload["error"]["code"], "file_too_large")
+
+
 @override_settings(ATG_REMOTE_OCR_KEY="test-secret-key", ATG_REMOTE_OCR_ENABLED=True)
 class RemoteOCRAPITestCase(APITestCase):
     def setUp(self):
