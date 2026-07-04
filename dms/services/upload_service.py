@@ -21,7 +21,7 @@ class DocumentUploadService:
     Service to handle raw uploads (Phase A) and finalizing uploads (Phase B).
     """
 
-    MAX_UPLOAD_SIZE_BYTES = 50 * 1024 * 1024
+    MAX_UPLOAD_SIZE_BYTES = 450 * 1024 * 1024
     ALLOWED_MIME_TYPES = {
         "application/pdf",
         "text/csv",
@@ -56,7 +56,7 @@ class DocumentUploadService:
                 uploaded_file.size,
                 cls.MAX_UPLOAD_SIZE_BYTES,
             )
-            raise ValueError("File exceeds maximum allowed size of 50MB.")
+            raise ValueError("File exceeds maximum allowed size of 450MB.")
 
         # 1. Read first block for MIME inspection
         uploaded_file.seek(0)

@@ -38,10 +38,20 @@ class StoreUpdateForm(forms.ModelForm):
                 attrs={"class": "form-select mono", "style": "font-size: 0.8rem;"}
             ),
             "store_num": forms.TextInput(
-                attrs={"class": "form-control mono", "placeholder": "Physical Store #"}
+                attrs={
+                    "class": "form-control mono",
+                    "placeholder": "Physical Store #",
+                    "inputmode": "numeric",
+                    "pattern": "[0-9]*",
+                }
             ),
             "riso_num": forms.TextInput(
-                attrs={"class": "form-control mono", "placeholder": "RISO ID"}
+                attrs={
+                    "class": "form-control mono",
+                    "placeholder": "RISO ID",
+                    "inputmode": "numeric",
+                    "pattern": "[0-9]*",
+                }
             ),
             "store_name": forms.TextInput(
                 attrs={"class": "form-control", "placeholder": "Site Name"}
@@ -57,7 +67,12 @@ class StoreUpdateForm(forms.ModelForm):
                 attrs={"class": "form-control", "placeholder": "State"}
             ),
             "zip_code": forms.TextInput(
-                attrs={"class": "form-control", "placeholder": "Zip Code"}
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "Zip Code",
+                    "inputmode": "numeric",
+                    "autocomplete": "postal-code",
+                }
             ),
             "lat": forms.TextInput(
                 attrs={"class": "form-control mono", "readonly": "readonly"}

@@ -661,6 +661,68 @@ class StoreChartApiTests(TestCase):
         self.assertIn("details", payload["error"])
         self.assertIn("trace_id", payload["error"])
 
+    def test_tank_chart_data_scatter_points_use_recent_plus_random_sample(self):
+        for idx in range(12):
+            ticket = VeederTicket.objects.create(store=self.store)
+            ticket.uploaded_at = timezone.now() - timedelta(minutes=idx)
+            ticket.save(update_fields=["uploaded_at"])
+            VeederReading.objects.create(
+                ticket=ticket,
+                tank_index=2,
+                fuel_type=self.fuel_type,
+                height=float(idx + 1),
+                volume=2000 + idx,
+                ullage=7000,
+            )
+
+        with patch(
+            "tankgauge.views.api.tank_data.random.sample",
+            side_effect=lambda population, k: population[:k],
+        ):
+            response = self.client.get(
+                reverse(
+                    "tankgauge:tank_chart_data_api", kwargs={"tank_id": self.mapping.id}
+                )
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        scatter_points = response.json()["data"]["series"]["scatter_points"]
+        self.assertEqual(len(scatter_points), 10)
+        self.assertEqual(
+            [point["inches"] for point in scatter_points[:5]], [1, 2, 3, 4, 5]
+        )
+        self.assertEqual(
+            [point["inches"] for point in scatter_points[5:]],
+            [6, 7, 8, 9, 10],
+        )
+
+    def test_tank_chart_data_scatter_points_skip_random_when_less_than_five(self):
+        for idx in range(4):
+            ticket = VeederTicket.objects.create(store=self.store)
+            ticket.uploaded_at = timezone.now() - timedelta(minutes=idx)
+            ticket.save(update_fields=["uploaded_at"])
+            VeederReading.objects.create(
+                ticket=ticket,
+                tank_index=2,
+                fuel_type=self.fuel_type,
+                height=float(idx + 1),
+                volume=3000 + idx,
+                ullage=6000,
+            )
+
+        with patch("tankgauge.views.api.tank_data.random.sample") as sample_mock:
+            response = self.client.get(
+                reverse(
+                    "tankgauge:tank_chart_data_api", kwargs={"tank_id": self.mapping.id}
+                )
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        scatter_points = response.json()["data"]["series"]["scatter_points"]
+        self.assertEqual(len(scatter_points), 4)
+        self.assertEqual([point["inches"] for point in scatter_points], [1, 2, 3, 4])
+        sample_mock.assert_not_called()
+
 
 class ClosestStoreApiTests(TestCase):
     def test_closest_store_api_missing_coordinates_uses_error_contract(self):

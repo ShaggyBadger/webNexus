@@ -1,5 +1,6 @@
 import logging
 import math
+import random
 
 from atg.models import VeederReading
 from rest_framework import status
@@ -137,12 +138,35 @@ class TankChartDataAPIView(APIView):
             ticket__store=mapping.store,
             tank_index=mapping.tank_index,
             fuel_type__name__iexact=mapping.fuel_type,
-        ).order_by("-ticket__uploaded_at")[:100]
+            height__isnull=False,
+            volume__isnull=False,
+        ).select_related("ticket")
+
+        recent_readings = list(readings.order_by("-ticket__uploaded_at", "-id")[:5])
+        if len(recent_readings) < 5:
+            selected_readings = recent_readings
+        else:
+            remaining_ids = list(
+                readings.exclude(
+                    id__in=[reading.id for reading in recent_readings]
+                ).values_list("id", flat=True)
+            )
+            random_ids = random.sample(remaining_ids, k=min(5, len(remaining_ids)))
+            random_readings_by_id = {
+                reading.id: reading
+                for reading in VeederReading.objects.filter(
+                    id__in=random_ids
+                ).select_related("ticket")
+            }
+            random_readings = [
+                random_readings_by_id[reading_id]
+                for reading_id in random_ids
+                if reading_id in random_readings_by_id
+            ]
+            selected_readings = recent_readings + random_readings
 
         scatter_points = []
-        for reading in readings:
-            if reading.height is None or reading.volume is None:
-                continue
+        for reading in selected_readings:
             scatter_points.append(
                 {
                     "inches": float(reading.height),

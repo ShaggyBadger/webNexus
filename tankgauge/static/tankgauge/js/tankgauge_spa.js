@@ -85,7 +85,7 @@ function tankGaugeApp() {
     },
 
     init() {
-      this.fetchClosestStore();
+      this.$nextTick(() => this.$refs.storeNumberInput?.focus());
     },
 
     clearMessages() {

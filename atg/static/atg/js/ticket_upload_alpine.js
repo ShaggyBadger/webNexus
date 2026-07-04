@@ -2,11 +2,9 @@ function atgTicketUploadApp() {
   return {
     step: 1,
     searchQuery: "",
-    searchResults: [],
     selectedStore: null,
-    loadingSearch: false,
+    loadingStore: false,
     loadingProfile: false,
-    searchTimer: null,
 
     knownReadings: [],
     manualReadings: [],
@@ -24,7 +22,11 @@ function atgTicketUploadApp() {
       if (fuelScript?.textContent) {
         this.fuelTypes = JSON.parse(fuelScript.textContent);
       }
-      this.preloadNearestStore();
+      this.$nextTick(() => this.$refs.storeNumberInput?.focus());
+    },
+
+    get canFetchStore() {
+      return `${this.searchQuery ?? ""}`.trim().length > 0;
     },
 
     get hasStore() {
@@ -54,39 +56,53 @@ function atgTicketUploadApp() {
       return "border-warning text-warning bg-warning bg-opacity-10";
     },
 
-    async onSearchInput() {
-      this.clearStatus();
-      if (this.searchTimer) {
-        clearTimeout(this.searchTimer);
+    async lookupStore(query) {
+      const response = await fetch(`/atg/api/v1/stores/?search=${encodeURIComponent(query)}`);
+      if (!response.ok) {
+        throw new Error("Store lookup failed.");
       }
+      const results = await response.json();
+      const normalizedQuery = `${query}`.trim().toLowerCase();
+      return (
+        results.find((item) => `${item.store_num}` === `${query}`) ||
+        results.find((item) => `${item.store_pk}` === `${query}`) ||
+        results.find((item) => `${item.name}`.toLowerCase() === normalizedQuery) ||
+        results[0] ||
+        null
+      );
+    },
 
-      const q = this.searchQuery.trim();
-      if (q.length < 1) {
-        this.searchResults = [];
+    async fetchStoreByInput() {
+      this.clearStatus();
+      const q = `${this.searchQuery ?? ""}`.trim();
+      if (this.loadingStore) {
+        return;
+      }
+      if (!q) {
+        this.showStatus("Enter a store or RISO number first.", "error");
         return;
       }
 
-      this.searchTimer = setTimeout(async () => {
-        this.loadingSearch = true;
-        try {
-          const response = await fetch(`/atg/api/v1/stores/?search=${encodeURIComponent(q)}`);
-          if (!response.ok) {
-            throw new Error("Store search failed");
-          }
-          this.searchResults = await response.json();
-        } catch (error) {
-          this.searchResults = [];
-          this.showStatus(error.message, "error");
-        } finally {
-          this.loadingSearch = false;
+      this.loadingStore = true;
+      this.showStatus("Fetching store form...", "info");
+      try {
+        const selected = await this.lookupStore(q);
+
+        if (!selected) {
+          throw new Error("No matching store found.");
         }
-      }, 250);
+
+        await this.chooseStore(selected);
+      } catch (error) {
+        this.showStatus(error.message, "error");
+      } finally {
+        this.loadingStore = false;
+      }
     },
 
     async chooseStore(store) {
       this.selectedStore = store;
-      this.searchResults = [];
-      this.searchQuery = "";
+      this.searchQuery = `${store.store_num ?? ""}`;
       this.step = 2;
       this.knownReadings = [];
       this.manualReadings = [];
@@ -96,17 +112,33 @@ function atgTicketUploadApp() {
     clearStore() {
       this.selectedStore = null;
       this.searchQuery = "";
-      this.searchResults = [];
       this.knownReadings = [];
       this.manualReadings = [];
       this.step = 1;
+      this.$nextTick(() => this.$refs.storeNumberInput?.focus());
     },
 
-    async preloadNearestStore() {
-      if (!navigator.geolocation) {
+    normalizeClosestStore(closest) {
+      return {
+        store_pk: closest.store_pk,
+        store_num: closest.store_num,
+        name: closest.store_name,
+        city: closest.city,
+        state: closest.state,
+      };
+    },
+
+    async fetchClosestStore() {
+      if (this.loadingStore) {
         return;
       }
 
+      if (!navigator.geolocation) {
+        this.showStatus("Geolocation is not available in this browser.", "error");
+        return;
+      }
+
+      this.loadingStore = true;
       this.showStatus("Detecting nearest store...", "info");
       navigator.geolocation.getCurrentPosition(
         async (position) => {
@@ -121,25 +153,37 @@ function atgTicketUploadApp() {
             }
 
             const payload = await response.json();
-            const closest = payload?.results?.[0];
-            if (!closest?.store_pk) {
+            const payloadData =
+              payload && payload.status === "success" && payload.data
+                ? payload.data
+                : payload;
+            const closest = payloadData?.results?.[0];
+            if (!closest?.store_num) {
               throw new Error("No nearby store available.");
             }
 
-            await this.chooseStore({
-              store_pk: closest.store_pk,
-              store_num: closest.store_num,
-              name: closest.store_name,
-              city: closest.city,
-              state: closest.state,
-            });
-            this.showStatus("Nearest store preloaded. Change if needed.", "success");
+            let resolvedStore = null;
+            if (closest.store_pk) {
+              resolvedStore = this.normalizeClosestStore(closest);
+            } else {
+              resolvedStore = await this.lookupStore(closest.store_num);
+            }
+
+            if (!resolvedStore) {
+              throw new Error("Nearest store lookup failed.");
+            }
+
+            await this.chooseStore(resolvedStore);
+            this.showStatus("Nearest store loaded.", "success");
           } catch (error) {
-            this.clearStatus();
+            this.showStatus(error.message, "error");
+          } finally {
+            this.loadingStore = false;
           }
         },
         () => {
-          this.clearStatus();
+          this.showStatus("Geolocation permission denied or unavailable.", "error");
+          this.loadingStore = false;
         },
         {
           maximumAge: 60000,
@@ -188,6 +232,8 @@ function atgTicketUploadApp() {
             "No known tank profile for this store yet. Use manual entries for this ticket.",
             "info",
           );
+        } else {
+          this.showStatus(`Store #${this.selectedStore.store_num} loaded.`, "success");
         }
 
         this.step = 2;

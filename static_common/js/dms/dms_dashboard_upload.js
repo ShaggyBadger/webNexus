@@ -1,6 +1,6 @@
 window.DMSUploadMixin = function DMSUploadMixin() {
   return {
-    maxUploadSizeBytes: 50 * 1024 * 1024,
+    maxUploadSizeBytes: 450 * 1024 * 1024,
     uploadOpen: false,
     upload: {
       phase: "raw",
