@@ -49,9 +49,6 @@
             <button class="btn btn-primary btn-tactical-amber mono fw-bold w-100" @click="fetchClosestStore()" :disabled="loading.store">
                 GPS // CLOSEST_STORE
             </button>
-            <button class="btn btn-tactical-secondary mono fw-bold w-100" type="button" @click="openQuickCapture()">
-                CAPTURE_VEEDER_TICKET
-            </button>
             <button
                 class="btn btn-tactical-secondary mono fw-bold w-100"
                 x-show="storeData"
@@ -62,8 +59,41 @@
             </button>
         </div>
         <div x-show="error" class="text-tactical-danger mt-2 mono fw-bold" x-text="error"></div>
+        <div
+            class="p-2 mt-2 mono small border"
+            x-show="quickCapture.statusMessage"
+            x-text="quickCapture.statusMessage"
+            :class="quickCaptureStatusClass()"
+            x-cloak
+        ></div>
         <div x-show="storeData" class="mt-3 p-2 bg-dark rounded border border-secondary mono text-muted-custom">
             <span x-text="storeData?.store_name"></span> | <span x-text="storeData?.city + ', ' + storeData?.state"></span>
+        </div>
+    </div>
+
+    <div class="tactical-card quick-capture-dock" x-show="step >= 1" x-cloak>
+        <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
+            <div class="quick-capture-copy">
+                <div class="mono quick-capture-title">VEEDER ROOT TICKET CAPTURE</div>
+                <div class="quick-capture-subtext mono">Take a photo and auto-submit to review queue.</div>
+            </div>
+            <button
+                class="btn quick-capture-top-btn mono fw-bold"
+                type="button"
+                @click="triggerQuickCapturePicker()"
+                :disabled="quickCapture.submitting"
+            >
+                <span x-show="!quickCapture.submitting">CAPTURE_VEEDER_TICKET</span>
+                <span x-show="quickCapture.submitting">UPLOADING...</span>
+            </button>
+            <input
+                type="file"
+                class="d-none"
+                accept="image/*"
+                capture="environment"
+                @change="onQuickCaptureFileChange($event)"
+                x-ref="quickCaptureImageInput"
+            >
         </div>
     </div>
 
@@ -182,92 +212,6 @@
         <div x-show="loading.chart" class="text-muted-custom mono">LOADING_CHART_DATA...</div>
         <div class="chart-wrap" x-show="!loading.chart">
             <canvas id="tankChart"></canvas>
-        </div>
-    </div>
-
-    <div class="quick-capture-overlay" x-show="quickCapture.open" x-cloak>
-        <div class="quick-capture-panel tactical-card">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h2 class="h5 mono text-tactical-warning mb-0">QUICK_CAPTURE // VEEDER_TICKET</h2>
-                <button type="button" class="btn btn-tactical-secondary mono fw-bold" @click="closeQuickCapture()">CLOSE</button>
-            </div>
-
-            <div class="row g-3">
-                <div class="col-12 col-md-6">
-                    <label class="form-label mono text-muted-custom">STORE NUMBER</label>
-                    <input
-                        type="text"
-                        inputmode="numeric"
-                        pattern="[0-9]*"
-                        enterkeyhint="next"
-                        class="form-control tactical-input"
-                        x-model="quickCapture.form.storeNum"
-                        x-ref="quickCaptureStoreInput"
-                        placeholder="Example: 1234"
-                    >
-                </div>
-                <div class="col-12 col-md-6">
-                    <label class="form-label mono text-muted-custom">RISO NUMBER (OPTIONAL)</label>
-                    <input
-                        type="text"
-                        inputmode="numeric"
-                        pattern="[0-9]*"
-                        enterkeyhint="next"
-                        class="form-control tactical-input"
-                        x-model="quickCapture.form.risoNum"
-                        placeholder="Example: 98765"
-                    >
-                </div>
-                <div class="col-12 col-md-6">
-                    <label class="form-label mono text-muted-custom">TICKET TIMESTAMP (OPTIONAL)</label>
-                    <input
-                        type="datetime-local"
-                        class="form-control tactical-input"
-                        x-model="quickCapture.form.ticketTimestamp"
-                    >
-                </div>
-                <div class="col-12 col-md-6">
-                    <label class="form-label mono text-muted-custom">TICKET IMAGE</label>
-                    <input
-                        type="file"
-                        class="form-control tactical-input"
-                        accept="image/*"
-                        capture="environment"
-                        @change="onQuickCaptureFileChange($event)"
-                        x-ref="quickCaptureImageInput"
-                    >
-                    <div class="mono small text-muted-custom mt-2" x-show="quickCapture.form.imageName" x-text="'SELECTED: ' + quickCapture.form.imageName"></div>
-                    <div class="mono small text-muted-custom mt-2">MAX FILE SIZE: 12MB</div>
-                </div>
-                <div class="col-12">
-                    <label class="form-label mono text-muted-custom">NOTES (OPTIONAL)</label>
-                    <textarea
-                        class="form-control tactical-input"
-                        rows="2"
-                        x-model="quickCapture.form.notes"
-                        placeholder="FIELD_CONTEXT..."
-                    ></textarea>
-                </div>
-            </div>
-
-            <div
-                class="p-2 mt-3 mono small border"
-                x-show="quickCapture.statusMessage"
-                x-text="quickCapture.statusMessage"
-                :class="quickCaptureStatusClass()"
-            ></div>
-
-            <div class="d-grid gap-2 mt-3">
-                <button
-                    type="button"
-                    class="btn btn-tactical-olive mono fw-bold w-100"
-                    @click="submitQuickCapture()"
-                    :disabled="quickCapture.submitting"
-                >
-                    <span x-show="!quickCapture.submitting">SUBMIT_TICKET_IMAGE</span>
-                    <span x-show="quickCapture.submitting">UPLOADING...</span>
-                </button>
-            </div>
         </div>
     </div>
 

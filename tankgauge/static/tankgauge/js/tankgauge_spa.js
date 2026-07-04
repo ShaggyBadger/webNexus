@@ -22,20 +22,11 @@ function tankGaugeApp() {
     info: null,
     csrfToken: document.querySelector('meta[name="csrf-token"]')?.content || "",
     quickCapture: {
-      open: false,
       submitting: false,
       statusType: "info",
       statusMessage: "",
       maxUploadSizeBytes: 12 * 1024 * 1024,
       allowedMimeTypes: ["image/jpeg", "image/png", "image/webp", "image/heic"],
-      form: {
-        storeNum: "",
-        risoNum: "",
-        ticketTimestamp: "",
-        notes: "",
-        imageFile: null,
-        imageName: "",
-      },
     },
 
     get canFetchStore() {
@@ -109,35 +100,24 @@ function tankGaugeApp() {
       this.info = null;
     },
 
-    openQuickCapture() {
-      this.quickCapture.open = true;
-      this.quickCapture.statusMessage = "";
-      this.quickCapture.statusType = "info";
-      this.quickCapture.form.ticketTimestamp = "";
-      this.quickCapture.form.notes = "";
-      this.quickCapture.form.imageFile = null;
-      this.quickCapture.form.imageName = "";
-      this.quickCapture.form.storeNum = `${this.storeData?.store_num ?? this.storeNumber ?? ""}`.trim();
-      this.quickCapture.form.risoNum = `${this.storeData?.riso_num ?? ""}`.trim();
-      this.$nextTick(() => this.$refs.quickCaptureStoreInput?.focus());
-    },
-
-    closeQuickCapture() {
-      this.quickCapture.open = false;
-      this.quickCapture.submitting = false;
-      this.quickCapture.statusMessage = "";
-      this.quickCapture.form.imageFile = null;
-      this.quickCapture.form.imageName = "";
-      if (this.$refs.quickCaptureImageInput) {
-        this.$refs.quickCaptureImageInput.value = "";
+    triggerQuickCapturePicker() {
+      if (this.quickCapture.submitting) {
+        return;
       }
+      this.quickCapture.statusMessage = "";
+      this.$refs.quickCaptureImageInput?.click();
     },
 
-    onQuickCaptureFileChange(event) {
+    async onQuickCaptureFileChange(event) {
       const selectedFile = event.target?.files?.[0] || null;
-      this.quickCapture.form.imageFile = selectedFile;
-      this.quickCapture.form.imageName = selectedFile ? selectedFile.name : "";
+      if (!selectedFile) {
+        return;
+      }
       this.quickCapture.statusMessage = "";
+      await this.submitQuickCapture(selectedFile);
+      if (event.target) {
+        event.target.value = "";
+      }
     },
 
     showQuickCaptureStatus(message, type = "info") {
@@ -170,12 +150,17 @@ function tankGaugeApp() {
       }
     },
 
-    async submitQuickCapture() {
+    resolveQuickCaptureStoreContext() {
+      const storeNum = `${this.storeData?.store_num ?? this.storeNumber ?? ""}`.trim();
+      const risoNum = `${this.storeData?.riso_num ?? ""}`.trim();
+      return { storeNum, risoNum };
+    },
+
+    async submitQuickCapture(file) {
       if (this.quickCapture.submitting) {
         return;
       }
 
-      const file = this.quickCapture.form.imageFile;
       try {
         this.validateQuickCaptureFile(file);
       } catch (error) {
@@ -189,10 +174,7 @@ function tankGaugeApp() {
       const payload = new FormData();
       payload.append("image", file);
 
-      const storeNum = `${this.quickCapture.form.storeNum ?? ""}`.trim();
-      const risoNum = `${this.quickCapture.form.risoNum ?? ""}`.trim();
-      const ticketTimestamp = `${this.quickCapture.form.ticketTimestamp ?? ""}`.trim();
-      const notes = `${this.quickCapture.form.notes ?? ""}`.trim();
+      const { storeNum, risoNum } = this.resolveQuickCaptureStoreContext();
 
       if (storeNum) {
         payload.append("store_num", storeNum);
@@ -200,12 +182,7 @@ function tankGaugeApp() {
       if (risoNum) {
         payload.append("riso_num", risoNum);
       }
-      if (ticketTimestamp) {
-        payload.append("ticket_timestamp", ticketTimestamp);
-      }
-      if (notes) {
-        payload.append("notes", notes);
-      }
+      payload.append("ticket_timestamp", new Date().toISOString());
 
       try {
         const response = await fetch("/atg/api/v1/tickets/quick-capture/", {
@@ -230,18 +207,6 @@ function tankGaugeApp() {
         const data = this.extractSuccessData(raw);
         const ticketId = data?.ticket_id || "UNKNOWN";
         this.showQuickCaptureStatus(`Ticket submitted. Queue ID: ${ticketId}`, "success");
-
-        if (this.$refs.quickCaptureImageInput) {
-          this.$refs.quickCaptureImageInput.value = "";
-        }
-        this.quickCapture.form.imageFile = null;
-        this.quickCapture.form.imageName = "";
-
-        window.setTimeout(() => {
-          if (this.quickCapture.open) {
-            this.closeQuickCapture();
-          }
-        }, 1400);
       } catch (error) {
         this.showQuickCaptureStatus(error.message, "error");
       } finally {

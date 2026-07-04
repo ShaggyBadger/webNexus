@@ -32,6 +32,55 @@
   color: #ffb86c;
 }
 
+.tankgauge-spa .quick-capture-top-btn {
+  background-color: #ffb86c;
+  color: #121417;
+  border: 1px solid #ffb86c;
+  border-radius: 2px;
+  min-height: 44px;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.tankgauge-spa .quick-capture-top-btn:hover {
+  filter: brightness(1.08);
+}
+
+.tankgauge-spa .quick-capture-top-btn:focus {
+  outline: 2px solid #ffb86c;
+  outline-offset: 2px;
+}
+
+.tankgauge-spa .quick-capture-top-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.tankgauge-spa .quick-capture-subtext {
+  color: #a0aec0;
+  font-size: 0.67rem;
+  letter-spacing: 0.03em;
+}
+
+.tankgauge-spa .quick-capture-title {
+  color: #ffb86c;
+  font-size: 0.74rem;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.18rem;
+}
+
+.tankgauge-spa .quick-capture-copy {
+  min-width: 240px;
+  flex: 1 1 auto;
+}
+
+.tankgauge-spa .quick-capture-dock {
+  border-color: #3b3227;
+  background: linear-gradient(180deg, rgba(255, 184, 108, 0.08), rgba(28, 31, 35, 0.98));
+}
+
 .tankgauge-spa .tactical-card.active {
   border-color: #ffb86c;
 }
@@ -250,23 +299,6 @@
   font-weight: 700;
 }
 
-.tankgauge-spa .quick-capture-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.7);
-  z-index: 1100;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1rem;
-}
-
-.tankgauge-spa .quick-capture-panel {
-  width: min(720px, 100%);
-  max-height: calc(100vh - 2rem);
-  overflow-y: auto;
-}
-
 @media (max-width: 767px) {
   .tankgauge-spa .result-toggle {
     display: grid;
@@ -300,11 +332,4 @@
     font-size: 1.05rem;
   }
 
-  .tankgauge-spa .quick-capture-overlay {
-    padding: 0.5rem;
-  }
-
-  .tankgauge-spa .quick-capture-panel {
-    max-height: calc(100vh - 1rem);
-  }
 }
