@@ -500,6 +500,87 @@ class VeederQuickCaptureApiTests(APITestCase):
         self.assertEqual(payload["error"]["code"], "file_too_large")
 
 
+class VeederReviewQueueApiTests(APITestCase):
+    def setUp(self):
+        self.staff_user = User.objects.create_user(
+            username="reviewer", password="password123", is_staff=True
+        )
+        self.normal_user = User.objects.create_user(
+            username="operator", password="password123"
+        )
+        self.store = Store.objects.create(
+            store_num=5555, riso_num=95555, store_name="Queue Store"
+        )
+        self.fuel_type = FuelType.objects.create(name="Diesel")
+        self.ticket = VeederTicket.objects.create(
+            store=self.store, image=get_test_image()
+        )
+
+    def test_review_queue_endpoints_require_staff(self):
+        self.client.login(username="operator", password="password123")
+
+        list_response = self.client.get(reverse("atg:veeder_review_queue_list"))
+        detail_response = self.client.get(
+            reverse(
+                "atg:veeder_review_queue_detail", kwargs={"ticket_id": self.ticket.id}
+            )
+        )
+
+        self.assertEqual(list_response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(detail_response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_review_queue_list_returns_pending_tickets(self):
+        self.client.login(username="reviewer", password="password123")
+
+        response = self.client.get(reverse("atg:veeder_review_queue_list"))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = response.json()
+        self.assertEqual(payload["status"], "success")
+        self.assertEqual(len(payload["data"]["tickets"]), 1)
+        self.assertEqual(payload["data"]["tickets"][0]["id"], self.ticket.id)
+        self.assertEqual(payload["data"]["tickets"][0]["status"], "PENDING")
+
+    def test_review_queue_finalize_creates_readings_and_marks_completed(self):
+        self.client.login(username="reviewer", password="password123")
+
+        response = self.client.post(
+            reverse(
+                "atg:veeder_review_queue_finalize", kwargs={"ticket_id": self.ticket.id}
+            ),
+            {
+                "store_num": str(self.store.store_num),
+                "notes": "Reviewed and finalized.",
+                "readings": [
+                    {
+                        "tank_index": 1,
+                        "fuel_type": self.fuel_type.id,
+                        "volume": 4000,
+                        "ullage": 6000,
+                        "height": 40.0,
+                        "confidence_score": 1.0,
+                        "is_user_corrected": True,
+                    }
+                ],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = response.json()
+        self.assertEqual(payload["status"], "success")
+        self.ticket.refresh_from_db()
+        self.assertEqual(self.ticket.readings.count(), 1)
+
+        list_response = self.client.get(
+            reverse("atg:veeder_review_queue_list"),
+            {"status": "COMPLETED"},
+        )
+        self.assertEqual(list_response.status_code, status.HTTP_200_OK)
+        completed_items = list_response.json()["data"]["tickets"]
+        self.assertEqual(len(completed_items), 1)
+        self.assertEqual(completed_items[0]["status"], "COMPLETED")
+
+
 @override_settings(ATG_REMOTE_OCR_KEY="test-secret-key", ATG_REMOTE_OCR_ENABLED=True)
 class RemoteOCRAPITestCase(APITestCase):
     def setUp(self):

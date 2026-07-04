@@ -46,9 +46,14 @@
 <div class="container py-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2 class="mono text-primary m-0">[ ATG_DATA_ARCHIVE ]</h2>
-        <a href="{% url 'atg:ticket_upload' %}" class="btn btn-primary mono btn-sm">
-            [ + NEW_INGEST ]
-        </a>
+        <div class="d-flex gap-2">
+            <a href="{% url 'atg:review_queue' %}" class="btn btn-warning mono btn-sm text-dark">
+                [ REVIEW_QUEUE ]
+            </a>
+            <a href="{% url 'atg:ticket_upload' %}" class="btn btn-success mono btn-sm">
+                [ + NEW_INGEST ]
+            </a>
+        </div>
     </div>
 
     <div class="row g-3">
