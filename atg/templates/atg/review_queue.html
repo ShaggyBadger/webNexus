@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}ATG REVIEW QUEUE | {{ SITE_NAME }}{% endblock %}
+
+{% block extra_head %}
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<style>
+    .review-shell .tactical-card {
+        background-color: rgba(18, 20, 23, 0.95);
+        border: 1px solid var(--navbar-border);
+        border-radius: 0;
+    }
+    .review-shell .ticket-row {
+        cursor: pointer;
+        border: 1px solid #2a2e33;
+        background: rgba(255, 255, 255, 0.02);
+    }
+    .review-shell .ticket-row.active {
+        border-color: #ffb86c;
+        background: rgba(255, 184, 108, 0.09);
+    }
+    .review-shell .evidence-image {
+        width: 100%;
+        max-height: 280px;
+        object-fit: contain;
+        border: 1px solid #2a2e33;
+        background: #121417;
+    }
+    .review-shell [x-cloak] {
+        display: none !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+{{ fuel_types|json_script:"review-fuel-types-data" }}
+
+<div class="container py-4 review-shell" x-data="atgReviewQueueApp()" x-init="init()">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="mono text-primary m-0">[ ATG_REVIEW_QUEUE ]</h2>
+        <a href="{% url 'atg:veeder_list' %}" class="btn btn-tactical-secondary mono btn-sm">ARCHIVE</a>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-md-3 col-6">
+            <label class="form-label mono">STATUS</label>
+            <select class="form-select mono" x-model="filters.status">
+                <option value="PENDING">PENDING</option>
+                <option value="COMPLETED">COMPLETED</option>
+            </select>
+        </div>
+        <div class="col-md-3 col-6">
+            <label class="form-label mono">STORE #</label>
+            <input class="form-control mono" x-model="filters.storeNum" inputmode="numeric" pattern="[0-9]*" type="text">
+        </div>
+        <div class="col-md-4 col-8">
+            <label class="form-label mono">UPLOADED BY</label>
+            <input class="form-control mono" x-model="filters.uploadedBy" type="text">
+        </div>
+        <div class="col-md-2 col-4 d-grid">
+            <label class="form-label mono">&nbsp;</label>
+            <button class="btn btn-tactical-olive mono fw-bold" @click="loadQueue()" :disabled="loadingQueue">REFRESH</button>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-lg-4">
+            <div class="tactical-card p-3">
+                <div class="mono small text-muted-custom mb-2">QUEUE_ITEMS</div>
+                <div class="mono small text-muted-custom" x-show="loadingQueue" x-cloak>LOADING...</div>
+                <div class="d-flex flex-column gap-2" x-show="!loadingQueue">
+                    <template x-for="ticket in queue" :key="ticket.id">
+                        <button
+                            type="button"
+                            class="ticket-row text-start p-2 mono"
+                            :class="selectedTicketId === ticket.id ? 'active' : ''"
+                            @click="selectTicket(ticket.id)"
+                        >
+                            <div class="fw-bold text-primary" x-text="'#' + (ticket.store_num || '--')"></div>
+                            <div class="small text-muted-custom" x-text="ticket.store_name || 'UNRESOLVED STORE'"></div>
+                            <div class="small text-muted-custom" x-text="ticket.uploaded_by + ' // ' + (ticket.status || 'PENDING')"></div>
+                        </button>
+                    </template>
+                    <div class="mono small text-muted-custom" x-show="queue.length === 0" x-cloak>NO TICKETS FOUND.</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-8">
+            <div class="tactical-card p-3" x-show="selectedTicket" x-cloak>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="mono text-primary" x-text="'TICKET ' + selectedTicket.id"></div>
+                    <div class="mono small text-muted-custom" x-text="'UPLOADED: ' + (selectedTicket.uploaded_at || '--')"></div>
+                </div>
+
+                <img class="evidence-image mb-3" :src="selectedTicket.image_url" alt="Ticket evidence" x-show="selectedTicket.image_url" x-cloak>
+
+                <div class="row g-2 mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label mono">STORE #</label>
+                        <input class="form-control mono" x-model="form.storeNum" inputmode="numeric" pattern="[0-9]*" type="text">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label mono">TICKET TIMESTAMP</label>
+                        <input class="form-control mono" x-model="form.ticketTimestamp" type="datetime-local">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label mono">NOTES</label>
+                        <input class="form-control mono" x-model="form.notes" type="text">
+                    </div>
+                </div>
+
+                <template x-for="(reading, idx) in form.readings" :key="idx">
+                    <div class="border border-secondary p-2 mb-2">
+                        <div class="row g-2">
+                            <div class="col-md-2 col-6">
+                                <label class="form-label mono">TANK</label>
+                                <input class="form-control mono" x-model="reading.tank_index" inputmode="numeric" pattern="[0-9]*" type="number" min="1">
+                            </div>
+                            <div class="col-md-3 col-6">
+                                <label class="form-label mono">FUEL</label>
+                                <select class="form-select mono" x-model="reading.fuel_type">
+                                    <option value="">--SELECT--</option>
+                                    <template x-for="fuel in fuelTypes" :key="fuel.id">
+                                        <option :value="fuel.id" x-text="fuel.name.toUpperCase()"></option>
+                                    </template>
+                                </select>
+                            </div>
+                            <div class="col-md-2 col-4">
+                                <label class="form-label mono">VOLUME</label>
+                                <input class="form-control mono" x-model="reading.volume" type="number" inputmode="numeric">
+                            </div>
+                            <div class="col-md-2 col-4">
+                                <label class="form-label mono">ULLAGE</label>
+                                <input class="form-control mono" x-model="reading.ullage" type="number" inputmode="numeric">
+                            </div>
+                            <div class="col-md-2 col-4">
+                                <label class="form-label mono">HEIGHT</label>
+                                <input class="form-control mono" x-model="reading.height" type="number" step="any" inputmode="decimal">
+                            </div>
+                            <div class="col-md-1 col-12 d-grid">
+                                <label class="form-label mono">&nbsp;</label>
+                                <button type="button" class="btn btn-tactical-danger mono" @click="removeReading(idx)">X</button>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+
+                <div class="d-grid gap-2 d-md-flex mb-3">
+                    <button type="button" class="btn btn-tactical-amber mono fw-bold" @click="addReading()">ADD_READING</button>
+                    <button type="button" class="btn btn-tactical-olive mono fw-bold" @click="finalizeTicket()" :disabled="saving">FINALIZE_TICKET</button>
+                </div>
+
+                <div class="p-2 mono small border" x-show="status.message" x-cloak :class="statusClass()" x-text="status.message"></div>
+            </div>
+            <div class="tactical-card p-3 mono text-muted-custom" x-show="!selectedTicket" x-cloak>
+                SELECT A TICKET TO BEGIN REVIEW.
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'atg/js/review_queue_page.js' %}"></script>
+{% endblock %}

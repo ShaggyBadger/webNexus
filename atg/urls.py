@@ -6,9 +6,17 @@ from .views.api_views import (
     VeederStatsView,
     StoreViewSet,
     StoreTankProfileAPIView,
+    VeederQuickCaptureAPIView,
+)
+from .views.review_api_views import (
+    FuelTypeListAPIView,
+    VeederReviewQueueDetailAPIView,
+    VeederReviewQueueFinalizeAPIView,
+    VeederReviewQueueListAPIView,
 )
 from .views.ticket_views import VeederUploadView
 from .views.dashboard_views import VeederListView, VeederDetailView
+from .views.review_views import VeederReviewQueueView
 from .views.remote_ocr_views import (
     RemoteOCRInstructionsView,
     RemoteOCRFetchJobView,
@@ -24,6 +32,31 @@ router.register(r"stores", StoreViewSet, basename="store")
 
 
 urlpatterns = [
+    path(
+        "api/v1/tickets/quick-capture/",
+        VeederQuickCaptureAPIView.as_view(),
+        name="ticket_quick_capture",
+    ),
+    path(
+        "api/v1/review-queue/",
+        VeederReviewQueueListAPIView.as_view(),
+        name="veeder_review_queue_list",
+    ),
+    path(
+        "api/v1/review-queue/fuel-types/",
+        FuelTypeListAPIView.as_view(),
+        name="veeder_review_queue_fuel_types",
+    ),
+    path(
+        "api/v1/review-queue/<str:ticket_id>/",
+        VeederReviewQueueDetailAPIView.as_view(),
+        name="veeder_review_queue_detail",
+    ),
+    path(
+        "api/v1/review-queue/<str:ticket_id>/finalize/",
+        VeederReviewQueueFinalizeAPIView.as_view(),
+        name="veeder_review_queue_finalize",
+    ),
     path("api/v1/", include(router.urls)),
     path("api/v1/stats/", VeederStatsView.as_view(), name="veeder_stats"),
     path(
@@ -47,6 +80,7 @@ urlpatterns = [
         name="remote_ocr_resolve",
     ),
     path("upload/", VeederUploadView.as_view(), name="ticket_upload"),
+    path("review-queue/", VeederReviewQueueView.as_view(), name="review_queue"),
     path("archive/", VeederListView.as_view(), name="veeder_list"),
     path("archive/<str:pk>/", VeederDetailView.as_view(), name="veeder_detail"),
 ]

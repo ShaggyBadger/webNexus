@@ -1,7 +1,10 @@
 import json
 from statistics import median
+from uuid import uuid4
 
 from django.db.models import Avg, Count, ExpressionWrapper, F, FloatField, Q
+from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 from rest_framework.views import APIView
 from rest_framework import viewsets, permissions, status, serializers
 from rest_framework.response import Response
@@ -49,6 +52,139 @@ class StoreViewSet(viewsets.ReadOnlyModelViewSet):
                 queryset = queryset.filter(store_name__icontains=search_query)
 
         return queryset.order_by("store_num", "id")[:10]
+
+
+class VeederQuickCaptureAPIView(APIView):
+    """Accept image-first Veeder ticket capture from TankGauge without full ingest."""
+
+    permission_classes = [permissions.AllowAny]
+
+    @staticmethod
+    def _trace_id() -> str:
+        return str(uuid4())
+
+    def _error(self, *, code: str, message: str, status_code: int, details=None):
+        return Response(
+            {
+                "error": {
+                    "code": code,
+                    "message": message,
+                    "details": details or {},
+                    "trace_id": self._trace_id(),
+                }
+            },
+            status=status_code,
+        )
+
+    @staticmethod
+    def _resolve_store(*, store_num_raw: str, riso_num_raw: str):
+        if store_num_raw and store_num_raw.isdigit():
+            store = Store.objects.filter(store_num=int(store_num_raw)).first()
+            if store:
+                return store
+
+        if riso_num_raw and riso_num_raw.isdigit():
+            store = Store.objects.filter(riso_num=int(riso_num_raw)).first()
+            if store:
+                return store
+
+        return None
+
+    def post(self, request):
+        image = request.FILES.get("image")
+        if not image:
+            return self._error(
+                code="missing_image",
+                message="Ticket image is required.",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        store_num_raw = f"{request.data.get('store_num', '')}".strip()
+        riso_num_raw = f"{request.data.get('riso_num', '')}".strip()
+        store = self._resolve_store(
+            store_num_raw=store_num_raw, riso_num_raw=riso_num_raw
+        )
+
+        ticket_timestamp_raw = f"{request.data.get('ticket_timestamp', '')}".strip()
+        ticket_timestamp = None
+        if ticket_timestamp_raw:
+            ticket_timestamp = parse_datetime(ticket_timestamp_raw)
+            if ticket_timestamp is None:
+                return self._error(
+                    code="invalid_ticket_timestamp",
+                    message="Ticket timestamp is invalid.",
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    details={"ticket_timestamp": ticket_timestamp_raw},
+                )
+            if timezone.is_naive(ticket_timestamp):
+                ticket_timestamp = timezone.make_aware(
+                    ticket_timestamp,
+                    timezone.get_current_timezone(),
+                )
+
+        notes = f"{request.data.get('notes', '')}".strip()
+
+        try:
+            ticket = VeederUploadService.process_quick_capture_submission(
+                user=request.user,
+                store=store,
+                image=image,
+                ticket_timestamp=ticket_timestamp,
+                notes=notes,
+            )
+        except ValueError as exc:
+            message = str(exc)
+            if "maximum allowed size" in message:
+                return self._error(
+                    code="file_too_large",
+                    message=message,
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    details={
+                        "max_upload_size_bytes": VeederUploadService.QUICK_CAPTURE_MAX_UPLOAD_SIZE_BYTES
+                    },
+                )
+            if "Unsupported ticket image type" in message:
+                return self._error(
+                    code="unsupported_mime_type",
+                    message=message,
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    details={
+                        "allowed_mime_types": sorted(
+                            VeederUploadService.QUICK_CAPTURE_ALLOWED_MIME_TYPES
+                        )
+                    },
+                )
+            return self._error(
+                code="quick_capture_validation_error",
+                message=message,
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        except Exception:
+            return self._error(
+                code="quick_capture_failed",
+                message="Unable to submit ticket image right now.",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        return Response(
+            {
+                "status": "success",
+                "data": {
+                    "ticket_id": ticket.id,
+                    "store": {
+                        "store_pk": ticket.store.id if ticket.store else None,
+                        "store_num": ticket.store.store_num if ticket.store else None,
+                        "name": ticket.store.store_name if ticket.store else None,
+                    },
+                    "uploaded_at": (
+                        ticket.uploaded_at.isoformat() if ticket.uploaded_at else None
+                    ),
+                    "requires_review": True,
+                },
+                "meta": {"trace_id": self._trace_id()},
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class VeederTicketViewSet(viewsets.ModelViewSet):
