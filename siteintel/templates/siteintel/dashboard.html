@@ -51,7 +51,7 @@
             <span class="d-md-none" style="font-size: 1.05rem;">INTEL HUB</span>
         </h2>
         <div class="d-flex gap-2 w-100 w-md-auto">
-            <a href="{% url 'siteintel:proposal_list' %}" class="btn btn-outline-secondary btn-sm mono flex-grow-1 flex-md-grow-0 py-1" style="font-size: 0.7rem;">
+            <a href="{% url 'siteintel:proposal_list' %}" class="btn btn-tactical-secondary btn-sm mono flex-grow-1 flex-md-grow-0 py-1" style="font-size: 0.7rem;">
                 <span class="d-none d-md-inline">[ MY PROPOSALS ]</span>
                 <span class="d-md-none">PROPOSALS</span>
             </a>
@@ -66,7 +66,7 @@
     <div class="mb-4 px-2">
         <form method="get" class="input-group">
             <input type="text" name="q" class="form-control search-bar-tactical" placeholder="SEARCH..." value="{{ request.GET.q }}">
-            <button class="btn btn-outline-primary mono" type="submit">
+            <button class="btn btn-tactical-amber mono" type="submit">
                 <span class="d-none d-md-inline">[ EXECUTE QUERY ]</span>
                 <span class="d-md-none">GO</span>
             </button>
@@ -90,11 +90,11 @@
                     </div>
                     <div class="d-flex gap-2 w-100 w-sm-auto">
                         {% if store.location %}
-                        <a href="{% url 'siteintel:location_detail' store.location.id %}" class="btn btn-outline-secondary btn-sm mono py-1 px-3 flex-grow-1 flex-sm-grow-0" style="font-size: 0.7rem;">
+                        <a href="{% url 'siteintel:location_detail' store.location.id %}" class="btn btn-tactical-secondary btn-sm mono py-1 px-3 flex-grow-1 flex-sm-grow-0" style="font-size: 0.7rem;">
                             VIEW
                         </a>
                         {% endif %}
-                        <a href="{% url 'siteintel:proposal_create' %}{% if store.location %}?location_id={{ store.location.id }}{% elif store.store_num %}?store_num={{ store.store_num }}{% endif %}" class="btn btn-outline-primary btn-sm mono py-1 px-3 flex-grow-1 flex-sm-grow-0" style="font-size: 0.7rem;">
+                        <a href="{% url 'siteintel:proposal_create' %}{% if store.location %}?location_id={{ store.location.id }}{% elif store.store_num %}?store_num={{ store.store_num }}{% endif %}" class="btn btn-tactical-amber btn-sm mono py-1 px-3 flex-grow-1 flex-sm-grow-0" style="font-size: 0.7rem;">
                             UPDATE
                         </a>
                     </div>

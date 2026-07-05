@@ -24,10 +24,10 @@
                         </label>
                         <!-- Tactical Markdown Toolbar -->
                         <div id="intel-md-toolbar" class="d-flex gap-2">
-                            <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2 mono" data-md-cmd="bold" title="BOLD" style="font-size: 0.7rem;">[ B ]</button>
-                            <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2 mono" data-md-cmd="italic" title="ITALIC" style="font-size: 0.7rem;">[ I ]</button>
-                            <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2 mono" data-md-cmd="list" title="LIST" style="font-size: 0.7rem;">[ L ]</button>
-                            <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2 mono" data-md-cmd="link" title="LINK" style="font-size: 0.7rem;">[ K ]</button>
+                            <button type="button" class="btn btn-tactical-secondary btn-sm py-0 px-2 mono" data-md-cmd="bold" title="BOLD" style="font-size: 0.7rem;">[ B ]</button>
+                            <button type="button" class="btn btn-tactical-secondary btn-sm py-0 px-2 mono" data-md-cmd="italic" title="ITALIC" style="font-size: 0.7rem;">[ I ]</button>
+                            <button type="button" class="btn btn-tactical-secondary btn-sm py-0 px-2 mono" data-md-cmd="list" title="LIST" style="font-size: 0.7rem;">[ L ]</button>
+                            <button type="button" class="btn btn-tactical-secondary btn-sm py-0 px-2 mono" data-md-cmd="link" title="LINK" style="font-size: 0.7rem;">[ K ]</button>
                         </div>
                     </div>
                     {{ form.notes }}
@@ -40,7 +40,7 @@
                     <button type="submit" class="btn btn-primary mono fw-bold">
                         [ TRANSMIT_INTELLIGENCE ]
                     </button>
-                    <a href="{% url 'siteintel:location_detail' object.location.id %}" class="btn btn-outline-secondary mono">
+                    <a href="{% url 'siteintel:location_detail' object.location.id %}" class="btn btn-tactical-secondary mono">
                         [ ABORT_AND_RETURN ]
                     </a>
                 </div>

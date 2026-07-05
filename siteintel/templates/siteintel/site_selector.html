@@ -29,7 +29,7 @@
 
             <form class="mb-4 px-2" autocomplete="off" @submit.prevent="runManualSearch()">
                 <div class="d-grid mb-3">
-                    <button type="button" class="btn btn-outline-primary btn-sm mono py-2" @click="scanNearbyStores()" :disabled="loadingGps">
+                    <button type="button" class="btn btn-tactical-amber btn-sm mono py-2" @click="scanNearbyStores()" :disabled="loadingGps">
                         <span x-show="!loadingGps">[ SCAN FOR NEARBY STORES ]</span>
                         <span x-show="loadingGps" x-cloak>[ SCANNING... ]</span>
                     </button>
@@ -59,7 +59,7 @@
                     <button type="submit" class="btn btn-primary mono" :disabled="loadingSearch">[ SEARCH ]</button>
                 </div>
                 <div class="d-grid mt-3">
-                    <a href="{% url 'siteintel:proposal_create' %}" class="btn btn-outline-warning btn-sm mono py-2">
+                    <a href="{% url 'siteintel:proposal_create' %}" class="btn btn-tactical-amber btn-sm mono py-2">
                         [ MANUAL SITE PROPOSAL ]
                     </a>
                 </div>
@@ -85,7 +85,7 @@
                 <div class="text-center py-3" x-show="!results.length && canPropose" x-cloak>
                     <div class="text-muted-custom mono mb-3">[ NO_MATCHES_FOUND ]</div>
                     <div class="d-grid">
-                        <a :href="proposalHref" class="btn btn-outline-primary btn-sm mono">[ INITIATE PROPOSAL ]</a>
+                        <a :href="proposalHref" class="btn btn-tactical-amber btn-sm mono">[ INITIATE PROPOSAL ]</a>
                     </div>
                 </div>
             </div>
@@ -95,7 +95,7 @@
             </div>
 
             <div class="mt-5 pt-4 border-top border-secondary text-center px-2">
-                <a href="{% url 'siteintel:dashboard' %}" class="btn btn-outline-secondary btn-sm mono">
+                <a href="{% url 'siteintel:dashboard' %}" class="btn btn-tactical-secondary btn-sm mono">
                     <span class="d-none d-md-inline">[ ACCESS SATELLITE HUB ]</span>
                     <span class="d-md-none">ACCESS SATELLITE HUB</span>
                 </a>

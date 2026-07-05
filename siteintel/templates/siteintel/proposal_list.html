@@ -85,10 +85,10 @@
 
                     {% if proposal.status == 'PENDING' %}
                     <div class="mt-3 pt-3 border-top border-secondary d-flex gap-2">
-                        <a href="{% url 'siteintel:proposal_edit' proposal.id %}" class="btn btn-outline-warning btn-sm mono py-1 px-3" style="font-size: 0.65rem;">
+                        <a href="{% url 'siteintel:proposal_edit' proposal.id %}" class="btn btn-tactical-amber btn-sm mono py-1 px-3" style="font-size: 0.65rem;">
                             [ EDIT ]
                         </a>
-                        <a href="{% url 'siteintel:proposal_delete' proposal.id %}" class="btn btn-outline-danger btn-sm mono py-1 px-3" style="font-size: 0.65rem;">
+                        <a href="{% url 'siteintel:proposal_delete' proposal.id %}" class="btn btn-tactical-danger btn-sm mono py-1 px-3" style="font-size: 0.65rem;">
                             [ DELETE ]
                         </a>
                     </div>
@@ -100,7 +100,7 @@
     {% else %}
         <div class="text-center py-5">
             <div class="mono text-muted-custom mb-3">NO ACTIVE PROPOSALS FOUND IN YOUR LOGS</div>
-            <a href="{% url 'siteintel:proposal_create' %}" class="btn btn-outline-primary mono">
+            <a href="{% url 'siteintel:proposal_create' %}" class="btn btn-tactical-amber mono">
                 [ INITIALIZE FIRST PROPOSAL ]
             </a>
         </div>

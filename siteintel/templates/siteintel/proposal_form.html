@@ -216,7 +216,7 @@
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <label class="form-label m-0">Geospatial Data</label>
                                     <div class="d-flex gap-2">
-                                        <button type="button" class="btn btn-outline-info btn-sm mono" id="geocode-btn" style="font-size: 0.7rem;">
+                                        <button type="button" class="btn btn-tactical-secondary btn-sm mono" id="geocode-btn" style="font-size: 0.7rem;">
                                             [ DECODE_COORDINATES ]
                                         </button>
                                         <button type="button" class="btn btn-primary btn-sm mono text-dark" id="gps-capture-btn" style="font-size: 0.7rem;">
@@ -298,7 +298,7 @@
                         
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <label class="form-label m-0">Custom Attributes</label>
-                            <button type="button" class="btn btn-outline-secondary btn-sm mono" id="add-custom-attr-btn" style="font-size: 0.7rem;">
+                            <button type="button" class="btn btn-tactical-secondary btn-sm mono" id="add-custom-attr-btn" style="font-size: 0.7rem;">
                                 [ + ADD CUSTOM QUIRK ]
                             </button>
                         </div>
@@ -342,7 +342,7 @@
                                     <div class="form-check d-none">
                                         {{ tank_form.DELETE }}
                                     </div>
-                                    <button type="button" class="btn btn-outline-danger btn-sm remove-tank mono py-0 px-1" style="font-size: 0.6rem;">
+                                    <button type="button" class="btn btn-tactical-danger btn-sm remove-tank mono py-0 px-1" style="font-size: 0.6rem;">
                                         [ REMOVE ]
                                     </button>
                                 {% endif %}
@@ -350,7 +350,7 @@
                             {% endfor %}
                         </div>
                         
-                        <button type="button" class="btn btn-outline-primary btn-sm mono mt-2" id="add-tank-btn">
+                        <button type="button" class="btn btn-tactical-amber btn-sm mono mt-2" id="add-tank-btn">
                             [ + ADD TANK RECORD ]
                         </button>
                     </div>
@@ -360,7 +360,7 @@
                     <button type="submit" class="btn btn-primary btn-lg mono">
                         [ TRANSMIT_PROPOSAL ]
                     </button>
-                    <a href="{% url 'siteintel:proposal_list' %}" class="btn btn-outline-secondary btn-sm mono">
+                    <a href="{% url 'siteintel:proposal_list' %}" class="btn btn-tactical-secondary btn-sm mono">
                         [ CANCEL_MISSION ]
                     </a>
                 </div>
@@ -372,7 +372,7 @@
 <div id="empty-tank-form" class="d-none">
     <div class="tank-entry" data-index="__prefix__">
         {% include "siteintel/components/tank_entry_row.html" with tank_form=tank_formset.empty_form assigned_tank=None %}
-        <button type="button" class="btn btn-outline-danger btn-sm remove-tank mono py-0 px-1" style="font-size: 0.6rem;">
+        <button type="button" class="btn btn-tactical-danger btn-sm remove-tank mono py-0 px-1" style="font-size: 0.6rem;">
             [ REMOVE ]
         </button>
     </div>
