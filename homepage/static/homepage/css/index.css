@@ -3,6 +3,7 @@
   --status-standby: #ffb86c;
   --homepage-action-blue: #2f80ed;
   --homepage-action-amber: #ffb86c;
+  --homepage-action-od-green: #6b8e23;
 }
 
 .eagle-logo {
@@ -95,7 +96,14 @@
   color: #121417;
 }
 
+.command-app-cta-olive {
+  background-color: var(--homepage-action-od-green);
+  border: 1px solid var(--homepage-action-od-green);
+  color: #f8f9fa;
+}
+
 .command-app-cta-primary.is-danger,
+.command-app-cta-olive.is-danger,
 .command-app-cta-amber.is-danger {
   background-color: #e94560;
   border-color: #e94560;
@@ -103,6 +111,7 @@
 }
 
 .command-app-cta-primary.is-success,
+.command-app-cta-olive.is-success,
 .command-app-cta-amber.is-success {
   background-color: #8da35d;
   border-color: #8da35d;
