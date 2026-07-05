@@ -169,101 +169,101 @@ class VeederReviewQueueFinalizeAPIView(APIView):
         )
 
     def post(self, request, ticket_id):
-        try:
-            ticket = (
-                VeederTicket.objects.select_for_update()
-                .select_related("store")
-                .get(id=ticket_id)
-            )
-        except VeederTicket.DoesNotExist:
-            return self._error(
-                code="ticket_not_found",
-                message="Ticket not found.",
-                details={"ticket_id": ticket_id},
-                status_code=status.HTTP_404_NOT_FOUND,
-            )
-
-        store_num_raw = f"{request.data.get('store_num', '')}".strip()
-        if store_num_raw:
-            if not store_num_raw.isdigit():
-                return self._error(
-                    code="invalid_store_num",
-                    message="Store number must be numeric.",
-                )
-            store = Store.objects.filter(store_num=int(store_num_raw)).first()
-            if not store:
-                return self._error(
-                    code="store_not_found",
-                    message="Store not found.",
-                    details={"store_num": store_num_raw},
-                )
-            ticket.store = store
-
-        if not ticket.store:
-            return self._error(
-                code="store_required",
-                message="Store assignment is required before finalize.",
-            )
-
-        ticket_timestamp_raw = f"{request.data.get('ticket_timestamp', '')}".strip()
-        if ticket_timestamp_raw:
-            parsed_timestamp = parse_datetime(ticket_timestamp_raw)
-            if parsed_timestamp is None:
-                return self._error(
-                    code="invalid_ticket_timestamp",
-                    message="Ticket timestamp is invalid.",
-                    details={"ticket_timestamp": ticket_timestamp_raw},
-                )
-            if timezone.is_naive(parsed_timestamp):
-                parsed_timestamp = timezone.make_aware(
-                    parsed_timestamp,
-                    timezone.get_current_timezone(),
-                )
-            ticket.ticket_timestamp = parsed_timestamp
-
-        notes_raw = request.data.get("notes")
-        if notes_raw is not None:
-            ticket.notes = f"{notes_raw}".strip()
-
-        readings_raw = request.data.get("readings")
-        if isinstance(readings_raw, str):
-            try:
-                readings_raw = json.loads(readings_raw)
-            except (TypeError, ValueError):
-                readings_raw = None
-
-        if not isinstance(readings_raw, list) or not readings_raw:
-            return self._error(
-                code="readings_required",
-                message="At least one reading is required to finalize.",
-            )
-
-        serializer = VeederReadingSerializer(data=readings_raw, many=True)
-        if not serializer.is_valid():
-            return self._error(
-                code="reading_validation_error",
-                message="One or more readings are invalid.",
-                details=serializer.errors,
-            )
-
-        tank_indices = [row.get("tank_index") for row in serializer.validated_data]
-        if len(tank_indices) != len(set(tank_indices)):
-            return self._error(
-                code="duplicate_tank_index",
-                message="Duplicate tank indices are not allowed.",
-            )
-
-        quality_errors = validate_readings_for_store(
-            ticket.store, serializer.validated_data
-        )
-        if quality_errors:
-            return self._error(
-                code="reading_quality_error",
-                message="Submitted readings failed store quality checks.",
-                details={"errors": quality_errors},
-            )
-
         with transaction.atomic():
+            try:
+                ticket = (
+                    VeederTicket.objects.select_for_update()
+                    .select_related("store")
+                    .get(id=ticket_id)
+                )
+            except VeederTicket.DoesNotExist:
+                return self._error(
+                    code="ticket_not_found",
+                    message="Ticket not found.",
+                    details={"ticket_id": ticket_id},
+                    status_code=status.HTTP_404_NOT_FOUND,
+                )
+
+            store_num_raw = f"{request.data.get('store_num', '')}".strip()
+            if store_num_raw:
+                if not store_num_raw.isdigit():
+                    return self._error(
+                        code="invalid_store_num",
+                        message="Store number must be numeric.",
+                    )
+                store = Store.objects.filter(store_num=int(store_num_raw)).first()
+                if not store:
+                    return self._error(
+                        code="store_not_found",
+                        message="Store not found.",
+                        details={"store_num": store_num_raw},
+                    )
+                ticket.store = store
+
+            if not ticket.store:
+                return self._error(
+                    code="store_required",
+                    message="Store assignment is required before finalize.",
+                )
+
+            ticket_timestamp_raw = f"{request.data.get('ticket_timestamp', '')}".strip()
+            if ticket_timestamp_raw:
+                parsed_timestamp = parse_datetime(ticket_timestamp_raw)
+                if parsed_timestamp is None:
+                    return self._error(
+                        code="invalid_ticket_timestamp",
+                        message="Ticket timestamp is invalid.",
+                        details={"ticket_timestamp": ticket_timestamp_raw},
+                    )
+                if timezone.is_naive(parsed_timestamp):
+                    parsed_timestamp = timezone.make_aware(
+                        parsed_timestamp,
+                        timezone.get_current_timezone(),
+                    )
+                ticket.ticket_timestamp = parsed_timestamp
+
+            notes_raw = request.data.get("notes")
+            if notes_raw is not None:
+                ticket.notes = f"{notes_raw}".strip()
+
+            readings_raw = request.data.get("readings")
+            if isinstance(readings_raw, str):
+                try:
+                    readings_raw = json.loads(readings_raw)
+                except (TypeError, ValueError):
+                    readings_raw = None
+
+            if not isinstance(readings_raw, list) or not readings_raw:
+                return self._error(
+                    code="readings_required",
+                    message="At least one reading is required to finalize.",
+                )
+
+            serializer = VeederReadingSerializer(data=readings_raw, many=True)
+            if not serializer.is_valid():
+                return self._error(
+                    code="reading_validation_error",
+                    message="One or more readings are invalid.",
+                    details=serializer.errors,
+                )
+
+            tank_indices = [row.get("tank_index") for row in serializer.validated_data]
+            if len(tank_indices) != len(set(tank_indices)):
+                return self._error(
+                    code="duplicate_tank_index",
+                    message="Duplicate tank indices are not allowed.",
+                )
+
+            quality_errors = validate_readings_for_store(
+                ticket.store, serializer.validated_data
+            )
+            if quality_errors:
+                return self._error(
+                    code="reading_quality_error",
+                    message="Submitted readings failed store quality checks.",
+                    details={"errors": quality_errors},
+                )
+
             ticket.save()
             ticket.readings.all().delete()
 
@@ -297,12 +297,14 @@ class VeederReviewQueueFinalizeAPIView(APIView):
 
             transaction.on_commit(run_auto_mapping)
 
+            readings_count = len(serializer.validated_data)
+
         return Response(
             {
                 "status": "success",
                 "data": {
                     "ticket_id": ticket.id,
-                    "readings_count": ticket.readings.count(),
+                    "readings_count": readings_count,
                     "store_num": ticket.store.store_num,
                 },
             }

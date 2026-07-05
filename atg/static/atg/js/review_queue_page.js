@@ -4,12 +4,9 @@ function atgReviewQueueApp() {
     selectedTicketId: null,
     selectedTicket: null,
     imageRotation: 0,
-    imageZoom: 1,
-    imagePanX: 0,
-    imagePanY: 0,
-    isImagePanning: false,
-    imagePointerX: 0,
-    imagePointerY: 0,
+    panzoomInstance: null,
+    panzoomStage: null,
+    panzoomWheelHandler: null,
     fuelTypes: [],
     loadingQueue: false,
     saving: false,
@@ -35,6 +32,44 @@ function atgReviewQueueApp() {
         this.fuelTypes = JSON.parse(fuelScript.textContent);
       }
       this.loadQueue();
+    },
+
+    initializePanzoom() {
+      this.destroyPanzoom();
+
+      const stage = this.$refs.imageStage;
+      const canvas = this.$refs.imageCanvas;
+      if (!stage || !canvas || typeof Panzoom !== "function") {
+        return;
+      }
+
+      const instance = Panzoom(canvas, {
+        maxScale: 5,
+        minScale: 1,
+        step: 0.25,
+        contain: "outside",
+        cursor: "grab",
+      });
+
+      this.panzoomWheelHandler = (event) => instance.zoomWithWheel(event);
+      stage.addEventListener("wheel", this.panzoomWheelHandler, {
+        passive: false,
+      });
+      this.panzoomStage = stage;
+      this.panzoomInstance = instance;
+    },
+
+    destroyPanzoom() {
+      if (this.panzoomStage && this.panzoomWheelHandler) {
+        this.panzoomStage.removeEventListener("wheel", this.panzoomWheelHandler);
+      }
+      this.panzoomStage = null;
+      this.panzoomWheelHandler = null;
+
+      if (this.panzoomInstance) {
+        this.panzoomInstance.destroy();
+        this.panzoomInstance = null;
+      }
     },
 
     showStatus(message, type = "info") {
@@ -108,10 +143,7 @@ function atgReviewQueueApp() {
     async selectTicket(ticketId) {
       this.selectedTicketId = ticketId;
       this.imageRotation = 0;
-      this.imageZoom = 1;
-      this.imagePanX = 0;
-      this.imagePanY = 0;
-      this.isImagePanning = false;
+      this.destroyPanzoom();
       try {
         const data = await this.fetchJson(`/atg/api/v1/review-queue/${ticketId}/`);
         this.selectedTicket = data.ticket;
@@ -135,6 +167,9 @@ function atgReviewQueueApp() {
         if (this.form.readings.length === 0) {
           this.addReading();
         }
+        this.$nextTick(() => {
+          this.initializePanzoom();
+        });
         this.showStatus("", "info");
       } catch (error) {
         this.showStatus(error.message, "error");
@@ -150,46 +185,22 @@ function atgReviewQueueApp() {
     },
 
     zoomInImage() {
-      this.imageZoom = Math.min(3, Number((this.imageZoom + 0.1).toFixed(2)));
+      if (this.panzoomInstance) {
+        this.panzoomInstance.zoomIn();
+      }
     },
 
     zoomOutImage() {
-      this.imageZoom = Math.max(0.5, Number((this.imageZoom - 0.1).toFixed(2)));
+      if (this.panzoomInstance) {
+        this.panzoomInstance.zoomOut();
+      }
     },
 
     resetImageView() {
       this.imageRotation = 0;
-      this.imageZoom = 1;
-      this.imagePanX = 0;
-      this.imagePanY = 0;
-      this.isImagePanning = false;
-    },
-
-    startImagePan(event) {
-      if (this.imageZoom <= 1) {
-        return;
+      if (this.panzoomInstance) {
+        this.panzoomInstance.reset();
       }
-      this.isImagePanning = true;
-      this.imagePointerX = event.clientX;
-      this.imagePointerY = event.clientY;
-    },
-
-    moveImagePan(event) {
-      if (!this.isImagePanning) {
-        return;
-      }
-
-      const deltaX = event.clientX - this.imagePointerX;
-      const deltaY = event.clientY - this.imagePointerY;
-
-      this.imagePanX += deltaX;
-      this.imagePanY += deltaY;
-      this.imagePointerX = event.clientX;
-      this.imagePointerY = event.clientY;
-    },
-
-    endImagePan() {
-      this.isImagePanning = false;
     },
 
     addReading() {
