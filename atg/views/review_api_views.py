@@ -38,6 +38,8 @@ class VeederReviewQueueListAPIView(APIView):
             queryset = queryset.filter(readings_count__gt=0)
         elif status_filter == "PENDING":
             queryset = queryset.filter(readings_count=0)
+        elif status_filter in {"", "ALL"}:
+            pass
         else:
             queryset = queryset.filter(readings_count=0)
 

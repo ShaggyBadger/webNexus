@@ -7,7 +7,7 @@ function atgReviewQueueApp() {
     loadingQueue: false,
     saving: false,
     filters: {
-      status: "PENDING",
+      status: "ALL",
       storeNum: "",
       uploadedBy: "",
     },
@@ -69,7 +69,7 @@ function atgReviewQueueApp() {
       this.loadingQueue = true;
       try {
         const params = new URLSearchParams();
-        if (this.filters.status) {
+        if (this.filters.status && this.filters.status !== "ALL") {
           params.set("status", this.filters.status);
         }
         if (this.filters.storeNum.trim()) {

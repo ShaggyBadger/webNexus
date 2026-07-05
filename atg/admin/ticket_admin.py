@@ -1,5 +1,5 @@
 from django.contrib import admin
-from django.template.response import TemplateResponse
+from django.shortcuts import redirect
 from django.urls import path, reverse
 from ..models import VeederTicket, VeederReading
 
@@ -39,13 +39,4 @@ class VeederTicketAdmin(admin.ModelAdmin):
         return custom_urls + urls
 
     def review_queue_view(self, request):
-        context = {
-            **self.admin_site.each_context(request),
-            "title": "ATG Review Queue",
-            "review_queue_url": reverse("atg:review_queue"),
-        }
-        return TemplateResponse(
-            request,
-            "admin/atg/veederticket/review_queue.html",
-            context,
-        )
+        return redirect(reverse("atg:review_queue"))
