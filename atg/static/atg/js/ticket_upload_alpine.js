@@ -16,6 +16,10 @@ function atgTicketUploadApp() {
     statusMessage: "",
     statusType: "info",
     submitting: false,
+    preflightRows: [],
+    preflightReadings: [],
+    overrideReasons: {},
+    confirmedTokens: {},
 
     init() {
       const fuelScript = document.getElementById("fuel-types-data");
@@ -39,6 +43,13 @@ function atgTicketUploadApp() {
 
     clearStatus() {
       this.statusMessage = "";
+    },
+
+    resetPreflightState() {
+      this.preflightRows = [];
+      this.preflightReadings = [];
+      this.overrideReasons = {};
+      this.confirmedTokens = {};
     },
 
     showStatus(message, type = "info") {
@@ -114,6 +125,7 @@ function atgTicketUploadApp() {
       this.searchQuery = "";
       this.knownReadings = [];
       this.manualReadings = [];
+      this.resetPreflightState();
       this.step = 1;
       this.$nextTick(() => this.$refs.storeNumberInput?.focus());
     },
@@ -260,6 +272,29 @@ function atgTicketUploadApp() {
       this.manualReadings.splice(idx, 1);
     },
 
+    get hasPreflightRows() {
+      return this.preflightRows.length > 0;
+    },
+
+    canConfirmPreflight() {
+      if (this.preflightRows.length === 0) {
+        return false;
+      }
+
+      for (const row of this.preflightRows) {
+        if (!this.confirmedTokens[row.preflight_token]) {
+          return false;
+        }
+        if (row.decision === "outside_threshold_requires_override") {
+          const reason = `${this.overrideReasons[row.preflight_token] ?? ""}`.trim();
+          if (reason.length < 5) {
+            return false;
+          }
+        }
+      }
+      return true;
+    },
+
     onKnownVolumeInput(reading) {
       if (!reading.baseline_capacity || reading.volume === "") {
         reading.expected_ullage = null;
@@ -374,6 +409,54 @@ function atgTicketUploadApp() {
       }
 
       this.submitting = true;
+      this.showStatus("Running preflight checks...", "info");
+
+      try {
+        const preflightResponse = await fetch("/atg/api/v1/readings/validate-preflight/", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": document.querySelector('[name=csrfmiddlewaretoken]').value,
+          },
+          body: JSON.stringify({
+            store: this.selectedStore.store_pk,
+            readings,
+          }),
+        });
+
+        const preflightPayload = await preflightResponse.json();
+        if (!preflightResponse.ok) {
+          const preflightError =
+            preflightPayload?.error?.message || "Preflight validation failed.";
+          throw new Error(preflightError);
+        }
+
+        this.preflightRows = preflightPayload?.data?.rows || [];
+        this.preflightReadings = readings;
+        this.confirmedTokens = {};
+        this.overrideReasons = {};
+        this.preflightRows.forEach((row) => {
+          this.confirmedTokens[row.preflight_token] = false;
+          this.overrideReasons[row.preflight_token] = "";
+        });
+        this.showStatus(
+          "Preflight complete. Review each row and confirm before transmit.",
+          "info",
+        );
+      } catch (error) {
+        this.showStatus(error.message, "error");
+      } finally {
+        this.submitting = false;
+      }
+    },
+
+    async confirmAndTransmit() {
+      if (!this.canConfirmPreflight()) {
+        this.showStatus("Confirm all rows and provide required override reasons.", "error");
+        return;
+      }
+
+      this.submitting = true;
       this.showStatus("Transmitting data package...", "info");
 
       const formData = new FormData();
@@ -382,7 +465,12 @@ function atgTicketUploadApp() {
       if (this.ticketTimestamp) {
         formData.append("ticket_timestamp", this.ticketTimestamp);
       }
-      formData.append("readings_json", JSON.stringify(readings));
+      formData.append("readings_json", JSON.stringify(this.preflightReadings));
+      formData.append(
+        "preflight_tokens_json",
+        JSON.stringify(this.preflightRows.map((row) => row.preflight_token)),
+      );
+      formData.append("preflight_override_reasons_json", JSON.stringify(this.overrideReasons));
 
       try {
         const response = await fetch("/atg/api/v1/tickets/", {
@@ -416,6 +504,7 @@ function atgTicketUploadApp() {
         }
 
         this.showStatus("Mission complete. Ticket ingested successfully.", "success");
+        this.resetPreflightState();
         setTimeout(() => {
           window.location.href = "/";
         }, 1400);
@@ -424,6 +513,11 @@ function atgTicketUploadApp() {
       } finally {
         this.submitting = false;
       }
+    },
+
+    cancelPreflightReview() {
+      this.resetPreflightState();
+      this.showStatus("Preflight review dismissed. You can edit values and re-run.", "info");
     },
   };
 }

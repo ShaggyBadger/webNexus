@@ -23,6 +23,7 @@ from ..serializers import (
     StoreSerializer,
 )
 from ..services import VeederUploadService
+from ..services.reading_preflight import ReadingPreflightService
 
 
 class StoreViewSet(viewsets.ReadOnlyModelViewSet):
@@ -213,6 +214,34 @@ class VeederTicketViewSet(viewsets.ModelViewSet):
         else:
             readings_data = self.request.data.get("readings", [])
 
+        preflight_tokens_json = self.request.data.get("preflight_tokens_json")
+        if preflight_tokens_json:
+            try:
+                preflight_tokens = json.loads(preflight_tokens_json)
+            except (ValueError, TypeError):
+                preflight_tokens = []
+        else:
+            preflight_tokens = self.request.data.get("preflight_tokens", [])
+
+        if not isinstance(preflight_tokens, list):
+            preflight_tokens = []
+
+        preflight_override_reasons_raw = self.request.data.get(
+            "preflight_override_reasons_json"
+        )
+        if preflight_override_reasons_raw:
+            try:
+                preflight_override_reasons = json.loads(preflight_override_reasons_raw)
+            except (ValueError, TypeError):
+                preflight_override_reasons = {}
+        else:
+            preflight_override_reasons = self.request.data.get(
+                "preflight_override_reasons", {}
+            )
+
+        if not isinstance(preflight_override_reasons, dict):
+            preflight_override_reasons = {}
+
         # We handle the creation manually via service to maintain strict atomicity
         # across the ticket and its multiple readings.
         try:
@@ -223,6 +252,8 @@ class VeederTicketViewSet(viewsets.ModelViewSet):
                 ticket_timestamp=serializer.validated_data.get("ticket_timestamp"),
                 notes=serializer.validated_data.get("notes"),
                 readings_data=readings_data,
+                preflight_tokens=preflight_tokens,
+                preflight_override_reasons=preflight_override_reasons,
             )
         except Exception as e:
             # Catching at view level to return 400 instead of 500
@@ -477,5 +508,91 @@ class StoreTankProfileAPIView(APIView):
                     "state": store.state,
                 },
                 "known_tanks": known_tanks,
+            }
+        )
+
+
+class VeederReadingsPreflightAPIView(APIView):
+    """Run server-side reading checks and mint one-time preflight tokens."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        store_id = request.data.get("store")
+        try:
+            store = Store.objects.get(id=store_id)
+        except Store.DoesNotExist:
+            return Response(
+                {
+                    "error": {
+                        "code": "store_not_found",
+                        "message": "Store not found.",
+                        "details": {"store": store_id},
+                        "trace_id": str(uuid4()),
+                    }
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        readings_raw = request.data.get("readings")
+        if isinstance(readings_raw, str):
+            try:
+                readings_raw = json.loads(readings_raw)
+            except (TypeError, ValueError):
+                readings_raw = None
+
+        if not isinstance(readings_raw, list) or not readings_raw:
+            return Response(
+                {
+                    "error": {
+                        "code": "readings_required",
+                        "message": "At least one reading is required for preflight.",
+                        "details": {},
+                        "trace_id": str(uuid4()),
+                    }
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = VeederReadingSerializer(data=readings_raw, many=True)
+        if not serializer.is_valid():
+            return Response(
+                {
+                    "error": {
+                        "code": "reading_validation_error",
+                        "message": "One or more readings are invalid.",
+                        "details": serializer.errors,
+                        "trace_id": str(uuid4()),
+                    }
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        tank_indices = [row.get("tank_index") for row in serializer.validated_data]
+        if len(tank_indices) != len(set(tank_indices)):
+            return Response(
+                {
+                    "error": {
+                        "code": "duplicate_tank_index",
+                        "message": "Duplicate tank indices are not allowed.",
+                        "details": {},
+                        "trace_id": str(uuid4()),
+                    }
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        analysis = ReadingPreflightService.validate_and_issue_tokens(
+            store=store,
+            validated_readings=serializer.validated_data,
+            user=request.user,
+        )
+        return Response(
+            {
+                "status": "success",
+                "data": {
+                    "rows": analysis["rows"],
+                },
+                "meta": {"trace_id": analysis["trace_id"]},
             }
         )

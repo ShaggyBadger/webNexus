@@ -13,7 +13,7 @@ from rest_framework.test import APITestCase
 
 from tankgauge.models import Store, StoreTankMapping, TankEstimation, TankType
 from missionlog.models import FuelType
-from .models import VeederTicket, VeederReading
+from .models import VeederTicket, VeederReading, VeederReadingPreflightToken
 from .services import VeederUploadService
 
 from PIL import Image
@@ -228,11 +228,26 @@ class VeederAPITestCase(APITestCase):
         ]
 
         url = reverse("atg:ticket-list")
+        preflight_response = self.client.post(
+            reverse("atg:readings_preflight"),
+            {
+                "store": self.store.id,
+                "readings": readings_data,
+            },
+            format="json",
+        )
+        self.assertEqual(preflight_response.status_code, status.HTTP_200_OK)
+        preflight_rows = preflight_response.json()["data"]["rows"]
+
         data = {
             "store": self.store.id,
             "image": self.image,
             "notes": "API test",
             "readings_json": json.dumps(readings_data),
+            "preflight_tokens_json": json.dumps(
+                [row["preflight_token"] for row in preflight_rows]
+            ),
+            "preflight_override_reasons_json": json.dumps({}),
         }
 
         response = self.client.post(url, data, format="multipart")
@@ -245,6 +260,80 @@ class VeederAPITestCase(APITestCase):
         self.assertEqual(ticket.notes, "API test")
         self.assertEqual(ticket.readings.count(), 1)
         self.assertEqual(ticket.readings.first().volume, 6000)
+
+    def test_ticket_create_rejects_missing_preflight_tokens(self):
+        readings_data = [
+            {
+                "tank_index": 1,
+                "fuel_type": self.fuel_type.id,
+                "volume": 6000,
+                "ullage": 800,
+                "height": 95.0,
+            }
+        ]
+        response = self.client.post(
+            reverse("atg:ticket-list"),
+            {
+                "store": self.store.id,
+                "image": self.image,
+                "readings_json": json.dumps(readings_data),
+            },
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Preflight tokens are required", str(response.data))
+
+    def test_preflight_issues_token_and_rejects_reuse(self):
+        readings_data = [
+            {
+                "tank_index": 1,
+                "fuel_type": self.fuel_type.id,
+                "volume": 6000,
+                "ullage": 800,
+                "height": 95.0,
+            }
+        ]
+
+        preflight_response = self.client.post(
+            reverse("atg:readings_preflight"),
+            {
+                "store": self.store.id,
+                "readings": readings_data,
+            },
+            format="json",
+        )
+        self.assertEqual(preflight_response.status_code, status.HTTP_200_OK)
+        token_id = preflight_response.json()["data"]["rows"][0]["preflight_token"]
+        self.assertTrue(
+            VeederReadingPreflightToken.objects.filter(id=token_id).exists()
+        )
+
+        first_response = self.client.post(
+            reverse("atg:ticket-list"),
+            {
+                "store": self.store.id,
+                "image": get_test_image(),
+                "readings_json": json.dumps(readings_data),
+                "preflight_tokens_json": json.dumps([token_id]),
+                "preflight_override_reasons_json": json.dumps({}),
+            },
+            format="multipart",
+        )
+        self.assertEqual(first_response.status_code, status.HTTP_201_CREATED)
+
+        second_response = self.client.post(
+            reverse("atg:ticket-list"),
+            {
+                "store": self.store.id,
+                "image": get_test_image(),
+                "readings_json": json.dumps(readings_data),
+                "preflight_tokens_json": json.dumps([token_id]),
+                "preflight_override_reasons_json": json.dumps({}),
+            },
+            format="multipart",
+        )
+        self.assertEqual(second_response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("already consumed", str(second_response.data))
 
     def test_ticket_viewset_create_without_store_and_image_rejected(self):
         readings_data = [

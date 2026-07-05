@@ -5,6 +5,7 @@ from django.db import transaction
 
 from ..models import VeederTicket, VeederReading
 from .auto_mapper import AutoMapperService
+from .reading_preflight import ReadingPreflightService
 from .reading_quality import validate_readings_for_store
 
 logger = logging.getLogger("webnexus")
@@ -47,7 +48,14 @@ class VeederUploadService:
 
     @staticmethod
     def process_ticket_submission(
-        user, store, image, ticket_timestamp=None, notes=None, readings_data=None
+        user,
+        store,
+        image,
+        ticket_timestamp=None,
+        notes=None,
+        readings_data=None,
+        preflight_tokens=None,
+        preflight_override_reasons=None,
     ):
         """
         Ingests a new ticket and creates its associated readings in an atomic transaction.
@@ -101,6 +109,15 @@ class VeederUploadService:
                         )
 
                     # Bulk create readings associated with the ticket
+                    if preflight_tokens is not None:
+                        ReadingPreflightService.verify_and_consume_tokens(
+                            store=store,
+                            validated_readings=serializer.validated_data,
+                            preflight_tokens=preflight_tokens,
+                            override_reasons=preflight_override_reasons or {},
+                            ticket=ticket,
+                        )
+
                     readings_to_create = []
                     for validated_reading in serializer.validated_data:
                         readings_to_create.append(

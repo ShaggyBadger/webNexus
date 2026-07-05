@@ -183,10 +183,55 @@
 
                 <div class="p-2 mb-3 mono small border" x-show="statusMessage" :class="statusClass()" x-text="statusMessage"></div>
 
+                <div class="tactical-card" x-show="hasPreflightRows" x-transition>
+                    <div class="tactical-header">
+                        <span>04_PREFLIGHT_VERIFICATION</span>
+                        <i class="fa-solid fa-shield-check"></i>
+                    </div>
+                    <div class="card-body">
+                        <template x-for="row in preflightRows" :key="row.preflight_token">
+                            <div class="border border-secondary p-2 mb-2">
+                                <div class="mono small fw-bold mb-1" x-text="'TANK ' + row.tank_index + ' // ' + row.fuel_type_name"></div>
+                                <div class="mono small text-muted-custom" x-text="'DECISION: ' + row.decision"></div>
+                                <div class="mono small text-muted-custom" x-text="'EXPECTED_GAL: ' + (row.metrics.expected_volume ?? '--')"></div>
+                                <div class="mono small text-muted-custom" x-text="'INPUT_GAL: ' + row.metrics.input_volume"></div>
+                                <div class="mono small text-muted-custom" x-text="'PERCENT_ERROR: ' + (row.metrics.percent_error ?? '--')"></div>
+
+                                <div class="form-check mt-2">
+                                    <input
+                                        class="form-check-input"
+                                        type="checkbox"
+                                        :id="'confirm-' + row.preflight_token"
+                                        x-model="confirmedTokens[row.preflight_token]"
+                                    >
+                                    <label class="form-check-label mono small" :for="'confirm-' + row.preflight_token">
+                                        CONFIRM_ROW
+                                    </label>
+                                </div>
+
+                                <div class="mt-2" x-show="row.decision === 'outside_threshold_requires_override'" x-cloak>
+                                    <label class="form-label mono small">OVERRIDE_REASON (MIN 5 CHARS)</label>
+                                    <input
+                                        type="text"
+                                        class="form-control form-control-sm mono"
+                                        x-model="overrideReasons[row.preflight_token]"
+                                        placeholder="Explain why this should be accepted"
+                                    >
+                                </div>
+                            </div>
+                        </template>
+
+                        <div class="d-grid gap-2 d-md-flex">
+                            <button type="button" class="btn btn-tactical-secondary mono fw-bold" @click="cancelPreflightReview()" :disabled="submitting">[ EDIT_VALUES ]</button>
+                            <button type="button" class="btn btn-tactical-olive mono fw-bold" @click="confirmAndTransmit()" :disabled="submitting || !canConfirmPreflight()">[ CONFIRM_AND_TRANSMIT ]</button>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="atg-action-stack mb-5" x-show.important="hasStore && step >= 2" x-cloak>
-                    <button type="submit" class="btn btn-primary btn-lg mono py-3" :disabled="submitting || !hasStore || !hasAnyReadings">
-                        <span x-show="!submitting">[ TRANSMIT_DATA ]</span>
-                        <span x-show="submitting">[ SENDING... ]</span>
+                    <button type="submit" class="btn btn-primary btn-lg mono py-3" :disabled="submitting || !hasStore || !hasAnyReadings || hasPreflightRows">
+                        <span x-show="!submitting">[ RUN_PREFLIGHT_CHECKS ]</span>
+                        <span x-show="submitting">[ VALIDATING... ]</span>
                     </button>
                     <a href="/" class="btn btn-outline-secondary btn-sm mono">[ ABORT_MISSION ]</a>
                 </div>

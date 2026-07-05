@@ -7,6 +7,7 @@ from .views.api_views import (
     StoreViewSet,
     StoreTankProfileAPIView,
     VeederQuickCaptureAPIView,
+    VeederReadingsPreflightAPIView,
 )
 from .views.review_api_views import (
     FuelTypeListAPIView,
@@ -32,6 +33,11 @@ router.register(r"stores", StoreViewSet, basename="store")
 
 
 urlpatterns = [
+    path(
+        "api/v1/readings/validate-preflight/",
+        VeederReadingsPreflightAPIView.as_view(),
+        name="readings_preflight",
+    ),
     path(
         "api/v1/tickets/quick-capture/",
         VeederQuickCaptureAPIView.as_view(),
