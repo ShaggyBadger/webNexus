@@ -197,6 +197,10 @@
                                 <div class="mono small text-muted-custom" x-text="'INPUT_GAL: ' + row.metrics.input_volume"></div>
                                 <div class="mono small text-muted-custom" x-text="'PERCENT_ERROR: ' + (row.metrics.percent_error ?? '--')"></div>
 
+                                <div class="mt-2" style="height: 220px; border: 1px solid #2a2e33; background: #121417; padding: 8px;">
+                                    <canvas :id="'preflight-chart-' + row.preflight_token"></canvas>
+                                </div>
+
                                 <div class="form-check mt-2">
                                     <input
                                         class="form-check-input"
@@ -242,5 +246,6 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="{% static 'atg/js/ticket_upload_alpine.js' %}"></script>
 {% endblock %}

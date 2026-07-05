@@ -20,6 +20,7 @@ function atgTicketUploadApp() {
     preflightReadings: [],
     overrideReasons: {},
     confirmedTokens: {},
+    preflightCharts: {},
 
     init() {
       const fuelScript = document.getElementById("fuel-types-data");
@@ -46,10 +47,100 @@ function atgTicketUploadApp() {
     },
 
     resetPreflightState() {
+      this.destroyPreflightCharts();
       this.preflightRows = [];
       this.preflightReadings = [];
       this.overrideReasons = {};
       this.confirmedTokens = {};
+    },
+
+    destroyPreflightCharts() {
+      Object.values(this.preflightCharts).forEach((chart) => {
+        if (chart && typeof chart.destroy === "function") {
+          chart.destroy();
+        }
+      });
+      this.preflightCharts = {};
+    },
+
+    renderPreflightCharts() {
+      this.destroyPreflightCharts();
+
+      if (typeof Chart !== "function") {
+        return;
+      }
+
+      this.preflightRows.forEach((row) => {
+        const canvas = document.getElementById(`preflight-chart-${row.preflight_token}`);
+        if (!canvas) {
+          return;
+        }
+
+        const historicalPoints = (row.graph?.historical_points || []).map((point) => ({
+          x: Number(point.inches),
+          y: Number(point.gallons),
+        }));
+        const candidate = row.graph?.candidate_point || {};
+
+        this.preflightCharts[row.preflight_token] = new Chart(canvas, {
+          type: "scatter",
+          data: {
+            datasets: [
+              {
+                label: "Historical",
+                data: historicalPoints,
+                backgroundColor: "#e94560",
+                pointRadius: 4,
+              },
+              {
+                label: "Candidate",
+                data: [{ x: Number(candidate.inches), y: Number(candidate.gallons) }],
+                backgroundColor: "#8da35d",
+                pointRadius: 6,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                labels: {
+                  color: "#f8f9fa",
+                },
+              },
+            },
+            scales: {
+              x: {
+                title: {
+                  display: true,
+                  text: "Height (in)",
+                  color: "#a0aec0",
+                },
+                ticks: {
+                  color: "#a0aec0",
+                },
+                grid: {
+                  color: "#2a2e33",
+                },
+              },
+              y: {
+                title: {
+                  display: true,
+                  text: "Volume (gal)",
+                  color: "#a0aec0",
+                },
+                ticks: {
+                  color: "#a0aec0",
+                },
+                grid: {
+                  color: "#2a2e33",
+                },
+              },
+            },
+          },
+        });
+      });
     },
 
     showStatus(message, type = "info") {
@@ -439,6 +530,7 @@ function atgTicketUploadApp() {
           this.confirmedTokens[row.preflight_token] = false;
           this.overrideReasons[row.preflight_token] = "";
         });
+        this.$nextTick(() => this.renderPreflightCharts());
         this.showStatus(
           "Preflight complete. Review each row and confirm before transmit.",
           "info",
