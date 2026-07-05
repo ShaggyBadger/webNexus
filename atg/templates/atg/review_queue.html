@@ -49,6 +49,26 @@
         justify-content: center;
         transform-origin: center center;
     }
+    .review-shell .review-workspace {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+    .review-shell .review-form-column {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+    .review-shell .review-image-column {
+        flex: 0 0 460px;
+        width: 460px;
+        max-width: 100%;
+    }
+    @media (max-width: 991.98px) {
+        .review-shell .review-image-column {
+            width: 100%;
+            flex: 1 1 auto;
+        }
+    }
     .review-shell [x-cloak] {
         display: none !important;
     }
@@ -61,7 +81,10 @@
 <div class="container py-4 review-shell" x-data="atgReviewQueueApp()" x-init="init()">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h2 class="mono text-primary m-0">[ ATG_REVIEW_QUEUE ]</h2>
-        <a href="{% url 'atg:veeder_list' %}" class="btn btn-tactical-secondary mono btn-sm">ARCHIVE</a>
+        <div class="d-flex gap-2">
+            <button type="button" class="btn btn-tactical-secondary mono btn-sm" @click="toggleQueueColumn()" x-text="showQueueColumn ? 'HIDE_QUEUE' : 'SHOW_QUEUE'"></button>
+            <a href="{% url 'atg:veeder_list' %}" class="btn btn-tactical-secondary mono btn-sm">ARCHIVE</a>
+        </div>
     </div>
 
     <div class="row g-3 mb-3">
@@ -88,7 +111,7 @@
     </div>
 
     <div class="row g-3">
-        <div class="col-lg-4">
+        <div class="col-lg-4" x-show="showQueueColumn" x-cloak>
             <div class="tactical-card p-3">
                 <div class="mono small text-muted-custom mb-2">QUEUE_ITEMS</div>
                 <div class="mono small text-muted-custom" x-show="loadingQueue" x-cloak>LOADING...</div>
@@ -110,14 +133,14 @@
             </div>
         </div>
 
-        <div class="col-lg-8">
+        <div :class="showQueueColumn ? 'col-12 col-lg-8' : 'col-12'">
             <div class="tactical-card p-3" x-show="selectedTicket" x-cloak>
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <div class="mono text-primary" x-text="selectedTicket ? ('TICKET ' + selectedTicket.id) : 'TICKET --'"></div>
                     <div class="mono small text-muted-custom" x-text="selectedTicket ? ('UPLOADED: ' + (selectedTicket.uploaded_at || '--')) : 'UPLOADED: --'"></div>
                 </div>
-                <div class="row g-3 align-items-start">
-                    <div class="col-lg-6 order-2 order-lg-1">
+                <div class="review-workspace flex-lg-row align-items-start">
+                    <div class="review-form-column order-2 order-lg-1">
                         <div class="row g-2 mb-3">
                             <div class="col-md-4 col-lg-12 col-xl-4">
                                 <label class="form-label mono">STORE #</label>
@@ -177,7 +200,7 @@
                         <div class="p-2 mono small border" x-show="status.message" x-cloak :class="statusClass()" x-text="status.message"></div>
                     </div>
 
-                    <div class="col-lg-6 order-1 order-lg-2">
+                    <div class="review-image-column order-1 order-lg-2">
                         <div
                             class="evidence-stage mb-2"
                             x-ref="imageStage"

@@ -1,6 +1,7 @@
 function atgReviewQueueApp() {
   return {
     queue: [],
+    showQueueColumn: true,
     selectedTicketId: null,
     selectedTicket: null,
     imageRotation: 0,
@@ -84,6 +85,10 @@ function atgReviewQueueApp() {
         return "border-success text-success bg-success bg-opacity-10";
       }
       return "border-warning text-warning bg-warning bg-opacity-10";
+    },
+
+    toggleQueueColumn() {
+      this.showQueueColumn = !this.showQueueColumn;
     },
 
     async fetchJson(url, options = {}) {
