@@ -47,100 +47,7 @@ function atgTicketUploadApp() {
     },
 
     resetPreflightState() {
-      this.destroyPreflightCharts();
-      this.preflightRows = [];
-      this.preflightReadings = [];
-      this.overrideReasons = {};
-      this.confirmedTokens = {};
-    },
-
-    destroyPreflightCharts() {
-      Object.values(this.preflightCharts).forEach((chart) => {
-        if (chart && typeof chart.destroy === "function") {
-          chart.destroy();
-        }
-      });
-      this.preflightCharts = {};
-    },
-
-    renderPreflightCharts() {
-      this.destroyPreflightCharts();
-
-      if (typeof Chart !== "function") {
-        return;
-      }
-
-      this.preflightRows.forEach((row) => {
-        const canvas = document.getElementById(`preflight-chart-${row.preflight_token}`);
-        if (!canvas) {
-          return;
-        }
-
-        const historicalPoints = (row.graph?.historical_points || []).map((point) => ({
-          x: Number(point.inches),
-          y: Number(point.gallons),
-        }));
-        const candidate = row.graph?.candidate_point || {};
-
-        this.preflightCharts[row.preflight_token] = new Chart(canvas, {
-          type: "scatter",
-          data: {
-            datasets: [
-              {
-                label: "Historical",
-                data: historicalPoints,
-                backgroundColor: "#e94560",
-                pointRadius: 4,
-              },
-              {
-                label: "Candidate",
-                data: [{ x: Number(candidate.inches), y: Number(candidate.gallons) }],
-                backgroundColor: "#8da35d",
-                pointRadius: 6,
-              },
-            ],
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-              legend: {
-                labels: {
-                  color: "#f8f9fa",
-                },
-              },
-            },
-            scales: {
-              x: {
-                title: {
-                  display: true,
-                  text: "Height (in)",
-                  color: "#a0aec0",
-                },
-                ticks: {
-                  color: "#a0aec0",
-                },
-                grid: {
-                  color: "#2a2e33",
-                },
-              },
-              y: {
-                title: {
-                  display: true,
-                  text: "Volume (gal)",
-                  color: "#a0aec0",
-                },
-                ticks: {
-                  color: "#a0aec0",
-                },
-                grid: {
-                  color: "#2a2e33",
-                },
-              },
-            },
-          },
-        });
-      });
+      window.VeederPreflightSection.reset(this);
     },
 
     showStatus(message, type = "info") {
@@ -368,22 +275,7 @@ function atgTicketUploadApp() {
     },
 
     canConfirmPreflight() {
-      if (this.preflightRows.length === 0) {
-        return false;
-      }
-
-      for (const row of this.preflightRows) {
-        if (!this.confirmedTokens[row.preflight_token]) {
-          return false;
-        }
-        if (row.decision === "outside_threshold_requires_override") {
-          const reason = `${this.overrideReasons[row.preflight_token] ?? ""}`.trim();
-          if (reason.length < 5) {
-            return false;
-          }
-        }
-      }
-      return true;
+      return window.VeederPreflightSection.canConfirm(this);
     },
 
     onKnownVolumeInput(reading) {
@@ -498,118 +390,15 @@ function atgTicketUploadApp() {
         this.showStatus(error.message, "error");
         return;
       }
-
-      this.submitting = true;
-      this.showStatus("Running preflight checks...", "info");
-
-      try {
-        const preflightResponse = await fetch("/atg/api/v1/readings/validate-preflight/", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-CSRFToken": document.querySelector('[name=csrfmiddlewaretoken]').value,
-          },
-          body: JSON.stringify({
-            store: this.selectedStore.store_pk,
-            readings,
-          }),
-        });
-
-        const preflightPayload = await preflightResponse.json();
-        if (!preflightResponse.ok) {
-          const preflightError =
-            preflightPayload?.error?.message || "Preflight validation failed.";
-          throw new Error(preflightError);
-        }
-
-        this.preflightRows = preflightPayload?.data?.rows || [];
-        this.preflightReadings = readings;
-        this.confirmedTokens = {};
-        this.overrideReasons = {};
-        this.preflightRows.forEach((row) => {
-          this.confirmedTokens[row.preflight_token] = false;
-          this.overrideReasons[row.preflight_token] = "";
-        });
-        this.$nextTick(() => this.renderPreflightCharts());
-        this.showStatus(
-          "Preflight complete. Review each row and confirm before transmit.",
-          "info",
-        );
-      } catch (error) {
-        this.showStatus(error.message, "error");
-      } finally {
-        this.submitting = false;
-      }
+      await window.VeederPreflightSection.runPreflight(this, readings);
     },
 
     async confirmAndTransmit() {
-      if (!this.canConfirmPreflight()) {
-        this.showStatus("Confirm all rows and provide required override reasons.", "error");
-        return;
-      }
-
-      this.submitting = true;
-      this.showStatus("Transmitting data package...", "info");
-
-      const formData = new FormData();
-      formData.append("store", this.selectedStore.store_pk);
-      formData.append("notes", this.notes || "");
-      if (this.ticketTimestamp) {
-        formData.append("ticket_timestamp", this.ticketTimestamp);
-      }
-      formData.append("readings_json", JSON.stringify(this.preflightReadings));
-      formData.append(
-        "preflight_tokens_json",
-        JSON.stringify(this.preflightRows.map((row) => row.preflight_token)),
-      );
-      formData.append("preflight_override_reasons_json", JSON.stringify(this.overrideReasons));
-
-      try {
-        const response = await fetch("/atg/api/v1/tickets/", {
-          method: "POST",
-          headers: {
-            "X-CSRFToken": document.querySelector('[name=csrfmiddlewaretoken]').value,
-          },
-          body: formData,
-        });
-
-        const rawText = await response.text();
-        let result = {};
-        if (rawText) {
-          try {
-            result = JSON.parse(rawText);
-          } catch (error) {
-            result = { error: rawText };
-          }
-        }
-
-        if (!response.ok) {
-          let errMsg = "Transmission failed.";
-          if (typeof result.error === "string") {
-            errMsg = result.error;
-          } else if (result.error?.message) {
-            errMsg = result.error.message;
-          } else if (result.error) {
-            errMsg = JSON.stringify(result.error);
-          }
-          throw new Error(errMsg);
-        }
-
-        this.showStatus("Mission complete. Ticket ingested successfully.", "success");
-        this.resetPreflightState();
-        setTimeout(() => {
-          window.location.href = "/";
-        }, 1400);
-      } catch (error) {
-        this.showStatus(error.message, "error");
-      } finally {
-        this.submitting = false;
-      }
+      await window.VeederPreflightSection.confirmAndTransmit(this);
     },
 
     cancelPreflightReview() {
-      this.resetPreflightState();
-      this.showStatus("Preflight review dismissed. You can edit values and re-run.", "info");
+      window.VeederPreflightSection.cancelReview(this);
     },
   };
 }

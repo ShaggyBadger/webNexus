@@ -69,6 +69,7 @@ class ReadingPreflightService:
                     "threshold_percent": analysis["threshold_percent"],
                     "metrics": analysis["metrics"],
                     "graph": analysis["graph"],
+                    "tank_mapping_id": analysis["tank_mapping_id"],
                     "preflight_token": token.id,
                     "expires_at": expires_at.isoformat(),
                 }
@@ -175,7 +176,7 @@ class ReadingPreflightService:
             for height, volume in history_qs.values_list("height", "volume")[:40]
         ]
 
-        expected_volume, source = cls._expected_volume(
+        expected_volume, source, tank_mapping_id = cls._expected_volume(
             store=store,
             fuel_key=fuel_key,
             tank_index=tank_index,
@@ -222,6 +223,7 @@ class ReadingPreflightService:
                     "gallons": input_volume,
                 },
             },
+            "tank_mapping_id": tank_mapping_id,
         }
 
     @classmethod
@@ -234,7 +236,7 @@ class ReadingPreflightService:
         input_height: float,
         water_inches: float,
         history_qs,
-    ) -> tuple[float | None, str]:
+    ) -> tuple[float | None, str, int | None]:
         mapping = (
             StoreTankMapping.objects.filter(
                 store=store,
@@ -273,7 +275,11 @@ class ReadingPreflightService:
                     float(estimation.length),
                     water_inches,
                 )
-            return max(total_volume - water_volume, 0.0), "estimation_geometry"
+            return (
+                max(total_volume - water_volume, 0.0),
+                "estimation_geometry",
+                mapping.id if mapping else None,
+            )
 
         history_capacity = [
             float(volume)
@@ -281,6 +287,10 @@ class ReadingPreflightService:
             if volume is not None
         ]
         if history_capacity:
-            return float(median(history_capacity)), "history_fallback"
+            return (
+                float(median(history_capacity)),
+                "history_fallback",
+                mapping.id if mapping else None,
+            )
 
-        return None, "bootstrap"
+        return None, "bootstrap", mapping.id if mapping else None
