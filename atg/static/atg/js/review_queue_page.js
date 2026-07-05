@@ -96,8 +96,13 @@ function atgReviewQueueApp() {
       }
 
       if (!response.ok) {
-        const message =
+        const baseMessage =
           payload?.error?.message || payload?.error || "Request failed.";
+        const details = payload?.error?.details;
+        const message =
+          details && Object.keys(details).length > 0
+            ? `${baseMessage} ${JSON.stringify(details)}`
+            : baseMessage;
         throw new Error(message);
       }
 
@@ -222,8 +227,93 @@ function atgReviewQueueApp() {
       this.form.readings.splice(index, 1);
     },
 
+    buildFinalizeReadings() {
+      const normalized = [];
+      const seenTankIndices = new Set();
+
+      const isBlank = (reading) => {
+        return (
+          `${reading.tank_index ?? ""}`.trim() === "" &&
+          `${reading.fuel_type ?? ""}`.trim() === "" &&
+          `${reading.volume ?? ""}`.trim() === "" &&
+          `${reading.ullage ?? ""}`.trim() === "" &&
+          `${reading.height ?? ""}`.trim() === "" &&
+          `${reading.temp ?? ""}`.trim() === "" &&
+          `${reading.water ?? ""}`.trim() === ""
+        );
+      };
+
+      for (const reading of this.form.readings) {
+        if (isBlank(reading)) {
+          continue;
+        }
+
+        const tankIndex = Number(reading.tank_index);
+        const fuelType = Number(reading.fuel_type);
+        const volume = Number(reading.volume);
+        const ullage = Number(reading.ullage);
+        const height = Number(reading.height);
+
+        if (
+          !tankIndex ||
+          !fuelType ||
+          Number.isNaN(volume) ||
+          Number.isNaN(ullage) ||
+          Number.isNaN(height)
+        ) {
+          throw new Error(
+            "Each reading must include tank, fuel, volume, ullage, and height.",
+          );
+        }
+
+        if (seenTankIndices.has(tankIndex)) {
+          throw new Error(`Duplicate tank index ${tankIndex} detected.`);
+        }
+        seenTankIndices.add(tankIndex);
+
+        const tempRaw = `${reading.temp ?? ""}`.trim();
+        const waterRaw = `${reading.water ?? ""}`.trim();
+        const tempValue = tempRaw === "" ? null : Number(tempRaw);
+        const waterValue = waterRaw === "" ? null : Number(waterRaw);
+
+        if (tempValue !== null && Number.isNaN(tempValue)) {
+          throw new Error(`Temp must be numeric for tank ${tankIndex}.`);
+        }
+        if (waterValue !== null && Number.isNaN(waterValue)) {
+          throw new Error(`Water must be numeric for tank ${tankIndex}.`);
+        }
+
+        normalized.push({
+          tank_index: tankIndex,
+          fuel_type: fuelType,
+          volume,
+          ullage,
+          height,
+          temp: tempValue,
+          water: waterValue,
+          raw_line_text: `${reading.raw_line_text ?? ""}`,
+          confidence_score: 1.0,
+          is_user_corrected: true,
+        });
+      }
+
+      if (normalized.length === 0) {
+        throw new Error("At least one non-empty reading is required.");
+      }
+
+      return normalized;
+    },
+
     async finalizeTicket() {
       if (!this.selectedTicketId) {
+        return;
+      }
+
+      let readings = [];
+      try {
+        readings = this.buildFinalizeReadings();
+      } catch (error) {
+        this.showStatus(error.message, "error");
         return;
       }
 
@@ -235,7 +325,7 @@ function atgReviewQueueApp() {
           store_num: `${this.form.storeNum ?? ""}`.trim(),
           ticket_timestamp: `${this.form.ticketTimestamp ?? ""}`.trim(),
           notes: `${this.form.notes ?? ""}`.trim(),
-          readings: this.form.readings,
+          readings,
         };
 
         await this.fetchJson(`/atg/api/v1/review-queue/${this.selectedTicketId}/finalize/`, {

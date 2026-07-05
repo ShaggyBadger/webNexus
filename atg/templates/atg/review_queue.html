@@ -116,88 +116,93 @@
                     <div class="mono text-primary" x-text="selectedTicket ? ('TICKET ' + selectedTicket.id) : 'TICKET --'"></div>
                     <div class="mono small text-muted-custom" x-text="selectedTicket ? ('UPLOADED: ' + (selectedTicket.uploaded_at || '--')) : 'UPLOADED: --'"></div>
                 </div>
-
-                <div
-                    class="evidence-stage mb-2"
-                    x-ref="imageStage"
-                    x-show="selectedTicket && selectedTicket.image_url"
-                    x-cloak
-                >
-                    <div class="evidence-canvas" x-ref="imageCanvas">
-                        <img
-                            class="evidence-image"
-                            :src="selectedTicket ? selectedTicket.image_url : ''"
-                            alt="Ticket evidence"
-                            :style="'transform: rotate(' + imageRotation + 'deg);'"
-                        >
-                    </div>
-                </div>
-
-                <div class="d-flex gap-2 mb-3" x-show="selectedTicket && selectedTicket.image_url" x-cloak>
-                    <button type="button" class="btn btn-tactical-secondary mono btn-sm" @click="rotateImageLeft()">ROTATE_LEFT</button>
-                    <button type="button" class="btn btn-tactical-secondary mono btn-sm" @click="rotateImageRight()">ROTATE_RIGHT</button>
-                    <button type="button" class="btn btn-tactical-secondary mono btn-sm" @click="zoomOutImage()">ZOOM_OUT</button>
-                    <button type="button" class="btn btn-tactical-secondary mono btn-sm" @click="zoomInImage()">ZOOM_IN</button>
-                    <button type="button" class="btn btn-tactical-secondary mono btn-sm" @click="resetImageView()">RESET_VIEW</button>
-                </div>
-
-                <div class="row g-2 mb-3">
-                    <div class="col-md-4">
-                        <label class="form-label mono">STORE #</label>
-                        <input class="form-control mono" x-model="form.storeNum" inputmode="numeric" pattern="[0-9]*" type="text">
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label mono">TICKET TIMESTAMP</label>
-                        <input class="form-control mono" x-model="form.ticketTimestamp" type="datetime-local">
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label mono">NOTES</label>
-                        <input class="form-control mono" x-model="form.notes" type="text">
-                    </div>
-                </div>
-
-                <template x-for="(reading, idx) in form.readings" :key="idx">
-                    <div class="border border-secondary p-2 mb-2">
-                        <div class="row g-2">
-                            <div class="col-md-2 col-6">
-                                <label class="form-label mono">TANK</label>
-                                <input class="form-control mono" x-model="reading.tank_index" inputmode="numeric" pattern="[0-9]*" type="number" min="1">
+                <div class="row g-3 align-items-start">
+                    <div class="col-lg-6 order-2 order-lg-1">
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-4 col-lg-12 col-xl-4">
+                                <label class="form-label mono">STORE #</label>
+                                <input class="form-control mono" x-model="form.storeNum" inputmode="numeric" pattern="[0-9]*" type="text">
                             </div>
-                            <div class="col-md-3 col-6">
-                                <label class="form-label mono">FUEL</label>
-                                <select class="form-select mono" x-model="reading.fuel_type">
-                                    <option value="">--SELECT--</option>
-                                    <template x-for="fuel in fuelTypes" :key="fuel.id">
-                                        <option :value="fuel.id" x-text="fuel.name.toUpperCase()"></option>
-                                    </template>
-                                </select>
+                            <div class="col-md-4 col-lg-12 col-xl-4">
+                                <label class="form-label mono">TICKET TIMESTAMP</label>
+                                <input class="form-control mono" x-model="form.ticketTimestamp" type="datetime-local">
                             </div>
-                            <div class="col-md-2 col-4">
-                                <label class="form-label mono">VOLUME</label>
-                                <input class="form-control mono" x-model="reading.volume" type="number" inputmode="numeric">
-                            </div>
-                            <div class="col-md-2 col-4">
-                                <label class="form-label mono">ULLAGE</label>
-                                <input class="form-control mono" x-model="reading.ullage" type="number" inputmode="numeric">
-                            </div>
-                            <div class="col-md-2 col-4">
-                                <label class="form-label mono">HEIGHT</label>
-                                <input class="form-control mono" x-model="reading.height" type="number" step="any" inputmode="decimal">
-                            </div>
-                            <div class="col-md-1 col-12 d-grid">
-                                <label class="form-label mono">&nbsp;</label>
-                                <button type="button" class="btn btn-tactical-danger mono" @click="removeReading(idx)">X</button>
+                            <div class="col-md-4 col-lg-12 col-xl-4">
+                                <label class="form-label mono">NOTES</label>
+                                <input class="form-control mono" x-model="form.notes" type="text">
                             </div>
                         </div>
+
+                        <template x-for="(reading, idx) in form.readings" :key="idx">
+                            <div class="border border-secondary p-2 mb-2">
+                                <div class="row g-2">
+                                    <div class="col-md-2 col-6">
+                                        <label class="form-label mono">TANK</label>
+                                        <input class="form-control mono" x-model="reading.tank_index" inputmode="numeric" pattern="[0-9]*" type="number" min="1">
+                                    </div>
+                                    <div class="col-md-3 col-6">
+                                        <label class="form-label mono">FUEL</label>
+                                        <select class="form-select mono" x-model="reading.fuel_type">
+                                            <option value="">--SELECT--</option>
+                                            <template x-for="fuel in fuelTypes" :key="fuel.id">
+                                                <option :value="fuel.id" x-text="fuel.name.toUpperCase()"></option>
+                                            </template>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-2 col-4">
+                                        <label class="form-label mono">VOLUME</label>
+                                        <input class="form-control mono" x-model="reading.volume" type="number" inputmode="numeric">
+                                    </div>
+                                    <div class="col-md-2 col-4">
+                                        <label class="form-label mono">ULLAGE</label>
+                                        <input class="form-control mono" x-model="reading.ullage" type="number" inputmode="numeric">
+                                    </div>
+                                    <div class="col-md-2 col-4">
+                                        <label class="form-label mono">HEIGHT</label>
+                                        <input class="form-control mono" x-model="reading.height" type="number" step="any" inputmode="decimal">
+                                    </div>
+                                    <div class="col-md-1 col-12 d-grid">
+                                        <label class="form-label mono">&nbsp;</label>
+                                        <button type="button" class="btn btn-tactical-danger mono" @click="removeReading(idx)">X</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+
+                        <div class="d-grid gap-2 d-md-flex mb-3">
+                            <button type="button" class="btn btn-tactical-amber mono fw-bold" @click="addReading()">ADD_READING</button>
+                            <button type="button" class="btn btn-tactical-olive mono fw-bold" @click="finalizeTicket()" :disabled="saving">FINALIZE_TICKET</button>
+                        </div>
+
+                        <div class="p-2 mono small border" x-show="status.message" x-cloak :class="statusClass()" x-text="status.message"></div>
                     </div>
-                </template>
 
-                <div class="d-grid gap-2 d-md-flex mb-3">
-                    <button type="button" class="btn btn-tactical-amber mono fw-bold" @click="addReading()">ADD_READING</button>
-                    <button type="button" class="btn btn-tactical-olive mono fw-bold" @click="finalizeTicket()" :disabled="saving">FINALIZE_TICKET</button>
+                    <div class="col-lg-6 order-1 order-lg-2">
+                        <div
+                            class="evidence-stage mb-2"
+                            x-ref="imageStage"
+                            x-show="selectedTicket && selectedTicket.image_url"
+                            x-cloak
+                        >
+                            <div class="evidence-canvas" x-ref="imageCanvas">
+                                <img
+                                    class="evidence-image"
+                                    :src="selectedTicket ? selectedTicket.image_url : ''"
+                                    alt="Ticket evidence"
+                                    :style="'transform: rotate(' + imageRotation + 'deg);'"
+                                >
+                            </div>
+                        </div>
+
+                        <div class="d-flex flex-wrap gap-2" x-show="selectedTicket && selectedTicket.image_url" x-cloak>
+                            <button type="button" class="btn btn-tactical-secondary mono btn-sm" @click="rotateImageLeft()">ROTATE_LEFT</button>
+                            <button type="button" class="btn btn-tactical-secondary mono btn-sm" @click="rotateImageRight()">ROTATE_RIGHT</button>
+                            <button type="button" class="btn btn-tactical-secondary mono btn-sm" @click="zoomOutImage()">ZOOM_OUT</button>
+                            <button type="button" class="btn btn-tactical-secondary mono btn-sm" @click="zoomInImage()">ZOOM_IN</button>
+                            <button type="button" class="btn btn-tactical-secondary mono btn-sm" @click="resetImageView()">RESET_VIEW</button>
+                        </div>
+                    </div>
                 </div>
-
-                <div class="p-2 mono small border" x-show="status.message" x-cloak :class="statusClass()" x-text="status.message"></div>
             </div>
             <div class="tactical-card p-3 mono text-muted-custom" x-show="!selectedTicket" x-cloak>
                 SELECT A TICKET TO BEGIN REVIEW.
