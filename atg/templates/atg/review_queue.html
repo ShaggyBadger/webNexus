@@ -39,6 +39,12 @@
         align-items: center;
         justify-content: center;
         padding: 8px;
+        user-select: none;
+        touch-action: none;
+        cursor: grab;
+    }
+    .review-shell .evidence-stage.panning {
+        cursor: grabbing;
     }
     .review-shell [x-cloak] {
         display: none !important;
@@ -108,12 +114,22 @@
                     <div class="mono small text-muted-custom" x-text="'UPLOADED: ' + (selectedTicket.uploaded_at || '--')"></div>
                 </div>
 
-                <div class="evidence-stage mb-2" x-show="selectedTicket.image_url" x-cloak>
+                <div
+                    class="evidence-stage mb-2"
+                    :class="isImagePanning ? 'panning' : ''"
+                    @pointerdown="startImagePan($event)"
+                    @pointermove="moveImagePan($event)"
+                    @pointerup="endImagePan()"
+                    @pointerleave="endImagePan()"
+                    @pointercancel="endImagePan()"
+                    x-show="selectedTicket.image_url"
+                    x-cloak
+                >
                     <img
                         class="evidence-image"
                         :src="selectedTicket.image_url"
                         alt="Ticket evidence"
-                        :style="'transform: rotate(' + imageRotation + 'deg) scale(' + imageZoom + ');'"
+                        :style="'transform: translate(' + imagePanX + 'px, ' + imagePanY + 'px) rotate(' + imageRotation + 'deg) scale(' + imageZoom + ');'"
                     >
                 </div>
 

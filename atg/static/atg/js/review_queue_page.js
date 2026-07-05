@@ -5,6 +5,11 @@ function atgReviewQueueApp() {
     selectedTicket: null,
     imageRotation: 0,
     imageZoom: 1,
+    imagePanX: 0,
+    imagePanY: 0,
+    isImagePanning: false,
+    imagePointerX: 0,
+    imagePointerY: 0,
     fuelTypes: [],
     loadingQueue: false,
     saving: false,
@@ -104,6 +109,9 @@ function atgReviewQueueApp() {
       this.selectedTicketId = ticketId;
       this.imageRotation = 0;
       this.imageZoom = 1;
+      this.imagePanX = 0;
+      this.imagePanY = 0;
+      this.isImagePanning = false;
       try {
         const data = await this.fetchJson(`/atg/api/v1/review-queue/${ticketId}/`);
         this.selectedTicket = data.ticket;
@@ -152,6 +160,36 @@ function atgReviewQueueApp() {
     resetImageView() {
       this.imageRotation = 0;
       this.imageZoom = 1;
+      this.imagePanX = 0;
+      this.imagePanY = 0;
+      this.isImagePanning = false;
+    },
+
+    startImagePan(event) {
+      if (this.imageZoom <= 1) {
+        return;
+      }
+      this.isImagePanning = true;
+      this.imagePointerX = event.clientX;
+      this.imagePointerY = event.clientY;
+    },
+
+    moveImagePan(event) {
+      if (!this.isImagePanning) {
+        return;
+      }
+
+      const deltaX = event.clientX - this.imagePointerX;
+      const deltaY = event.clientY - this.imagePointerY;
+
+      this.imagePanX += deltaX;
+      this.imagePanY += deltaY;
+      this.imagePointerX = event.clientX;
+      this.imagePointerY = event.clientY;
+    },
+
+    endImagePan() {
+      this.isImagePanning = false;
     },
 
     addReading() {
