@@ -3,6 +3,7 @@ function atgReviewQueueApp() {
     queue: [],
     selectedTicketId: null,
     selectedTicket: null,
+    imageRotation: 0,
     fuelTypes: [],
     loadingQueue: false,
     saving: false,
@@ -100,6 +101,7 @@ function atgReviewQueueApp() {
 
     async selectTicket(ticketId) {
       this.selectedTicketId = ticketId;
+      this.imageRotation = 0;
       try {
         const data = await this.fetchJson(`/atg/api/v1/review-queue/${ticketId}/`);
         this.selectedTicket = data.ticket;
@@ -127,6 +129,14 @@ function atgReviewQueueApp() {
       } catch (error) {
         this.showStatus(error.message, "error");
       }
+    },
+
+    rotateImageLeft() {
+      this.imageRotation = (this.imageRotation - 90) % 360;
+    },
+
+    rotateImageRight() {
+      this.imageRotation = (this.imageRotation + 90) % 360;
     },
 
     addReading() {

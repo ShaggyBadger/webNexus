@@ -26,6 +26,8 @@
         object-fit: contain;
         border: 1px solid #2a2e33;
         background: #121417;
+        transform-origin: center center;
+        transition: transform 0.2s ease;
     }
     .review-shell [x-cloak] {
         display: none !important;
@@ -95,7 +97,19 @@
                     <div class="mono small text-muted-custom" x-text="'UPLOADED: ' + (selectedTicket.uploaded_at || '--')"></div>
                 </div>
 
-                <img class="evidence-image mb-3" :src="selectedTicket.image_url" alt="Ticket evidence" x-show="selectedTicket.image_url" x-cloak>
+                <img
+                    class="evidence-image mb-2"
+                    :src="selectedTicket.image_url"
+                    alt="Ticket evidence"
+                    :style="'transform: rotate(' + imageRotation + 'deg);'"
+                    x-show="selectedTicket.image_url"
+                    x-cloak
+                >
+
+                <div class="d-flex gap-2 mb-3" x-show="selectedTicket.image_url" x-cloak>
+                    <button type="button" class="btn btn-tactical-secondary mono btn-sm" @click="rotateImageLeft()">ROTATE_LEFT</button>
+                    <button type="button" class="btn btn-tactical-secondary mono btn-sm" @click="rotateImageRight()">ROTATE_RIGHT</button>
+                </div>
 
                 <div class="row g-2 mb-3">
                     <div class="col-md-4">
