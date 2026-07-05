@@ -15,6 +15,7 @@ from tankgauge.models import Store
 from ..models import VeederReading, VeederTicket
 from ..serializers.reading_serializers import VeederReadingSerializer
 from ..services.auto_mapper import AutoMapperService
+from ..services.reading_preflight import ReadingPreflightService
 from ..services.reading_quality import validate_readings_for_store
 
 
@@ -233,71 +234,102 @@ class VeederReviewQueueFinalizeAPIView(APIView):
                 except (TypeError, ValueError):
                     readings_raw = None
 
-            if not isinstance(readings_raw, list) or not readings_raw:
-                return self._error(
-                    code="readings_required",
-                    message="At least one reading is required to finalize.",
-                )
-
-            serializer = VeederReadingSerializer(data=readings_raw, many=True)
-            if not serializer.is_valid():
-                return self._error(
-                    code="reading_validation_error",
-                    message="One or more readings are invalid.",
-                    details=serializer.errors,
-                )
-
-            tank_indices = [row.get("tank_index") for row in serializer.validated_data]
-            if len(tank_indices) != len(set(tank_indices)):
-                return self._error(
-                    code="duplicate_tank_index",
-                    message="Duplicate tank indices are not allowed.",
-                )
-
-            quality_errors = validate_readings_for_store(
-                ticket.store, serializer.validated_data
+        if not isinstance(readings_raw, list) or not readings_raw:
+            return self._error(
+                code="readings_required",
+                message="At least one reading is required to finalize.",
             )
-            if quality_errors:
-                return self._error(
-                    code="reading_quality_error",
-                    message="Submitted readings failed store quality checks.",
-                    details={"errors": quality_errors},
+
+        preflight_tokens_raw = request.data.get("preflight_tokens")
+        if isinstance(preflight_tokens_raw, str):
+            try:
+                preflight_tokens_raw = json.loads(preflight_tokens_raw)
+            except (TypeError, ValueError):
+                preflight_tokens_raw = None
+
+        preflight_override_reasons_raw = request.data.get("preflight_override_reasons")
+        if isinstance(preflight_override_reasons_raw, str):
+            try:
+                preflight_override_reasons_raw = json.loads(
+                    preflight_override_reasons_raw
                 )
+            except (TypeError, ValueError):
+                preflight_override_reasons_raw = None
 
-            ticket.save()
-            ticket.readings.all().delete()
+        if not isinstance(preflight_tokens_raw, list) or not preflight_tokens_raw:
+            return self._error(
+                code="preflight_tokens_required",
+                message="Preflight tokens are required before finalize.",
+            )
 
-            mappings = set()
-            for validated in serializer.validated_data:
-                VeederReading.objects.create(
-                    ticket=ticket,
-                    tank_index=validated.get("tank_index"),
-                    fuel_type=validated.get("fuel_type"),
-                    volume=validated.get("volume"),
-                    ullage=validated.get("ullage"),
-                    height=validated.get("height"),
-                    temp=validated.get("temp"),
-                    water=validated.get("water"),
-                    raw_line_text=validated.get("raw_line_text"),
-                    confidence_score=validated.get("confidence_score", 1.0),
-                    is_user_corrected=True,
-                )
-                mappings.add(
-                    (validated.get("tank_index"), validated.get("fuel_type").name)
-                )
+        if not isinstance(preflight_override_reasons_raw, dict):
+            preflight_override_reasons_raw = {}
 
-            def run_auto_mapping() -> None:
-                for tank_index, fuel_name in sorted(mappings):
-                    try:
-                        AutoMapperService.trigger_updates(
-                            ticket.store, fuel_name, tank_index
-                        )
-                    except Exception:
-                        pass
+        serializer = VeederReadingSerializer(data=readings_raw, many=True)
+        if not serializer.is_valid():
+            return self._error(
+                code="reading_validation_error",
+                message="One or more readings are invalid.",
+                details=serializer.errors,
+            )
 
-            transaction.on_commit(run_auto_mapping)
+        tank_indices = [row.get("tank_index") for row in serializer.validated_data]
+        if len(tank_indices) != len(set(tank_indices)):
+            return self._error(
+                code="duplicate_tank_index",
+                message="Duplicate tank indices are not allowed.",
+            )
 
-            readings_count = len(serializer.validated_data)
+        quality_errors = validate_readings_for_store(
+            ticket.store, serializer.validated_data
+        )
+        if quality_errors:
+            return self._error(
+                code="reading_quality_error",
+                message="Submitted readings failed store quality checks.",
+                details={"errors": quality_errors},
+            )
+
+        ReadingPreflightService.verify_and_consume_tokens(
+            store=ticket.store,
+            validated_readings=serializer.validated_data,
+            preflight_tokens=preflight_tokens_raw,
+            override_reasons=preflight_override_reasons_raw,
+            ticket=ticket,
+        )
+
+        ticket.save()
+        ticket.readings.all().delete()
+
+        mappings = set()
+        for validated in serializer.validated_data:
+            VeederReading.objects.create(
+                ticket=ticket,
+                tank_index=validated.get("tank_index"),
+                fuel_type=validated.get("fuel_type"),
+                volume=validated.get("volume"),
+                ullage=validated.get("ullage"),
+                height=validated.get("height"),
+                temp=validated.get("temp"),
+                water=validated.get("water"),
+                raw_line_text=validated.get("raw_line_text"),
+                confidence_score=validated.get("confidence_score", 1.0),
+                is_user_corrected=True,
+            )
+            mappings.add((validated.get("tank_index"), validated.get("fuel_type").name))
+
+        def run_auto_mapping() -> None:
+            for tank_index, fuel_name in sorted(mappings):
+                try:
+                    AutoMapperService.trigger_updates(
+                        ticket.store, fuel_name, tank_index
+                    )
+                except Exception:
+                    pass
+
+        transaction.on_commit(run_auto_mapping)
+
+        readings_count = len(serializer.validated_data)
 
         return Response(
             {

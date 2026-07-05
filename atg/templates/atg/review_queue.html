@@ -194,7 +194,46 @@
 
                         <div class="d-grid gap-2 d-md-flex mb-3">
                             <button type="button" class="btn btn-tactical-amber mono fw-bold" @click="addReading()">ADD_READING</button>
-                            <button type="button" class="btn btn-tactical-olive mono fw-bold" @click="finalizeTicket()" :disabled="saving">FINALIZE_TICKET</button>
+                            <button type="button" class="btn btn-tactical-olive mono fw-bold" @click="finalizeTicket()" :disabled="saving || (hasPreflightRows && !canConfirmPreflight())" x-text="hasPreflightRows ? 'CONFIRM_AND_FINALIZE' : 'RUN_PREFLIGHT'"></button>
+                        </div>
+
+                        <div class="tactical-card p-2 mb-3" x-show="hasPreflightRows" x-cloak>
+                            <div class="mono small text-primary mb-2">PREFLIGHT_VERIFICATION</div>
+                            <template x-for="row in preflightRows" :key="row.preflight_token">
+                                <div class="border border-secondary p-2 mb-2">
+                                    <div class="mono small fw-bold" x-text="'TANK ' + row.tank_index + ' // ' + row.fuel_type_name"></div>
+                                    <div class="mono small text-muted-custom" x-text="'DECISION: ' + row.decision"></div>
+                                    <div class="mono small text-muted-custom" x-text="'EXPECTED_GAL: ' + (row.metrics.expected_volume ?? '--')"></div>
+                                    <div class="mono small text-muted-custom" x-text="'INPUT_GAL: ' + row.metrics.input_volume"></div>
+                                    <div class="mono small text-muted-custom" x-text="'PERCENT_ERROR: ' + (row.metrics.percent_error ?? '--')"></div>
+
+                                    <div class="mt-2" style="height: 220px; border: 1px solid #2a2e33; background: #121417; padding: 8px;">
+                                        <canvas :id="'preflight-chart-' + row.preflight_token"></canvas>
+                                    </div>
+
+                                    <div class="form-check mt-2">
+                                        <input
+                                            class="form-check-input"
+                                            type="checkbox"
+                                            :id="'review-confirm-' + row.preflight_token"
+                                            x-model="confirmedTokens[row.preflight_token]"
+                                        >
+                                        <label class="form-check-label mono small" :for="'review-confirm-' + row.preflight_token">
+                                            CONFIRM_ROW
+                                        </label>
+                                    </div>
+
+                                    <div class="mt-2" x-show="row.decision === 'outside_threshold_requires_override'" x-cloak>
+                                        <label class="form-label mono small">OVERRIDE_REASON (MIN 5 CHARS)</label>
+                                        <input
+                                            type="text"
+                                            class="form-control form-control-sm mono"
+                                            x-model="overrideReasons[row.preflight_token]"
+                                            placeholder="Explain why this should be accepted"
+                                        >
+                                    </div>
+                                </div>
+                            </template>
                         </div>
 
                         <div class="p-2 mono small border" x-show="status.message" x-cloak :class="statusClass()" x-text="status.message"></div>
@@ -236,6 +275,8 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{% static 'atg/js/modules/veeder_graph_section.js' %}"></script>
 <script src="https://cdn.jsdelivr.net/npm/@panzoom/panzoom@4.6.0/dist/panzoom.min.js"></script>
 <script src="{% static 'atg/js/review_queue_page.js' %}"></script>
 {% endblock %}

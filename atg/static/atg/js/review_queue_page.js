@@ -26,6 +26,11 @@ function atgReviewQueueApp() {
       type: "info",
       message: "",
     },
+    preflightRows: [],
+    preflightReadings: [],
+    overrideReasons: {},
+    confirmedTokens: {},
+    preflightCharts: {},
 
     init() {
       const fuelScript = document.getElementById("review-fuel-types-data");
@@ -75,6 +80,40 @@ function atgReviewQueueApp() {
 
     showStatus(message, type = "info") {
       this.status = { message, type };
+    },
+
+    resetPreflightState() {
+      if (window.VeederGraphSection) {
+        window.VeederGraphSection.destroyCharts(this);
+      }
+      this.preflightRows = [];
+      this.preflightReadings = [];
+      this.overrideReasons = {};
+      this.confirmedTokens = {};
+    },
+
+    get hasPreflightRows() {
+      return this.preflightRows.length > 0;
+    },
+
+    canConfirmPreflight() {
+      if (this.preflightRows.length === 0) {
+        return false;
+      }
+
+      for (const row of this.preflightRows) {
+        if (!this.confirmedTokens[row.preflight_token]) {
+          return false;
+        }
+        if (row.decision === "outside_threshold_requires_override") {
+          const reason = `${this.overrideReasons[row.preflight_token] ?? ""}`.trim();
+          if (reason.length < 5) {
+            return false;
+          }
+        }
+      }
+
+      return true;
     },
 
     statusClass() {
@@ -142,6 +181,7 @@ function atgReviewQueueApp() {
           this.selectedTicketId = null;
           this.selectedTicket = null;
           this.form.readings = [];
+          this.resetPreflightState();
         }
       } catch (error) {
         this.showStatus(error.message, "error");
@@ -154,6 +194,7 @@ function atgReviewQueueApp() {
       this.selectedTicketId = ticketId;
       this.imageRotation = 0;
       this.destroyPanzoom();
+      this.resetPreflightState();
       try {
         const data = await this.fetchJson(`/atg/api/v1/review-queue/${ticketId}/`);
         this.selectedTicket = data.ticket;
@@ -230,6 +271,58 @@ function atgReviewQueueApp() {
 
     removeReading(index) {
       this.form.readings.splice(index, 1);
+    },
+
+    async resolveStorePkForPreflight(storeNumRaw) {
+      const response = await fetch(`/atg/api/v1/stores/?search=${encodeURIComponent(storeNumRaw)}`);
+      if (!response.ok) {
+        throw new Error("Unable to resolve store for preflight.");
+      }
+
+      const stores = await response.json();
+      const match = (stores || []).find(
+        (item) => `${item.store_num}` === `${storeNumRaw}`,
+      );
+      if (!match?.store_pk) {
+        throw new Error("Store not found for preflight checks.");
+      }
+      return match.store_pk;
+    },
+
+    async runFinalizePreflight(readings) {
+      const storeNumRaw = `${this.form.storeNum ?? ""}`.trim();
+      if (!storeNumRaw) {
+        throw new Error("Store number is required before preflight.");
+      }
+
+      const storePk = await this.resolveStorePkForPreflight(storeNumRaw);
+      const payload = await this.fetchJson("/atg/api/v1/readings/validate-preflight/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken":
+            document.querySelector('meta[name="csrf-token"]')?.content || "",
+        },
+        body: JSON.stringify({
+          store: storePk,
+          readings,
+        }),
+      });
+
+      this.preflightRows = payload?.rows || [];
+      this.preflightReadings = readings;
+      this.confirmedTokens = {};
+      this.overrideReasons = {};
+      this.preflightRows.forEach((row) => {
+        this.confirmedTokens[row.preflight_token] = false;
+        this.overrideReasons[row.preflight_token] = "";
+      });
+
+      this.$nextTick(() => {
+        if (window.VeederGraphSection) {
+          window.VeederGraphSection.renderCharts(this);
+        }
+      });
     },
 
     buildFinalizeReadings() {
@@ -322,15 +415,50 @@ function atgReviewQueueApp() {
         return;
       }
 
+      if (this.hasPreflightRows) {
+        const currentShape = JSON.stringify(readings);
+        const preflightShape = JSON.stringify(this.preflightReadings);
+        if (currentShape !== preflightShape) {
+          this.resetPreflightState();
+          this.showStatus(
+            "Readings changed after preflight. Run preflight again.",
+            "error",
+          );
+          return;
+        }
+
+        if (!this.canConfirmPreflight()) {
+          this.showStatus(
+            "Confirm all preflight rows and provide override reasons where required.",
+            "error",
+          );
+          return;
+        }
+      }
+
       this.saving = true;
-      this.showStatus("Finalizing ticket...", "info");
+      this.showStatus(
+        this.hasPreflightRows ? "Finalizing ticket..." : "Running preflight...",
+        "info",
+      );
 
       try {
+        if (!this.hasPreflightRows) {
+          await this.runFinalizePreflight(readings);
+          this.showStatus(
+            "Preflight complete. Confirm each row, then finalize.",
+            "info",
+          );
+          return;
+        }
+
         const payload = {
           store_num: `${this.form.storeNum ?? ""}`.trim(),
           ticket_timestamp: `${this.form.ticketTimestamp ?? ""}`.trim(),
           notes: `${this.form.notes ?? ""}`.trim(),
-          readings,
+          readings: this.preflightReadings,
+          preflight_tokens: this.preflightRows.map((row) => row.preflight_token),
+          preflight_override_reasons: this.overrideReasons,
         };
 
         await this.fetchJson(`/atg/api/v1/review-queue/${this.selectedTicketId}/finalize/`, {
@@ -344,6 +472,7 @@ function atgReviewQueueApp() {
         });
 
         this.showStatus("Ticket finalized successfully.", "success");
+        this.resetPreflightState();
         await this.loadQueue();
       } catch (error) {
         this.showStatus(error.message, "error");

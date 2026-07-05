@@ -632,6 +632,29 @@ class VeederReviewQueueApiTests(APITestCase):
     def test_review_queue_finalize_creates_readings_and_marks_completed(self):
         self.client.login(username="reviewer", password="password123")
 
+        readings = [
+            {
+                "tank_index": 1,
+                "fuel_type": self.fuel_type.id,
+                "volume": 4000,
+                "ullage": 6000,
+                "height": 40.0,
+                "confidence_score": 1.0,
+                "is_user_corrected": True,
+            }
+        ]
+
+        preflight_response = self.client.post(
+            reverse("atg:readings_preflight"),
+            {
+                "store": self.store.id,
+                "readings": readings,
+            },
+            format="json",
+        )
+        self.assertEqual(preflight_response.status_code, status.HTTP_200_OK)
+        preflight_rows = preflight_response.json()["data"]["rows"]
+
         response = self.client.post(
             reverse(
                 "atg:veeder_review_queue_finalize", kwargs={"ticket_id": self.ticket.id}
@@ -639,17 +662,9 @@ class VeederReviewQueueApiTests(APITestCase):
             {
                 "store_num": str(self.store.store_num),
                 "notes": "Reviewed and finalized.",
-                "readings": [
-                    {
-                        "tank_index": 1,
-                        "fuel_type": self.fuel_type.id,
-                        "volume": 4000,
-                        "ullage": 6000,
-                        "height": 40.0,
-                        "confidence_score": 1.0,
-                        "is_user_corrected": True,
-                    }
-                ],
+                "readings": readings,
+                "preflight_tokens": [row["preflight_token"] for row in preflight_rows],
+                "preflight_override_reasons": {},
             },
             format="json",
         )
