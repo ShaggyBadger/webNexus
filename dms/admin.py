@@ -29,6 +29,7 @@ class DocumentAdmin(admin.ModelAdmin):
         "category",
         "status",
         "version",
+        "download_count",
         "is_public",
         "uploaded_by",
         "uploaded_at",
