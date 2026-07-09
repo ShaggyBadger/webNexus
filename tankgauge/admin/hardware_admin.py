@@ -5,7 +5,14 @@ from ..models import TankType, TankChart
 @admin.register(TankType)
 class TankTypeAdmin(admin.ModelAdmin):
     list_display = ("name", "manufacturer", "capacity")
-    search_fields = ("name", "manufacturer")
+    search_fields = (
+        "name",
+        "manufacturer",
+        "model",
+        "=capacity",
+        "=max_depth",
+        "description",
+    )
 
 
 @admin.register(TankChart)

@@ -12,6 +12,7 @@ from rest_framework.test import APITestCase
 
 from atg.models import VeederReading, VeederTicket
 from missionlog.models import FuelType
+from tankgauge.admin.hardware_admin import TankTypeAdmin
 from tankgauge.admin.store_admin import StoreTankMappingAdmin
 from tankgauge.logic.estimation_service import EstimationService
 from tankgauge.logic.tank_lookup import (
@@ -744,3 +745,17 @@ class StoreTankMappingAdminTests(TestCase):
         self.assertIn("store__store_num", admin_instance.search_fields)
         self.assertIn("store__store_name", admin_instance.search_fields)
         self.assertIn("tank_index", admin_instance.search_fields)
+
+    def test_store_tank_mapping_admin_uses_tank_type_autocomplete(self):
+        admin_instance = StoreTankMappingAdmin(StoreTankMapping, AdminSite())
+        self.assertIn("tank_type", admin_instance.autocomplete_fields)
+
+
+class TankTypeAdminTests(TestCase):
+    def test_tank_type_admin_searches_name_and_key_specs(self):
+        admin_instance = TankTypeAdmin(TankType, AdminSite())
+        self.assertIn("name", admin_instance.search_fields)
+        self.assertIn("manufacturer", admin_instance.search_fields)
+        self.assertIn("model", admin_instance.search_fields)
+        self.assertIn("=capacity", admin_instance.search_fields)
+        self.assertIn("=max_depth", admin_instance.search_fields)
