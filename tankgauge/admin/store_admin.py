@@ -12,3 +12,4 @@ class StoreAdmin(admin.ModelAdmin):
 class StoreTankMappingAdmin(admin.ModelAdmin):
     list_display = ("store", "tank_type", "fuel_type", "tank_index")
     list_filter = ("fuel_type",)
+    search_fields = ("store__store_num", "store__store_name", "tank_index")

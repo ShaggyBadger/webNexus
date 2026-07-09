@@ -1,6 +1,7 @@
 from datetime import timedelta
 from unittest.mock import patch
 
+from django.contrib.admin.sites import AdminSite
 from django.contrib.auth.models import User
 from django.core.management import call_command
 from django.test import TestCase, override_settings
@@ -11,6 +12,7 @@ from rest_framework.test import APITestCase
 
 from atg.models import VeederReading, VeederTicket
 from missionlog.models import FuelType
+from tankgauge.admin.store_admin import StoreTankMappingAdmin
 from tankgauge.logic.estimation_service import EstimationService
 from tankgauge.logic.tank_lookup import (
     get_mapping_resolution_metrics,
@@ -734,3 +736,11 @@ class ClosestStoreApiTests(TestCase):
         self.assertIn("message", payload["error"])
         self.assertIn("details", payload["error"])
         self.assertIn("trace_id", payload["error"])
+
+
+class StoreTankMappingAdminTests(TestCase):
+    def test_store_tank_mapping_admin_searches_by_store_number(self):
+        admin_instance = StoreTankMappingAdmin(StoreTankMapping, AdminSite())
+        self.assertIn("store__store_num", admin_instance.search_fields)
+        self.assertIn("store__store_name", admin_instance.search_fields)
+        self.assertIn("tank_index", admin_instance.search_fields)
