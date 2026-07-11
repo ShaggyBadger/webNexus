@@ -8,6 +8,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
 
 from ...logic.store_lookup import get_store_by_any_id
+from ...logic.tank_limits import resolve_tank_limits
 from ...models import StoreTankMapping, TankChart, TankEstimation
 from .error_contract import drf_error_response, drf_success_response
 
@@ -20,13 +21,15 @@ class StoreTanksAPIView(APIView):
     permission_classes = [AllowAny]
 
     def _serialize_mapping(self, mapping):
+        limits = resolve_tank_limits(mapping)
         return {
             "id": mapping.id,
             "tank_index": mapping.tank_index,
             "fuel_type": mapping.fuel_type,
             "tank_type_name": mapping.tank_type.name if mapping.tank_type else None,
-            "capacity": mapping.tank_type.capacity if mapping.tank_type else None,
-            "max_depth": mapping.tank_type.max_depth if mapping.tank_type else None,
+            "capacity": limits["capacity_gallons"],
+            "max_depth": limits["max_depth_inches"],
+            "limits_source": limits["source"],
         }
 
     def get(self, request, store_num):
@@ -198,11 +201,8 @@ class TankChartDataAPIView(APIView):
                 status_code=status.HTTP_404_NOT_FOUND,
             )
 
-        max_depth = (
-            mapping.tank_type.max_depth
-            if mapping.tank_type and mapping.tank_type.max_depth
-            else 120
-        )
+        limits = resolve_tank_limits(mapping)
+        max_depth = limits["max_depth_inches"] or 120
         official_chart = self._get_official_chart(mapping)
         generated_curve = self._get_generated_curve(mapping, max_depth)
         scatter_points = self._get_scatter_points(mapping)
@@ -223,9 +223,9 @@ class TankChartDataAPIView(APIView):
                 "tank": {
                     "id": mapping.id,
                     "fuel_type": mapping.fuel_type,
-                    "capacity": (
-                        mapping.tank_type.capacity if mapping.tank_type else None
-                    ),
+                    "capacity": limits["capacity_gallons"],
+                    "max_depth": limits["max_depth_inches"],
+                    "limits_source": limits["source"],
                     "tank_index": mapping.tank_index,
                 },
                 "series": {

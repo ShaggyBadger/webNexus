@@ -57,6 +57,25 @@ class MissionResumeBehaviorTests(TestCase):
         self.assertEqual(payload["data"]["mission"]["id"], mission.id)
         self.assertEqual(payload["data"]["mission"]["hours_on_duty_not_driving"], 1.75)
 
+    def test_active_mission_returns_inactive_when_none_exist(self):
+        response = self.client.get(reverse("missionlog:active_mission"))
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "success")
+        self.assertFalse(payload["data"]["active"])
+
+    def test_active_mission_returns_inactive_when_all_completed(self):
+        Mission.objects.create(
+            user=self.user,
+            shift_start=timezone.now(),
+            is_completed=True,
+        )
+        response = self.client.get(reverse("missionlog:active_mission"))
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "success")
+        self.assertFalse(payload["data"]["active"])
+
     def test_start_mission_blocks_when_old_incomplete_exists(self):
         Mission.objects.create(
             user=self.user,
@@ -166,3 +185,69 @@ class PostTripPayloadHandlingTests(TestCase):
         fuel_log = mission.fuel_logs.get()
         self.assertEqual(fuel_log.gallons, Decimal("40.125"))
         self.assertEqual(fuel_log.price_per_gallon, Decimal("3.219"))
+
+    def test_post_trip_create_calculates_end_miles_from_start_and_total(self):
+        response = self.client.post(
+            reverse("missionlog:post_trip_create"),
+            data=json.dumps(
+                {
+                    "shift_start": timezone.now().isoformat(),
+                    "is_completed": False,
+                    "start_miles": "1000",
+                    "total_miles": "150",
+                    "deliveries": [],
+                }
+            ),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 201)
+        mission = Mission.objects.get(id=response.json()["data"]["mission"]["id"])
+        self.assertEqual(mission.start_miles, 1000)
+        self.assertEqual(mission.end_miles, 1150)
+        self.assertEqual(mission.total_miles, 150)
+
+    def test_post_trip_create_respects_explicit_end_miles_without_total(self):
+        response = self.client.post(
+            reverse("missionlog:post_trip_create"),
+            data=json.dumps(
+                {
+                    "shift_start": timezone.now().isoformat(),
+                    "is_completed": False,
+                    "start_miles": "1000",
+                    "end_miles": "1200",
+                    "deliveries": [],
+                }
+            ),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 201)
+        mission = Mission.objects.get(id=response.json()["data"]["mission"]["id"])
+        self.assertEqual(mission.start_miles, 1000)
+        self.assertEqual(mission.end_miles, 1200)
+        self.assertEqual(mission.total_miles, 200)
+
+    def test_post_trip_update_recalculates_mileage_bounds(self):
+        mission = Mission.objects.create(
+            user=self.user,
+            shift_start=timezone.now(),
+            start_miles=1000,
+            end_miles=1100,
+            is_completed=False,
+        )
+
+        response = self.client.put(
+            reverse("missionlog:post_trip_update", kwargs={"pk": mission.id}),
+            data=json.dumps(
+                {
+                    "start_miles": "1000",
+                    "total_miles": "250",
+                    "deliveries": [],
+                }
+            ),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        mission.refresh_from_db()
+        self.assertEqual(mission.start_miles, 1000)
+        self.assertEqual(mission.end_miles, 1250)
+        self.assertEqual(mission.total_miles, 250)

@@ -38,6 +38,15 @@ TANKGAUGE_ENABLE_GENERATED_CHART_MATERIALIZATION = os.environ.get(
 # Valid values: "OFFICIAL_FIRST" | "MATHEMATICAL_FIRST"
 TANKGAUGE_DEFAULT_MODE_PRIORITY = "OFFICIAL_FIRST"
 
+# TANKGAUGE_DEFAULT_TANK_LIMITS_SOURCE_PRIORITY:
+# Controls where TankGauge should source max capacity/depth for tank profiles.
+# OFFICIAL_FIRST: use TankType capacity/max_depth first; fallback to Veeder-derived estimation.
+# VEEDER_FIRST: use Veeder-derived estimation first; fallback to TankType values.
+# This setting is file-based for now and can be promoted to admin control later.
+TANKGAUGE_DEFAULT_TANK_LIMITS_SOURCE_PRIORITY = os.environ.get(
+    "TANKGAUGE_DEFAULT_TANK_LIMITS_SOURCE_PRIORITY", "OFFICIAL_FIRST"
+).upper()
+
 # SECURITY WARNING: don't run with debug turned on in production!
 # TACTICAL_BOOLEAN_PARSING:
 # Convert the environment string to a robust boolean.

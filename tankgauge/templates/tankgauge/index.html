@@ -107,7 +107,7 @@
                     :class="selectedTank?.id === tank.id ? 'tank-option-selected' : 'tank-option-idle'"
                 >
                     <input type="radio" class="d-none" name="tankSelect" :value="tank.id" @change="selectTank(tank)">
-                    <span x-text="(tank.tank_index ? 'Tank ' + tank.tank_index + ': ' : '') + tank.fuel_type.toUpperCase() + ' (' + (tank.capacity ? tank.capacity + ' Gal Max' : 'Unknown Capacity') + ')' "></span>
+                    <span x-text="(tank.tank_index ? 'Tank ' + tank.tank_index + ': ' : '') + tank.fuel_type.toUpperCase() + ' (' + (tank.capacity !== null && tank.capacity !== undefined ? tank.capacity + ' Gal Max' : 'Unknown Capacity') + ')' "></span>
                 </label>
             </template>
         </div>
@@ -118,7 +118,13 @@
 
         <div class="mb-3 p-2 bg-dark rounded border border-secondary mono">
             <strong>TARGET:</strong> <span x-text="selectedTank?.fuel_type.toUpperCase()"></span><br>
-            <strong>MAX CAPACITY:</strong> <span x-text="selectedTank?.capacity + ' Gal'"></span>
+            <strong>MAX CAPACITY:</strong> <span x-text="selectedTank?.capacity !== null && selectedTank?.capacity !== undefined ? selectedTank.capacity + ' Gal' : 'Unknown'"></span><br>
+            <strong>LIMIT SOURCE:</strong>
+            <span
+                class="badge"
+                :class="selectedTank?.limits_source === 'VEEDER' ? 'bg-warning text-dark' : selectedTank?.limits_source === 'OFFICIAL' ? 'bg-secondary text-light' : 'bg-dark text-light border border-secondary'"
+                x-text="selectedTank?.limits_source || 'UNAVAILABLE'"
+            ></span>
         </div>
 
         <div class="row g-3 mb-3">

@@ -22,6 +22,10 @@
         right: 10px;
         z-index: 1000;
     }
+    .map-mode-toggle .btn {
+        min-height: 44px;
+        min-width: 44px;
+    }
     .intel-section-header {
         font-family: 'JetBrains Mono', monospace;
         color: var(--primary-color);
@@ -87,9 +91,10 @@
     }
     .tank-config-btn {
         width: 100%;
-        background: transparent;
+        background: #1c1f23;
         color: inherit;
         text-align: left;
+        min-height: 44px;
         transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
     }
     .tank-config-btn:hover {
@@ -113,6 +118,15 @@
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+    }
+    .intel-action-btn {
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .intel-layer-select {
+        min-height: 44px;
     }
 </style>
 {% endblock %}
@@ -149,7 +163,7 @@
                         <span class="d-md-none">SITE_CONFIG</span>
                     </div>
                     {% if user.is_authenticated %}
-                    <a href="{% url 'siteintel:proposal_create' %}?location_id={{ location.id }}" class="btn btn-warning btn-sm mono py-1 px-2 text-dark text-nowrap" style="font-size: 0.65rem;">
+                    <a href="{% url 'siteintel:proposal_create' %}?location_id={{ location.id }}" class="btn btn-tactical-amber btn-sm mono py-1 px-2 text-dark text-nowrap intel-action-btn" style="font-size: 0.65rem;">
                         <span class="d-none d-md-inline">[ PROPOSE_UPDATE ]</span>
                         <span class="d-md-none">UPDATE</span>
                     </a>
@@ -227,14 +241,14 @@
                             </div>
                             <div class="col-12 mt-2 d-grid gap-2">
                                 <button
-                                    class="btn btn-primary btn-sm mono py-1 px-3 text-nowrap"
+                                    class="btn btn-tactical-olive btn-sm mono py-1 px-3 text-nowrap intel-action-btn"
                                     style="font-size: 0.62rem; letter-spacing: 1px;"
                                     onclick="USTVerification.showConfirmModal({{ store.id }})"
                                     {% if not ust_permit %}disabled title="SYNC permit data first"{% endif %}
                                 >
                                     [ CONFIRM_ON_SITE ]
                                 </button>
-                                <button class="btn btn-warning btn-sm mono py-1 px-3 text-nowrap" style="font-size: 0.62rem; letter-spacing: 1px;" onclick="USTVerification.showUpdateModal({{ store.id }})">
+                                <button class="btn btn-tactical-amber btn-sm mono py-1 px-3 text-nowrap intel-action-btn text-dark" style="font-size: 0.62rem; letter-spacing: 1px;" onclick="USTVerification.showUpdateModal({{ store.id }})">
                                     [ SYNC_COMPLIANCE_DATA ]
                                 </button>
                             </div>
@@ -412,7 +426,7 @@
                         
                         {% if user.is_authenticated %}
                         <!-- Tactical Layer Selector -->
-                        <select class="form-select form-select-sm mono bg-dark-custom text-primary border-secondary py-0" style="width: auto; font-size: 0.65rem; height: 1.5rem;" x-model="intelLayer">
+                        <select class="form-select form-select-sm mono bg-dark-custom text-primary border-secondary py-0 intel-layer-select" style="width: auto; font-size: 0.65rem;" x-model="intelLayer">
                             <option value="PERSONAL">USER_LAYER</option>
                             <option value="DEFAULT">SHARED_LAYER</option>
                         </select>
@@ -422,7 +436,7 @@
                     </div>
                     
                     {% if user.is_authenticated %}
-                    <a href="{% url 'siteintel:intel_update' location.id %}" class="btn btn-warning btn-sm mono py-0 flex-shrink-0 ms-2 text-dark" style="font-size: 0.65rem;">
+                    <a href="{% url 'siteintel:intel_update' location.id %}" class="btn btn-tactical-amber btn-sm mono py-0 flex-shrink-0 ms-2 text-dark intel-action-btn" style="font-size: 0.65rem;">
                         <span class="d-none d-md-inline">[ UPDATE INTEL ]</span>
                         <span class="d-md-none">UPDATE</span>
                     </a>
@@ -461,7 +475,7 @@
                         <span class="d-md-none">SKETCH</span>
                     </div>
                     {% if user.is_authenticated %}
-                    <a href="{% url 'siteintel:hand_map_edit' location.id %}" class="btn btn-warning btn-sm mono py-0 text-dark" style="font-size: 0.65rem;">
+                    <a href="{% url 'siteintel:hand_map_edit' location.id %}" class="btn btn-tactical-amber btn-sm mono py-0 text-dark intel-action-btn" style="font-size: 0.65rem;">
                         <span class="d-none d-md-inline">{% if personal_hand_map %}[ EDIT_SKETCH ]{% else %}[ ADD_SKETCH ]{% endif %}</span>
                         <span class="d-md-none">{% if personal_hand_map %}EDIT{% else %}ADD{% endif %}</span>
                     </a>

@@ -573,6 +573,66 @@ class StoreChartApiTests(TestCase):
         self.assertEqual(payload["data"]["store"]["store_num"], self.store.store_num)
         self.assertEqual(payload["data"]["store"]["riso_num"], self.store.riso_num)
 
+    def test_store_tanks_api_falls_back_to_veeder_limits_when_official_missing(self):
+        null_limits_tank_type = TankType.objects.create(name="15k120")
+        mapping = StoreTankMapping.objects.create(
+            store=self.store,
+            tank_type=null_limits_tank_type,
+            fuel_type="regular",
+            tank_index=3,
+        )
+        TankEstimation.objects.create(
+            tank_mapping=mapping,
+            radius=59.97,
+            length=306.83,
+            confidence=0.7,
+            mean_error=12.0,
+            max_error=24.0,
+            sample_count=4,
+            algorithm_version="v1",
+            is_active=True,
+        )
+
+        response = self.client.get(
+            reverse(
+                "tankgauge:store_tanks_api", kwargs={"store_num": self.store.store_num}
+            )
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        tanks = response.json()["data"]["tanks"]
+        target = [tank for tank in tanks if tank["id"] == mapping.id][0]
+        self.assertEqual(target["capacity"], 15007)
+        self.assertEqual(target["max_depth"], 120)
+        self.assertEqual(target["limits_source"], "VEEDER")
+
+    @override_settings(TANKGAUGE_DEFAULT_TANK_LIMITS_SOURCE_PRIORITY="VEEDER_FIRST")
+    def test_store_tanks_api_can_prefer_veeder_over_official(self):
+        TankEstimation.objects.create(
+            tank_mapping=self.mapping,
+            radius=48.0,
+            length=240.0,
+            confidence=0.7,
+            mean_error=10.0,
+            max_error=22.0,
+            sample_count=5,
+            algorithm_version="v1",
+            is_active=True,
+        )
+
+        response = self.client.get(
+            reverse(
+                "tankgauge:store_tanks_api", kwargs={"store_num": self.store.store_num}
+            )
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        tanks = response.json()["data"]["tanks"]
+        target = [tank for tank in tanks if tank["id"] == self.mapping.id][0]
+        self.assertEqual(target["capacity"], 7520)
+        self.assertEqual(target["max_depth"], 96)
+        self.assertEqual(target["limits_source"], "VEEDER")
+
     def test_tank_chart_data_api_returns_official_generated_and_scatter_series(self):
         TankChart.objects.create(
             tank_type=self.tank_type,
