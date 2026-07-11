@@ -48,5 +48,6 @@ urlpatterns = [
     path("missionlog/", include("missionlog.urls")),
     path("dms/", include("dms.urls")),
     path("atg/", include("atg.urls")),
+    path("feedback/", include("feedback.urls")),
     path("system/health/", health_check, name="health_check"),
 ]

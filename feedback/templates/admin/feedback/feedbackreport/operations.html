@@ -1,0 +1,91 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<div id="content-main">
+    <h1>Feedback Operations</h1>
+    <p>Operational triage view for contact and bug reports.</p>
+
+    <form method="get" style="margin-bottom: 1rem; display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
+        <label>
+            Status
+            <select name="status">
+                <option value="">All</option>
+                {% for value, label in status_choices %}
+                <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </label>
+
+        <label>
+            Category
+            <select name="category">
+                <option value="">All</option>
+                {% for value, label in category_choices %}
+                <option value="{{ value }}" {% if category_filter == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </label>
+
+        <label>
+            Search
+            <input type="text" name="q" value="{{ search_query }}" placeholder="user, url, message" />
+        </label>
+
+        <button type="submit" class="button">Apply</button>
+        <a href="{{ changelist_url }}" class="button">Open Default Admin</a>
+    </form>
+
+    <table class="adminlist" style="width: 100%; border-collapse: collapse;">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Status</th>
+                <th>Category</th>
+                <th>User</th>
+                <th>When</th>
+                <th>Click Event</th>
+                <th>URL</th>
+                <th>Message</th>
+                <th>Metadata</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for report in reports %}
+            <tr>
+                <td><a href="{% url 'admin:feedback_feedbackreport_change' report.id %}">{{ report.id }}</a></td>
+                <td>{{ report.get_status_display }}</td>
+                <td>{{ report.get_category_display|default:"--" }}</td>
+                <td>{% if report.user %}{{ report.user.username }}{% else %}ANONYMOUS{% endif %}</td>
+                <td>{{ report.timestamp|date:"Y-m-d H:i" }}</td>
+                <td>
+                    {% if report.click_event_id %}
+                    <a href="{% url 'admin:feedback_feedbackclickevent_change' report.click_event_id %}">#{{ report.click_event_id }}</a>
+                    {% else %}
+                    --
+                    {% endif %}
+                </td>
+                <td>
+                    <a href="{{ report.url }}" target="_blank" rel="noopener noreferrer">open</a>
+                    <div style="max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                        {{ report.url }}
+                    </div>
+                </td>
+                <td style="max-width: 420px;">
+                    <div style="max-height: 100px; overflow: auto; white-space: pre-wrap;">{{ report.message|default:"--" }}</div>
+                </td>
+                <td style="max-width: 320px;">
+                    <details>
+                        <summary>view</summary>
+                        <pre style="white-space: pre-wrap; max-height: 200px; overflow: auto;">{{ report.page_metadata }}</pre>
+                    </details>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="9">No feedback reports match the current filters.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

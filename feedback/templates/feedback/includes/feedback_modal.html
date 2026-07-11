@@ -1,0 +1,32 @@
+<div id="feedback-modal" class="feedback-modal" hidden>
+    <div class="feedback-modal-backdrop" id="feedback-modal-close-backdrop"></div>
+    <div class="feedback-modal-card tactical-card">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h2 class="h6 mono text-tactical-warning mb-0">CONTACT // BUG REPORT</h2>
+            <button id="feedback-close-btn" type="button" class="btn btn-tactical-secondary btn-sm mono">CLOSE</button>
+        </div>
+
+        <div id="feedback-status" class="mono small text-muted-custom mb-2"></div>
+
+        <div class="mb-2">
+            <label class="form-label mono text-muted-custom">CATEGORY</label>
+            <select id="feedback-category" class="form-select tactical-input mono">
+                <option value="">Select one</option>
+                <option value="chart_wrong">Chart Wrong</option>
+                <option value="data_discrepancy">Data Discrepancy</option>
+                <option value="ui_glitch">UI Glitch</option>
+                <option value="question">Question</option>
+                <option value="general">General Feedback</option>
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label mono text-muted-custom">MESSAGE</label>
+            <textarea id="feedback-message" class="form-control tactical-input mono" rows="4" placeholder="Describe what happened and what you expected."></textarea>
+        </div>
+
+        <div class="d-grid gap-2">
+            <button id="feedback-submit-btn" type="button" class="btn btn-tactical-olive mono fw-bold">SUBMIT REPORT</button>
+        </div>
+    </div>
+</div>

@@ -183,6 +183,7 @@
         }
     </style>
     {% block extra_head %}{% endblock %}
+    {% include 'feedback/includes/feedback_styles.html' %}
 </head>
 <body>
     {% include 'components/navbar.html' %}
@@ -196,6 +197,7 @@
     </main>
 
     {% include 'components/footer.html' %}
+    {% include 'feedback/includes/feedback_modal.html' %}
 
     <!-- Bootstrap JS Bundle -->
     <script src="{% static 'css/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
@@ -225,6 +227,7 @@
             });
         };
     </script>
+    <script type="module" src="{% static 'js/feedback/feedback_widget.js' %}"></script>
     {% block extra_scripts %}{% endblock %}
 </body>
 </html>

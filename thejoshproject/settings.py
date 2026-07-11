@@ -47,6 +47,12 @@ TANKGAUGE_DEFAULT_TANK_LIMITS_SOURCE_PRIORITY = os.environ.get(
     "TANKGAUGE_DEFAULT_TANK_LIMITS_SOURCE_PRIORITY", "OFFICIAL_FIRST"
 ).upper()
 
+# FEEDBACK_MAX_METADATA_BYTES:
+# Maximum serialized JSON size accepted for feedback page metadata payloads.
+FEEDBACK_MAX_METADATA_BYTES = int(
+    os.environ.get("FEEDBACK_MAX_METADATA_BYTES", "16384")
+)
+
 # SECURITY WARNING: don't run with debug turned on in production!
 # TACTICAL_BOOLEAN_PARSING:
 # Convert the environment string to a robust boolean.
@@ -98,6 +104,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "dms",
     "atg",
+    "feedback",
 ]
 
 
@@ -318,4 +325,10 @@ REST_FRAMEWORK = {
         "rest_framework.permissions.IsAuthenticated",
     ],
     "EXCEPTION_HANDLER": "dms.exceptions.dms_exception_handler",
+    "DEFAULT_THROTTLE_RATES": {
+        "feedback_initiate": os.environ.get(
+            "FEEDBACK_THROTTLE_INITIATE_RATE", "30/min"
+        ),
+        "feedback_submit": os.environ.get("FEEDBACK_THROTTLE_SUBMIT_RATE", "20/min"),
+    },
 }

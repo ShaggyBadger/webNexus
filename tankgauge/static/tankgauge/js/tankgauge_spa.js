@@ -92,7 +92,45 @@ function tankGaugeApp() {
     },
 
     init() {
+      if (!Array.isArray(window.__webnexusFeedbackProviders)) {
+        window.__webnexusFeedbackProviders = [];
+      }
+      this.feedbackProvider = () => ({ tankgauge: this.feedbackMetadata() });
+      window.__webnexusFeedbackProviders.push(this.feedbackProvider);
+
+      this.feedbackMetadataListener = (event) => {
+        if (!event || !event.detail) {
+          return;
+        }
+        event.detail.metadata = {
+          ...(event.detail.metadata || {}),
+          tankgauge: this.feedbackMetadata(),
+        };
+      };
+      window.addEventListener("feedback-request-metadata", this.feedbackMetadataListener);
       this.$nextTick(() => this.$refs.storeNumberInput?.focus());
+    },
+
+    feedbackMetadata() {
+      const officialPoints = this.chartData?.series?.official_chart?.length || 0;
+      const generatedPoints = this.chartData?.series?.generated_curve?.length || 0;
+      const scatterPoints = this.chartData?.series?.scatter_points?.length || 0;
+      return {
+        step: this.step,
+        store_number_input: this.storeNumber,
+        store_data: this.storeData,
+        selected_tank: this.selectedTank,
+        input_values: {
+          delivery_gallons: this.inputs.deliveryGallons,
+          current_inches: this.inputs.currentInches,
+        },
+        calculation_results: this.results,
+        chart_summary: {
+          official_points: officialPoints,
+          generated_points: generatedPoints,
+          veeder_points: scatterPoints,
+        },
+      };
     },
 
     clearMessages() {

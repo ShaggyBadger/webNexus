@@ -23,7 +23,7 @@ const TacticalGPS = {
 
   renderOptInButton(container) {
     container.innerHTML = `
-            <button id="gps-pulse-btn" class="btn btn-outline-primary btn-sm mono py-0 px-2" style="font-size: 0.65rem;">
+            <button id="gps-pulse-btn" class="btn btn-sm mono fw-bold command-app-cta command-app-cta-primary px-2">
                 [ INITIALIZE GPS PULSE ]
             </button>
         `;
