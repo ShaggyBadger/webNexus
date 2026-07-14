@@ -29,7 +29,7 @@
 
   async function runPreflight(host, readings) {
     host.submitting = true;
-    host.showStatus("Running preflight checks...", "info");
+    host.showStatus("Validating readings...", "info");
 
     try {
       const response = await fetch("/atg/api/v1/readings/validate-preflight/", {

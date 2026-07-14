@@ -234,7 +234,7 @@
 
                 <div class="atg-action-stack mb-5" x-show.important="hasStore && step >= 2" x-cloak>
                     <button type="submit" class="btn btn-primary btn-lg mono py-3" :disabled="submitting || !hasStore || !hasAnyReadings || hasPreflightRows">
-                        <span x-show="!submitting">[ RUN_PREFLIGHT_CHECKS ]</span>
+                        <span x-show="!submitting">[ VALIDATE ]</span>
                         <span x-show="submitting">[ VALIDATING... ]</span>
                     </button>
                     <a href="/" class="btn btn-outline-secondary btn-sm mono">[ ABORT_MISSION ]</a>

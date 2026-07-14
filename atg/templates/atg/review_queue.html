@@ -194,7 +194,7 @@
 
                         <div class="d-grid gap-2 d-md-flex mb-3">
                             <button type="button" class="btn btn-tactical-amber mono fw-bold" @click="addReading()">ADD_READING</button>
-                            <button type="button" class="btn btn-tactical-olive mono fw-bold" @click="finalizeTicket()" :disabled="saving || (hasPreflightRows && !canConfirmPreflight())" x-text="hasPreflightRows ? 'CONFIRM_AND_FINALIZE' : 'RUN_PREFLIGHT'"></button>
+                            <button type="button" class="btn btn-tactical-olive mono fw-bold" @click="finalizeTicket()" :disabled="saving || (hasPreflightRows && !canConfirmPreflight())" x-text="hasPreflightRows ? 'CONFIRM_AND_FINALIZE' : 'VALIDATE'"></button>
                         </div>
 
                         <div class="tactical-card p-2 mb-3" x-show="hasPreflightRows" x-cloak>

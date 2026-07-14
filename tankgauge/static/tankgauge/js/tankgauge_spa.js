@@ -267,6 +267,27 @@ function tankGaugeApp() {
       }
     },
 
+    buildReadingDotDataset() {
+      const profile = this.activeProfile;
+      if (!profile) {
+        return null;
+      }
+      if (profile.initial_inches == null || profile.initial_gallons == null) {
+        return null;
+      }
+      return {
+        label: "Current Reading",
+        data: [{ x: profile.initial_inches, y: profile.initial_gallons }],
+        backgroundColor: "#50fa7b",
+        borderColor: "#ffffff",
+        borderWidth: 2,
+        showLine: false,
+        pointRadius: 6,
+        pointHoverRadius: 9,
+        order: 0,
+      };
+    },
+
     async apiGet(url, fallbackMessage) {
       const response = await fetch(url);
       let data = null;
@@ -466,6 +487,7 @@ function tankGaugeApp() {
         this.step = 4;
         this.info = "Calculation complete. Review tank fill projection.";
         this.scrollToStep("resultsStepCard");
+        this.renderChart();
       } catch (error) {
         this.error = error.message;
         this.info = null;
@@ -556,10 +578,15 @@ function tankGaugeApp() {
           borderColor: "#ffffff",
           borderWidth: 1.5,
           showLine: false,
-          pointRadius: 7,
-          pointHoverRadius: 10,
+          pointRadius: 4,
+          pointHoverRadius: 6,
           order: 1,
         });
+      }
+
+      const readingDataset = this.buildReadingDotDataset();
+      if (readingDataset) {
+        datasets.push(readingDataset);
       }
 
       this.chartInstance = new Chart(canvas, {
