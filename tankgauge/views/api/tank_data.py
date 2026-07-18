@@ -7,6 +7,7 @@ from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
 
+from ...logic.mode_resolver import ModeResolver
 from ...logic.store_lookup import get_store_by_any_id
 from ...logic.tank_limits import resolve_tank_limits
 from ...models import StoreTankMapping, TankChart, TankEstimation
@@ -20,16 +21,63 @@ class StoreTanksAPIView(APIView):
 
     permission_classes = [AllowAny]
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.mode_resolver = ModeResolver()
+
+    def _unavailable_limits(self, mode_value: str, reason: str) -> dict:
+        return {
+            "capacity_gallons": None,
+            "max_depth_inches": None,
+            "ninety_percent_gallons": None,
+            "source": "UNAVAILABLE",
+            "confidence": "NONE",
+            "mode": mode_value,
+            "warnings": [reason] if reason else [],
+        }
+
     def _serialize_mapping(self, mapping):
-        limits = resolve_tank_limits(mapping)
+        available_modes, mode_meta = (
+            self.mode_resolver.resolve_available_modes_for_mapping(
+                mapping,
+                allow_estimation_run=True,
+            )
+        )
+        default_mode = self.mode_resolver.select_default_mode(available_modes)
+
+        limits_by_mode = {}
+        for mode_availability in available_modes:
+            if mode_availability.available:
+                mode_limits = self.mode_resolver.build_limits_for_mode(
+                    mapping,
+                    mode=mode_availability.mode,
+                    source_meta=mode_meta.get(mode_availability.mode),
+                ).to_dict()
+            else:
+                mode_limits = self._unavailable_limits(
+                    mode_availability.mode.value,
+                    mode_availability.reason,
+                )
+            limits_by_mode[mode_availability.mode.value] = mode_limits
+
+        limits = limits_by_mode.get(default_mode.value) or self._unavailable_limits(
+            default_mode.value,
+            "No data available for selected calculation mode.",
+        )
+        legacy_limits = resolve_tank_limits(mapping)
+
         return {
             "id": mapping.id,
             "tank_index": mapping.tank_index,
             "fuel_type": mapping.fuel_type,
             "tank_type_name": mapping.tank_type.name if mapping.tank_type else None,
-            "capacity": limits["capacity_gallons"],
-            "max_depth": limits["max_depth_inches"],
-            "limits_source": limits["source"],
+            "capacity": legacy_limits["capacity_gallons"],
+            "max_depth": legacy_limits["max_depth_inches"],
+            "limits_source": legacy_limits["source"],
+            "available_modes": [mode.to_dict() for mode in available_modes],
+            "default_mode": default_mode.value,
+            "limits": limits,
+            "limits_by_mode": limits_by_mode,
         }
 
     def get(self, request, store_num):

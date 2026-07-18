@@ -248,8 +248,27 @@ class EstimationAndApiTests(APITestCase):
         self.assertEqual(response.data["status"], "success")
         self.assertEqual(response.data["data"]["status"], "SUCCESS")
         self.assertEqual(response.data["data"]["preferred_mode"], "MATHEMATICAL")
-        self.assertIsNotNone(response.data["data"]["profiles"]["mathematical"])
-        self.assertIsNotNone(response.data["data"]["profiles"]["official"])
+        self.assertIsNotNone(response.data["data"]["profiles"]["MATHEMATICAL"])
+        self.assertIsNotNone(response.data["data"]["profiles"]["OFFICIAL"])
+        self.assertEqual(response.data["data"]["display_mode"], "AUTO")
+        self.assertIn("active_profile", response.data["data"])
+
+    def test_api_calc_honors_display_mode_override(self):
+        url = reverse("tankgauge:calculate_tank_api")
+        payload = {
+            "store_id": "36073",
+            "fuel_type": "diesel",
+            "tank_id": str(self.mapping.id),
+            "current_inches": 20.0,
+            "delivery_gallons": 500,
+            "display_mode": "OFFICIAL",
+        }
+        response = self.client.post(url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["status"], "success")
+        self.assertEqual(response.data["data"]["status"], "SUCCESS")
+        self.assertEqual(response.data["data"]["mode"], "OFFICIAL")
+        self.assertEqual(response.data["data"]["active_profile"]["mode"], "OFFICIAL")
 
     def test_api_calc_success_without_auth(self):
         url = reverse("tankgauge:calculate_tank_api")
@@ -291,6 +310,54 @@ class EstimationAndApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["status"], "success")
         self.assertEqual(response.data["data"]["status"], "UNAVAILABLE")
+
+    def test_api_calc_uses_veeder_capacity_for_ninety_hold_when_official_capacity_missing(
+        self,
+    ):
+        null_limits_tank_type = TankType.objects.create(name="15k120")
+        mapping = StoreTankMapping.objects.create(
+            store=self.store,
+            tank_type=null_limits_tank_type,
+            fuel_type="diesel",
+            tank_index=5,
+        )
+        TankEstimation.objects.create(
+            tank_mapping=mapping,
+            radius=59.97,
+            length=306.83,
+            confidence=0.7,
+            mean_error=12.0,
+            max_error=24.0,
+            sample_count=4,
+            algorithm_version="v1",
+            is_active=True,
+        )
+
+        url = reverse("tankgauge:calculate_tank_api")
+        payload = {
+            "store_id": str(self.store.store_num),
+            "fuel_type": "diesel",
+            "tank_id": str(mapping.id),
+            "current_inches": 20.0,
+            "delivery_gallons": 500,
+            "display_mode": "AUTO",
+        }
+        response = self.client.post(url, payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["status"], "success")
+        self.assertEqual(response.data["data"]["status"], "SUCCESS")
+        self.assertEqual(response.data["data"]["mode"], "MATHEMATICAL")
+        self.assertGreater(response.data["data"]["ninety_limit"], 0)
+        self.assertGreater(response.data["data"]["avail_90"], 0)
+        self.assertGreater(
+            response.data["data"]["active_profile"]["capacity"]["capacity_gallons"],
+            0,
+        )
+        self.assertGreater(
+            response.data["data"]["active_profile"]["fillable_to_90"],
+            0,
+        )
 
     def test_estimation_health_api_for_mapped_tank(self):
         TankEstimation.objects.create(
@@ -545,6 +612,11 @@ class StoreChartApiTests(TestCase):
         self.assertEqual(payload["status"], "success")
         tank_indices = [item["tank_index"] for item in payload["data"]["tanks"]]
         self.assertEqual(tank_indices, [1, 2])
+        first_tank = payload["data"]["tanks"][0]
+        self.assertIn("available_modes", first_tank)
+        self.assertIn("default_mode", first_tank)
+        self.assertIn("limits", first_tank)
+        self.assertIn("limits_by_mode", first_tank)
 
     def test_store_tanks_api_not_found_uses_error_contract(self):
         response = self.client.get(

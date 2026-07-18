@@ -10,6 +10,7 @@ function tankGaugeApp() {
       currentInches: "",
     },
     results: null,
+    selectedDisplayMode: "AUTO",
     activeProfileKey: null,
     chartData: null,
     chartInstance: null,
@@ -53,7 +54,56 @@ function tankGaugeApp() {
       if (!this.results || !this.results.profiles) {
         return false;
       }
-      return Boolean(this.results.profiles.official && this.results.profiles.mathematical);
+      return Boolean(this.results.profiles.OFFICIAL && this.results.profiles.MATHEMATICAL);
+    },
+
+    get resolvedDisplayMode() {
+      if (this.results?.mode) {
+        return this.results.mode;
+      }
+      const defaultMode = this.selectedTank?.default_mode || "MATHEMATICAL";
+      if (this.selectedDisplayMode === "AUTO") {
+        return defaultMode;
+      }
+      if (!this.isModeAvailable(this.selectedDisplayMode)) {
+        return defaultMode;
+      }
+      return this.selectedDisplayMode;
+    },
+
+    get selectedLimits() {
+      if (!this.selectedTank) {
+        return null;
+      }
+      if (this.results?.active_profile?.capacity) {
+        return this.results.active_profile.capacity;
+      }
+      const limitsByMode = this.selectedTank.limits_by_mode || {};
+      return limitsByMode[this.resolvedDisplayMode] || this.selectedTank.limits || null;
+    },
+
+    get selectedLimitWarnings() {
+      return this.selectedLimits?.warnings || [];
+    },
+
+    get activeProfileWarnings() {
+      return this.activeProfile?.warnings || [];
+    },
+
+    get activeModeConfidence() {
+      const modeAvailability = this.getModeAvailability(this.resolvedDisplayMode);
+      return modeAvailability?.confidence || "NONE";
+    },
+
+    get activeModeReason() {
+      if (this.selectedDisplayMode === "AUTO") {
+        return null;
+      }
+      const selectedAvailability = this.getModeAvailability(this.selectedDisplayMode);
+      if (!selectedAvailability) {
+        return null;
+      }
+      return selectedAvailability.available ? null : selectedAvailability.reason;
     },
 
     get prefersReducedMotion() {
@@ -83,6 +133,7 @@ function tankGaugeApp() {
 
     resetTankState() {
       this.selectedTank = null;
+      this.selectedDisplayMode = "AUTO";
       this.inputs.deliveryGallons = "";
       this.inputs.currentInches = "";
       this.results = null;
@@ -125,6 +176,7 @@ function tankGaugeApp() {
           current_inches: this.inputs.currentInches,
         },
         calculation_results: this.results,
+        selected_display_mode: this.selectedDisplayMode,
         chart_summary: {
           official_points: officialPoints,
           generated_points: generatedPoints,
@@ -258,6 +310,32 @@ function tankGaugeApp() {
       this.resetStoreState();
       this.scrollToStep("storeStepCard");
       this.$nextTick(() => this.$refs.storeNumberInput?.focus());
+    },
+
+    getModeAvailability(mode) {
+      const availableModes = this.results?.available_modes || this.selectedTank?.available_modes || [];
+      return availableModes.find((item) => item.mode === mode) || null;
+    },
+
+    isModeAvailable(mode) {
+      const modeAvailability = this.getModeAvailability(mode);
+      return Boolean(modeAvailability && modeAvailability.available);
+    },
+
+    async setDisplayMode(mode) {
+      if (mode !== "AUTO" && !this.isModeAvailable(mode)) {
+        return;
+      }
+      if (this.selectedDisplayMode === mode) {
+        return;
+      }
+
+      this.selectedDisplayMode = mode;
+      this.activeProfileKey = this.resolvedDisplayMode;
+
+      if (this.canCalculate && !this.loading.calculate) {
+        await this.calculateTelemetry();
+      }
     },
 
     destroyChart() {
@@ -445,6 +523,8 @@ function tankGaugeApp() {
         this.activeProfileKey = null;
       }
       this.selectedTank = tank;
+      this.selectedDisplayMode = "AUTO";
+      this.activeProfileKey = this.resolvedDisplayMode;
       this.step = 3;
       this.info = `Tank ${tank.tank_index || "?"} selected. Enter delivery telemetry.`;
       this.scrollToStep("inputStepCard");
@@ -469,6 +549,7 @@ function tankGaugeApp() {
           tank_index: this.selectedTank.tank_index,
           current_inches: parseFloat(this.inputs.currentInches),
           delivery_gallons: parseFloat(this.inputs.deliveryGallons),
+          display_mode: this.selectedDisplayMode,
         };
 
         this.results = await this.apiPost(
@@ -477,10 +558,7 @@ function tankGaugeApp() {
           "Calculation failed.",
         );
         if (this.results.status === "SUCCESS") {
-          this.activeProfileKey =
-            this.results.preferred_mode === "MATHEMATICAL"
-              ? "mathematical"
-              : "official";
+          this.activeProfileKey = this.results.mode;
         } else {
           this.activeProfileKey = null;
         }

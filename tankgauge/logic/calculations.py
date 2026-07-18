@@ -4,6 +4,12 @@ from django.conf import settings
 from tankgauge.models import Store, StoreTankMapping, TankChart, TankEstimation
 from .geometry import GeometryEngine
 from .estimation_service import EstimationService, MIN_HEIGHT_SPREAD, MIN_READINGS
+from .mode_resolver import (
+    MATHEMATICAL_UNAVAILABLE_REASON,
+    OFFICIAL_UNAVAILABLE_REASON,
+    ModeResolver,
+)
+from .types import CalculationMode, ConfidenceLevel, ModeAvailability
 
 # Tactical Logger
 logger = logging.getLogger("tankgauge")
@@ -35,7 +41,11 @@ def _get_mode_priority():
 
 
 def perform_tank_calc(
-    tank_mapping, current_inches, delivery_gallons, virtual_meta=None
+    tank_mapping,
+    current_inches,
+    delivery_gallons,
+    virtual_meta=None,
+    display_mode="AUTO",
 ):
     """
     OPERATIONAL FLOW:
@@ -51,6 +61,9 @@ def perform_tank_calc(
 
     Returns a dictionary of tactical results including source metadata.
     """
+    mode_resolver = ModeResolver()
+    requested_mode = mode_resolver.parse_display_mode(display_mode)
+
     if tank_mapping:
         tank_type = tank_mapping.tank_type
         fuel_type = tank_mapping.fuel_type
@@ -65,7 +78,6 @@ def perform_tank_calc(
                 "reason_code": "mapped_tank",
             },
         )
-        mode, source_meta = determine_operating_mode(tank_mapping)
     else:
         # TACTICAL_VIRTUAL_PATH: No explicit mapping exists, use virtual_meta
         fuel_type = virtual_meta.get("fuel_type")
@@ -82,29 +94,6 @@ def perform_tank_calc(
                 "reason_code": "virtual_tank",
             },
         )
-        mode, source_meta = determine_virtual_operating_mode(
-            store_id, fuel_type, tank_index
-        )
-
-    if mode == MODE_UNAVAILABLE:
-        unavailable_msg = (
-            "No tank chart or sufficient Veeder data exists for this tank."
-        )
-        if source_meta and source_meta.get("message"):
-            unavailable_msg = source_meta["message"]
-        logger.warning(
-            "CALC_UNAVAILABLE",
-            extra={
-                "fuel_type": fuel_type,
-                "reason_code": "mode_unavailable",
-                "unavailable_message": unavailable_msg,
-            },
-        )
-        return {
-            "status": "UNAVAILABLE",
-            "message": unavailable_msg,
-            "mode": mode,
-        }
 
     profiles = {}
     for candidate_mode in (MODE_OFFICIAL, MODE_MATHEMATICAL):
@@ -114,32 +103,129 @@ def perform_tank_calc(
             delivery_gallons=delivery_gallons,
             virtual_meta=virtual_meta,
             mode=candidate_mode,
+            mode_resolver=mode_resolver,
         )
         if profile:
             profiles[candidate_mode] = profile
 
+    available_mode_objects = []
+    for candidate_mode in (MODE_OFFICIAL, MODE_MATHEMATICAL):
+        candidate_profile = profiles.get(candidate_mode)
+        mode_enum = CalculationMode(candidate_mode)
+        if candidate_profile:
+            available_mode_objects.append(
+                ModeAvailability(
+                    mode=mode_enum,
+                    available=True,
+                    reason=None,
+                    confidence=ConfidenceLevel(candidate_profile["confidence_level"]),
+                )
+            )
+        else:
+            unavailable_reason = (
+                OFFICIAL_UNAVAILABLE_REASON
+                if candidate_mode == MODE_OFFICIAL
+                else MATHEMATICAL_UNAVAILABLE_REASON
+            )
+            available_mode_objects.append(
+                ModeAvailability(
+                    mode=mode_enum,
+                    available=False,
+                    reason=unavailable_reason,
+                    confidence=ConfidenceLevel.NONE,
+                )
+            )
+
     if not profiles:
+        unavailable_msg = (
+            "No tank chart or sufficient Veeder data exists for this tank."
+        )
+        if virtual_meta:
+            _, source_meta = determine_virtual_operating_mode(
+                virtual_meta.get("store_id"),
+                virtual_meta.get("fuel_type"),
+                virtual_meta.get("tank_index"),
+            )
+            if source_meta and source_meta.get("message"):
+                unavailable_msg = source_meta["message"]
+
         return {
             "status": "UNAVAILABLE",
-            "message": "No tank chart or sufficient Veeder data exists for this tank.",
+            "message": unavailable_msg,
             "mode": MODE_UNAVAILABLE,
-            "profiles": {},
+            "display_mode": requested_mode.value,
+            "default_mode": mode_resolver.select_default_mode(
+                available_mode_objects
+            ).value,
+            "available_modes": [
+                availability.to_dict() for availability in available_mode_objects
+            ],
+            "available_mode_names": [
+                availability.mode.value
+                for availability in available_mode_objects
+                if availability.available
+            ],
+            "profiles": {
+                MODE_OFFICIAL: None,
+                MODE_MATHEMATICAL: None,
+            },
+            "profiles_legacy": {
+                "official": None,
+                "mathematical": None,
+            },
         }
+
+    active_mode = mode_resolver.resolve_active_mode(
+        requested_mode=requested_mode,
+        available_modes=available_mode_objects,
+    ).value
+    if active_mode not in profiles:
+        active_mode = (
+            MODE_MATHEMATICAL if MODE_MATHEMATICAL in profiles else MODE_OFFICIAL
+        )
+
+    default_mode = mode_resolver.select_default_mode(available_mode_objects).value
+    selected = profiles[active_mode]
+    active_profile = {
+        **selected,
+        "warnings": list(selected.get("warnings") or []),
+    }
+    profile_payload = {
+        MODE_OFFICIAL: profiles.get(MODE_OFFICIAL),
+        MODE_MATHEMATICAL: profiles.get(MODE_MATHEMATICAL),
+    }
+
+    for mode_key, profile in profile_payload.items():
+        if profile:
+            profile_payload[mode_key] = {
+                **profile,
+                "warnings": list(profile.get("warnings") or []),
+            }
 
     preferred_mode = (
         MODE_MATHEMATICAL if MODE_MATHEMATICAL in profiles else MODE_OFFICIAL
     )
-    selected = profiles[preferred_mode]
 
     result = {
         "status": "SUCCESS",
         "fuel_type": fuel_type,
-        "mode": preferred_mode,
+        "mode": active_mode,
+        "display_mode": requested_mode.value,
+        "default_mode": default_mode,
+        "active_profile": active_profile,
         "preferred_mode": preferred_mode,
-        "available_modes": list(profiles.keys()),
-        "profiles": {
-            "official": profiles.get(MODE_OFFICIAL),
-            "mathematical": profiles.get(MODE_MATHEMATICAL),
+        "available_modes": [
+            availability.to_dict() for availability in available_mode_objects
+        ],
+        "available_mode_names": [
+            availability.mode.value
+            for availability in available_mode_objects
+            if availability.available
+        ],
+        "profiles": profile_payload,
+        "profiles_legacy": {
+            "official": profile_payload.get(MODE_OFFICIAL),
+            "mathematical": profile_payload.get(MODE_MATHEMATICAL),
         },
         # Backward-compatible selected profile fields
         "data_source": selected["data_source"],
@@ -160,7 +246,7 @@ def perform_tank_calc(
         "CALC_COMPLETE",
         extra={
             "fuel_type": fuel_type,
-            "mode": preferred_mode,
+            "mode": active_mode,
             "data_source": selected["data_source"],
             "initial_gallons": selected["initial_gallons"],
             "final_gallons": selected["final_gallons"],
@@ -172,7 +258,13 @@ def perform_tank_calc(
 
 
 def _calculate_profile_for_mode(
-    *, tank_mapping, current_inches, delivery_gallons, virtual_meta, mode
+    *,
+    tank_mapping,
+    current_inches,
+    delivery_gallons,
+    virtual_meta,
+    mode,
+    mode_resolver,
 ):
     if tank_mapping:
         resolved_mode, source_meta = determine_operating_mode(
@@ -204,28 +296,46 @@ def _calculate_profile_for_mode(
         source_meta,
     )
 
+    limits = mode_resolver.build_limits_for_mode(
+        tank_mapping,
+        mode=CalculationMode(mode),
+        source_meta=source_meta,
+    )
+
     capacity = 0
-    if tank_mapping and tank_mapping.tank_type:
-        capacity = tank_mapping.tank_type.capacity or 0
-    elif "capacity" in source_meta:
-        capacity = source_meta["capacity"]
+    if limits.capacity_gallons is not None:
+        capacity = int(limits.capacity_gallons)
+    elif tank_mapping and tank_mapping.tank_type:
+        capacity = int(tank_mapping.tank_type.capacity or 0)
+    elif "capacity" in source_meta and source_meta["capacity"] is not None:
+        capacity = int(source_meta["capacity"])
 
     ninety_percent_limit = capacity * 0.9
     gallons_to_ninety = max(0, ninety_percent_limit - initial_gallons)
 
-    max_depth = 0.0
-    if mode == MODE_MATHEMATICAL and source_meta.get("estimation"):
+    if limits.max_depth_inches is not None:
+        max_depth = float(limits.max_depth_inches)
+    elif mode == MODE_MATHEMATICAL and source_meta.get("estimation"):
         max_depth = float(source_meta["estimation"].radius) * 2.0
     elif tank_mapping and tank_mapping.tank_type:
         max_depth = float(tank_mapping.tank_type.max_depth or 0)
+    else:
+        max_depth = 0.0
 
     no_fit_warning = final_gallons > ninety_percent_limit
     estimated_ending_gallons = int(final_gallons)
     estimated_ending_inches = final_inches
+
+    warnings = list(limits.warnings)
+    if mode == MODE_MATHEMATICAL and limits.confidence == ConfidenceLevel.LOW:
+        warnings.append("Mathematical estimate confidence is LOW.")
+
     return {
         "mode": mode,
+        "capacity": limits.to_dict(),
         "data_source": source_meta.get("name", mode),
         "confidence": source_meta.get("confidence", 1.0),
+        "confidence_level": limits.confidence.value,
         "initial_inches": float(current_inches),
         "initial_gallons": int(initial_gallons),
         "delivery_gallons": int(delivery_gallons),
@@ -240,6 +350,7 @@ def _calculate_profile_for_mode(
         "avail_90": int(gallons_to_ninety),
         "final_gallons": estimated_ending_gallons,
         "final_inches": estimated_ending_inches,
+        "warnings": warnings,
     }
 
 

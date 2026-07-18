@@ -116,14 +116,48 @@
     <div class="tactical-card" x-show="step >= 3" x-transition x-ref="inputStepCard">
         <h2 class="h5 mono text-tactical-warning mb-3">03 // INPUT_DELIVERY_TELEMETRY</h2>
 
+        <div class="mb-3 p-2 bg-dark rounded border border-secondary mono" x-show="selectedTank" x-cloak>
+            <div class="mb-2"><strong>CALCULATION SOURCE</strong></div>
+            <div class="d-flex flex-wrap gap-2">
+                <button
+                    type="button"
+                    class="btn mono fw-bold"
+                    :class="selectedDisplayMode === 'AUTO' ? 'btn-tactical-amber' : 'btn-tactical-secondary'"
+                    @click="setDisplayMode('AUTO')"
+                >AUTO</button>
+                <button
+                    type="button"
+                    class="btn mono fw-bold"
+                    :class="selectedDisplayMode === 'OFFICIAL' ? 'btn-tactical-amber' : 'btn-tactical-secondary'"
+                    @click="setDisplayMode('OFFICIAL')"
+                    :disabled="!isModeAvailable('OFFICIAL')"
+                >OFFICIAL CHART</button>
+                <button
+                    type="button"
+                    class="btn mono fw-bold"
+                    :class="selectedDisplayMode === 'MATHEMATICAL' ? 'btn-tactical-amber' : 'btn-tactical-secondary'"
+                    @click="setDisplayMode('MATHEMATICAL')"
+                    :disabled="!isModeAvailable('MATHEMATICAL')"
+                >VEEDER MATH</button>
+            </div>
+            <div class="mt-2 small text-muted-custom" x-show="resolvedDisplayMode" x-cloak>
+                ACTIVE: <span x-text="resolvedDisplayMode"></span> |
+                CONFIDENCE: <span x-text="activeModeConfidence"></span>
+            </div>
+            <div class="text-tactical-danger mt-2 small" x-show="activeModeReason" x-text="activeModeReason" x-cloak></div>
+            <template x-for="warning in selectedLimitWarnings" :key="warning">
+                <div class="text-tactical-danger mt-1 small" x-text="warning"></div>
+            </template>
+        </div>
+
         <div class="mb-3 p-2 bg-dark rounded border border-secondary mono">
             <strong>TARGET:</strong> <span x-text="selectedTank?.fuel_type.toUpperCase()"></span><br>
-            <strong>MAX CAPACITY:</strong> <span x-text="selectedTank?.capacity !== null && selectedTank?.capacity !== undefined ? selectedTank.capacity + ' Gal' : 'Unknown'"></span><br>
+            <strong>MAX CAPACITY:</strong> <span x-text="selectedLimits?.capacity_gallons !== null && selectedLimits?.capacity_gallons !== undefined ? selectedLimits.capacity_gallons + ' Gal' : 'Unknown'"></span><br>
             <strong>LIMIT SOURCE:</strong>
             <span
                 class="badge"
-                :class="selectedTank?.limits_source === 'VEEDER' ? 'bg-warning text-dark' : selectedTank?.limits_source === 'OFFICIAL' ? 'bg-secondary text-light' : 'bg-dark text-light border border-secondary'"
-                x-text="selectedTank?.limits_source || 'UNAVAILABLE'"
+                :class="selectedLimits?.source === 'VEEDER' ? 'bg-warning text-dark' : selectedLimits?.source === 'OFFICIAL' ? 'bg-secondary text-light' : selectedLimits?.source === 'GENERATED' ? 'bg-info text-dark' : 'bg-dark text-light border border-secondary'"
+                x-text="selectedLimits?.source || 'UNAVAILABLE'"
             ></span>
         </div>
 
@@ -154,21 +188,9 @@
             <div>
                 <template x-if="results.status === 'SUCCESS'">
                     <div class="mono">
-                        <div class="result-toggle mb-3" x-show="hasMultipleProfiles" x-cloak>
-                            <button
-                                type="button"
-                                class="btn mono fw-bold"
-                                :class="activeProfileKey === 'mathematical' ? 'btn-tactical-amber' : 'btn-tactical-secondary'"
-                                @click="activeProfileKey = 'mathematical'"
-                                :disabled="!results?.profiles?.mathematical"
-                            >VEEDER MATH</button>
-                            <button
-                                type="button"
-                                class="btn mono fw-bold"
-                                :class="activeProfileKey === 'official' ? 'btn-tactical-amber' : 'btn-tactical-secondary'"
-                                @click="activeProfileKey = 'official'"
-                                :disabled="!results?.profiles?.official"
-                            >OFFICIAL CHART</button>
+                        <div class="mb-3 small text-muted-custom" x-show="activeProfile" x-cloak>
+                            MODE: <span x-text="resolvedDisplayMode"></span> |
+                            CONFIDENCE: <span x-text="activeProfile?.confidence_level || activeModeConfidence"></span>
                         </div>
 
                         <div class="result-panel">
@@ -203,6 +225,9 @@
                         >
                             WARNING: 90% SAFE FILL CAPACITY EXCEEDED
                         </div>
+                        <template x-for="warning in activeProfileWarnings" :key="warning">
+                            <div class="result-warning mt-2" x-text="warning"></div>
+                        </template>
                     </div>
                 </template>
 

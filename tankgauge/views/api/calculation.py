@@ -44,6 +44,7 @@ class CalculateTankAPIView(APIView):
         tank_index = data.get("tank_index")
         current_inches = data["current_inches"]
         delivery_gallons = data["delivery_gallons"]
+        display_mode = data.get("display_mode", "AUTO")
 
         virtual_meta = None
         mapping = None
@@ -115,6 +116,7 @@ class CalculateTankAPIView(APIView):
                 current_inches,
                 delivery_gallons,
                 virtual_meta=virtual_meta,
+                display_mode=display_mode,
             )
             final_gallons = result.get("final_gallons")
             logger.info(
