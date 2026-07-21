@@ -14,6 +14,13 @@ class FuelType(models.Model):
         unique=True,
         help_text="Standardized name (e.g., Regular, Premium, Diesel).",
     )
+    abbreviation = models.CharField(
+        max_length=10,
+        unique=True,
+        blank=True,
+        null=True,
+        help_text="Short code for DMS tags and filenames (e.g., RUL, DSL, PUL).",
+    )
     color_name = models.CharField(
         max_length=50, blank=True, null=True, help_text="Visual identifier name."
     )
