@@ -239,6 +239,14 @@
             }
         }
     </style>
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-TVNRDTK05X"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-TVNRDTK05X');
+    </script>
     {% block extra_head %}{% endblock %}
     {% include 'feedback/includes/feedback_styles.html' %}
 </head>
