@@ -3,9 +3,26 @@
 {% block title %}Contact | {{ SITE_NAME }}{% endblock %}
 
 {% block content %}
-<div class="container py-5">
+<div class="container py-5" x-data="{ copied: false }">
     <h1 class="mono">[ COMMS_LINK ]</h1>
     <hr class="border-secondary">
-    <p class="mono text-muted-custom">Establish secure communications with command HQ.</p>
+    <p class="mono text-muted-custom mb-4">Establish secure communications with command HQ.</p>
+
+    <div class="p-4 mono" style="max-width: 480px; background: #1c1f23; border: 1px solid #2a2e33;">
+        <div class="small text-muted-custom mb-2">EMAIL</div>
+        <div class="d-flex align-items-center justify-content-between">
+            <span class="text-primary mono">josh@thejoshproject.xyz</span>
+            <button
+                class="btn btn-sm mono"
+                :class="copied ? 'btn-success' : 'btn-secondary'"
+                @click="
+                    navigator.clipboard.writeText('josh@thejoshproject.xyz');
+                    copied = true;
+                    setTimeout(() => copied = false, 2000);
+                "
+                x-text="copied ? 'COPIED' : 'COPY'"
+            ></button>
+        </div>
+    </div>
 </div>
 {% endblock %}
