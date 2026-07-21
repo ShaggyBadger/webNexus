@@ -59,6 +59,7 @@ class VeederReading(models.Model):
         default=False,
         help_text="True if a human field agent corrected or verified this entry.",
     )
+    created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
 
     class Meta:
         verbose_name = "Veeder Reading"

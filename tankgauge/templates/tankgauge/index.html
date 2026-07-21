@@ -238,7 +238,18 @@
     </div>
 
     <div class="tactical-card" x-show="step >= 3" x-transition x-ref="chartStepCard">
-        <h2 class="h5 mono text-tactical-warning mb-3">05 // TANK_CHART_VISUALIZATION</h2>
+        <div class="d-flex justify-content-between align-items-center mb-3 gap-2">
+            <h2 class="h5 mono text-tactical-warning mb-0">05 // TANK_CHART_VISUALIZATION</h2>
+            <a
+                class="btn btn-tactical-secondary btn-sm mono"
+                x-show="storeData && selectedTank"
+                :href="`/tankcharts/chart/${storeData.store_num}/${selectedTank.tank_index}/`"
+                target="_blank"
+                rel="noopener"
+            >
+                VIEW FIELD CHART
+            </a>
+        </div>
         <div x-show="loading.chart" class="text-muted-custom mono">LOADING_CHART_DATA...</div>
         <div class="chart-wrap" x-show="!loading.chart">
             <canvas id="tankChart"></canvas>

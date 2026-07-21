@@ -236,6 +236,7 @@
             self.selectTank({
               id: Number(firstButton.dataset.tankId),
               tankIndex: parseNumberOrNull(firstButton.dataset.tankIndex),
+              storeNum: parseNumberOrNull(firstButton.dataset.storeNum),
               fuelType: firstButton.dataset.fuelType || "UNKNOWN",
               capacity: parseNumberOrNull(firstButton.dataset.capacity),
               maxDepth: parseNumberOrNull(firstButton.dataset.maxDepth),
@@ -272,6 +273,14 @@
         this.tankProfileError = "";
         this.destroyTankChart();
         await this.loadTankProfile();
+      },
+
+      openTankChart: function () {
+        if (!this.selectedTank || !this.selectedTank.storeNum || !this.selectedTank.tankIndex) {
+          return;
+        }
+        const url = `/tankcharts/chart/${this.selectedTank.storeNum}/${this.selectedTank.tankIndex}/`;
+        window.open(url, "_blank", "noopener");
       },
 
       loadTankProfile: async function () {

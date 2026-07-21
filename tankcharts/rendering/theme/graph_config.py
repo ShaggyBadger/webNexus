@@ -1,0 +1,7 @@
+class GraphConfig:
+    FIGSIZE = (7.2, 2.2)
+    GRID_COLOR = "#d7d9dd"
+    OFFICIAL_LINE_WIDTH = 1.8
+    ESTIMATED_LINE_WIDTH = 1.8
+    VEEDER_MARKER_SIZE = 16
+    FONT_SIZE = 8
