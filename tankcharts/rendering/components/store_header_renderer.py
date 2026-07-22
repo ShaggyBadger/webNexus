@@ -25,12 +25,13 @@ class StoreHeaderRenderer:
             f" | {chart.store_name or 'Unknown brand'} | {page_label}"
         )
         location_line = (
-            f"{chart.address or 'Unknown address'}"
-            f" | {city_state_zip or 'Unknown city/state/zip'}"
+            f"{chart.address or 'Unknown address'} | "
+            f"{city_state_zip or 'Unknown city/state/zip'} | "
+            f"TANKS {len(chart.tanks)}"
         )
         return [
             Paragraph(title_line, self.styles["title"]),
             Paragraph(location_line, self.styles["body"]),
-            Paragraph(tank_summaries, self.styles["body"]),
+            Paragraph(tank_summaries, self.styles["footer"]),
             Spacer(1, Spacing.SECTION_GAP),
         ]

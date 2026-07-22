@@ -1,5 +1,5 @@
 from reportlab.lib import colors
-from reportlab.platypus import Paragraph, Table, TableStyle
+from reportlab.platypus import Table, TableStyle
 
 from tankcharts.domain import StoreFieldChart
 from tankcharts.rendering.theme import Colors, PageLayout
@@ -12,17 +12,14 @@ class StoreLookupTableRenderer:
         self.styles = styles
 
     def render(self, chart: StoreFieldChart, *, tank_indices: list[int]) -> list:
-        header_row = [Paragraph("INCHES", self.styles["heading"])]
+        header_row = ["INCHES"]
         for tank in chart.tanks:
             if tank.tank_index in tank_indices:
                 header_row.append(
-                    Paragraph(
-                        self._tank_header_label(
-                            fuel_type=tank.fuel_type,
-                            tank_index=tank.tank_index,
-                            max_depth_inches=tank.max_depth_inches,
-                        ),
-                        self.styles["heading"],
+                    self._tank_header_label(
+                        fuel_type=tank.fuel_type,
+                        tank_index=tank.tank_index,
+                        max_depth_inches=tank.max_depth_inches,
                     )
                 )
 
@@ -30,12 +27,10 @@ class StoreLookupTableRenderer:
 
         for row in chart.combined_table_rows:
             inches = int(row["inches"])
-            row_cells = [Paragraph(str(inches), self.styles["body_right"])]
+            row_cells = [str(inches)]
             for tank_index in tank_indices:
                 value = row.get(f"tank_{tank_index}_gallons")
-                row_cells.append(
-                    Paragraph(self._format_number(value), self.styles["body_right"])
-                )
+                row_cells.append(self._format_number(value))
             table_data.append(row_cells)
 
         col_widths = self._column_widths(tank_count=len(tank_indices))
@@ -44,18 +39,22 @@ class StoreLookupTableRenderer:
         style_commands = [
             ("BACKGROUND", (0, 0), (-1, 0), Colors.HEADER_BG),
             ("TEXTCOLOR", (0, 0), (-1, -1), Colors.TEXT_PRIMARY),
-            ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
-            ("FONTSIZE", (0, 0), (-1, -1), PageLayout.TABLE_FONT_SIZE),
-            ("FONTSIZE", (0, 0), (-1, 0), PageLayout.TABLE_HEADER_FONT_SIZE),
+            ("FONTNAME", (0, 0), (-1, -1), "Helvetica-Bold"),
+            ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
+            ("FONTSIZE", (0, 0), (-1, -1), 6.0),
+            ("FONTSIZE", (0, 0), (-1, 0), 6.5),
             ("ALIGN", (0, 0), (-1, -1), "RIGHT"),
             ("ALIGN", (0, 0), (-1, 0), "CENTER"),
             ("BOX", (0, 0), (-1, -1), 0.5, Colors.BORDER),
             ("INNERGRID", (0, 0), (-1, -1), 0.3, Colors.BORDER),
             ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, Colors.ROW_ALT]),
-            ("LEFTPADDING", (0, 0), (-1, -1), 3),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 3),
-            ("TOPPADDING", (0, 0), (-1, -1), 1),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 1),
+            ("LEFTPADDING", (0, 0), (-1, -1), 2),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 2),
+            ("TOPPADDING", (0, 1), (-1, -1), 0),
+            ("BOTTOMPADDING", (0, 1), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, 0), 1),
+            ("BOTTOMPADDING", (0, 0), (-1, 0), 1),
+            ("LEADING", (0, 0), (-1, -1), 6),
         ]
 
         for row_number in range(51, len(table_data), 50):

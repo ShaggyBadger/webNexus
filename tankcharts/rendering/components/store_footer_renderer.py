@@ -17,7 +17,4 @@ class StoreFooterRenderer:
             f"Store-wide chart for {len(chart.tanks)} tanks | "
             f"{chart.total_veeder_observation_count} total Veeder observations"
         )
-        return [
-            Paragraph(generated_label, self.styles["footer"]),
-            Paragraph(note_line, self.styles["footer"]),
-        ]
+        return [Paragraph(f"{generated_label} | {note_line}", self.styles["footer"])]

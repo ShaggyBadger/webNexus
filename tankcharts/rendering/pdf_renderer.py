@@ -82,7 +82,6 @@ class PDFRenderer:
             elements.extend(
                 self.store_table_renderer.render(chart, tank_indices=tank_indices)
             )
-            elements.append(Spacer(1, Spacing.SECTION_GAP))
             elements.extend(self.store_footer_renderer.render(chart))
             elements.append(PageBreak())
 
