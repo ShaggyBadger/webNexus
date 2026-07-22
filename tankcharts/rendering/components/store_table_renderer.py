@@ -91,28 +91,17 @@ class StoreLookupTableRenderer:
                 "LINEBEFORE",
                 (separator_col_index, 0),
                 (separator_col_index, -1),
-                1.4,
+                0.3,
                 Colors.ESTIMATED_CURVE,
             ),
             (
                 "LINEAFTER",
                 (separator_col_index, 0),
                 (separator_col_index, -1),
-                1.4,
+                0.3,
                 Colors.ESTIMATED_CURVE,
             ),
         ]
-
-        for row_number in range(51, len(table_data), 50):
-            style_commands.append(
-                (
-                    "LINEABOVE",
-                    (0, row_number),
-                    (-1, row_number),
-                    1.0,
-                    Colors.ESTIMATED_CURVE,
-                )
-            )
 
         table.setStyle(TableStyle(style_commands))
         return [table]
