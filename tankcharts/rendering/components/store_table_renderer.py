@@ -12,28 +12,54 @@ class StoreLookupTableRenderer:
         self.styles = styles
 
     def render(self, chart: StoreFieldChart, *, tank_indices: list[int]) -> list:
-        header_row = ["INCHES"]
+        left_headers = ["INCHES"]
         for tank in chart.tanks:
             if tank.tank_index in tank_indices:
-                header_row.append(
+                left_headers.append(
                     self._tank_header_label(
                         fuel_type=tank.fuel_type,
                         tank_index=tank.tank_index,
                         max_depth_inches=tank.max_depth_inches,
                     )
                 )
+        right_headers = list(left_headers)
 
-        table_data = [header_row]
+        table_data = [left_headers + [""] + right_headers]
 
-        for row in chart.combined_table_rows:
-            inches = int(row["inches"])
-            row_cells = [str(inches)]
+        max_depth_inches = len(chart.combined_table_rows)
+        split_point = (max_depth_inches + 1) // 2
+
+        for row_number in range(1, split_point + 1):
+            left_row = chart.combined_table_rows[row_number - 1]
+            right_index = row_number + split_point
+            right_row = (
+                chart.combined_table_rows[right_index - 1]
+                if right_index <= max_depth_inches
+                else None
+            )
+
+            row_cells = [str(int(left_row["inches"]))]
             for tank_index in tank_indices:
-                value = row.get(f"tank_{tank_index}_gallons")
-                row_cells.append(self._format_number(value))
+                row_cells.append(
+                    self._format_number(left_row.get(f"tank_{tank_index}_gallons"))
+                )
+
+            row_cells.append("")
+            row_cells.append(str(int(right_row["inches"])) if right_row else "")
+            for tank_index in tank_indices:
+                row_cells.append(
+                    self._format_number(
+                        right_row.get(f"tank_{tank_index}_gallons")
+                        if right_row
+                        else None
+                    )
+                )
+
             table_data.append(row_cells)
 
-        col_widths = self._column_widths(tank_count=len(tank_indices))
+        col_widths, separator_col_index = self._column_widths(
+            tank_count=len(tank_indices)
+        )
         table = Table(table_data, colWidths=col_widths, repeatRows=1)
 
         style_commands = [
@@ -55,6 +81,26 @@ class StoreLookupTableRenderer:
             ("TOPPADDING", (0, 0), (-1, 0), 1),
             ("BOTTOMPADDING", (0, 0), (-1, 0), 1),
             ("LEADING", (0, 0), (-1, -1), 6),
+            (
+                "BACKGROUND",
+                (separator_col_index, 0),
+                (separator_col_index, -1),
+                Colors.ESTIMATED_CURVE,
+            ),
+            (
+                "LINEBEFORE",
+                (separator_col_index, 0),
+                (separator_col_index, -1),
+                1.4,
+                Colors.ESTIMATED_CURVE,
+            ),
+            (
+                "LINEAFTER",
+                (separator_col_index, 0),
+                (separator_col_index, -1),
+                1.4,
+                Colors.ESTIMATED_CURVE,
+            ),
         ]
 
         for row_number in range(51, len(table_data), 50):
@@ -71,10 +117,16 @@ class StoreLookupTableRenderer:
         table.setStyle(TableStyle(style_commands))
         return [table]
 
-    def _column_widths(self, *, tank_count: int) -> list[float]:
-        inches_col_width = PageLayout.STORE_TABLE_COL_INCHES_WIDTH
-        tank_col_width = (PageLayout.CONTENT_WIDTH - inches_col_width) / tank_count
-        return [inches_col_width] + [tank_col_width] * tank_count
+    def _column_widths(self, *, tank_count: int) -> tuple[list[float], int]:
+        separator_width = PageLayout.STORE_TABLE_SEPARATOR_WIDTH
+        block_width = (PageLayout.CONTENT_WIDTH - separator_width) / 2
+        inches_col_width = PageLayout.STORE_TABLE_COL_INCHES_WIDTH / 2
+        tank_col_width = (block_width - inches_col_width) / tank_count
+
+        left_block = [inches_col_width] + [tank_col_width] * tank_count
+        separator_col_index = len(left_block)
+        widths = left_block + [separator_width] + left_block
+        return widths, separator_col_index
 
     def _tank_header_label(
         self,
