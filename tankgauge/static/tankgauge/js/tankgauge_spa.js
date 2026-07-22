@@ -176,6 +176,17 @@ function tankGaugeApp() {
       this.destroyChart();
     },
 
+    preferredModeForTank(tank) {
+      const availableModes = tank?.available_modes || [];
+      const hasMath = availableModes.some(
+        (item) => item.mode === "MATHEMATICAL" && item.available,
+      );
+      if (hasMath) {
+        return "MATHEMATICAL";
+      }
+      return "OFFICIAL";
+    },
+
     init() {
       if (!Array.isArray(window.__webnexusFeedbackProviders)) {
         window.__webnexusFeedbackProviders = [];
@@ -774,13 +785,3 @@ function tankGaugeApp() {
 document.addEventListener("alpine:init", () => {
   Alpine.data("tankGaugeApp", tankGaugeApp);
 });
-    preferredModeForTank(tank) {
-      const availableModes = tank?.available_modes || [];
-      const hasMath = availableModes.some(
-        (item) => item.mode === "MATHEMATICAL" && item.available,
-      );
-      if (hasMath) {
-        return "MATHEMATICAL";
-      }
-      return "OFFICIAL";
-    },
