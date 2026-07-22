@@ -98,6 +98,16 @@
 
     <div class="tactical-card" x-show="step >= 2" x-transition x-ref="tankStepCard">
         <h2 class="h5 mono text-tactical-warning mb-3">02 // SELECT_TARGET_TANK</h2>
+        <div class="mb-3" x-show="storeData" x-cloak>
+            <a
+                class="btn btn-primary btn-tactical-olive mono fw-bold w-100"
+                :href="`/tankcharts/store/${storeData.store_num}/`"
+                target="_blank"
+                rel="noopener"
+            >
+                PRINT STORE CHART PACK
+            </a>
+        </div>
         <p class="mono small text-muted-custom mb-2">Tap one tank to continue to telemetry input.</p>
         <div class="d-flex flex-column gap-2">
             <template x-for="tank in tanks" :key="tank.id">

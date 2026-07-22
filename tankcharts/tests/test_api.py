@@ -69,6 +69,11 @@ class TankChartAPITests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertIn("/dms/documents/", response["Location"])
 
+    def test_store_chart_endpoint_redirects_to_dms_download(self):
+        response = self.client.get(f"/tankcharts/store/{self.store_num}/")
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/dms/documents/", response["Location"])
+
     def test_batch_endpoint_requires_admin(self):
         response = self.client.post(
             f"/tankcharts/batch/{self.store_num}/", {"force": True}

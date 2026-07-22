@@ -61,6 +61,18 @@ class DMSChartStorageService:
             .first()
         )
 
+    def find_existing_store(self, *, store_num: int) -> Document | None:
+        filename = self._build_store_original_filename(store_num=store_num)
+        return (
+            Document.objects.filter(
+                original_filename=filename,
+                category=self.tank_chart_category,
+                status="ACTIVE",
+            )
+            .order_by("-uploaded_at")
+            .first()
+        )
+
     def is_stale(
         self,
         *,
@@ -101,6 +113,41 @@ class DMSChartStorageService:
 
         current_official_row_count = self._official_row_count(mapping=mapping)
         return int(prior_official_row_count) != int(current_official_row_count)
+
+    def is_store_stale(self, *, document: Document, store_num: int) -> bool:
+        store = Store.objects.filter(store_num=store_num).first()
+        if not store:
+            return True
+
+        mappings = list(
+            StoreTankMapping.objects.select_related("tank_type")
+            .filter(store=store)
+            .order_by("tank_index", "id")
+        )
+        if not mappings:
+            return True
+
+        metadata = self._parse_metadata(document=document)
+        prior_official_counts = metadata.get("official_row_counts")
+        if not isinstance(prior_official_counts, dict):
+            return True
+
+        for mapping in mappings:
+            if self._tank_updated_after(
+                mapping=mapping,
+                uploaded_at=document.uploaded_at,
+            ):
+                return True
+
+            key = str(mapping.tank_index)
+            if key not in prior_official_counts:
+                return True
+
+            current_count = self._official_row_count(mapping=mapping)
+            if int(prior_official_counts[key]) != int(current_count):
+                return True
+
+        return False
 
     def store(
         self,
@@ -170,12 +217,73 @@ class DMSChartStorageService:
 
         return document
 
+    def store_store_chart(
+        self,
+        *,
+        store_num: int,
+        pdf_bytes: bytes,
+        metadata: dict,
+    ) -> Document:
+        store = Store.objects.filter(store_num=store_num).first()
+        if not store:
+            raise ValueError(f"Store {store_num} not found.")
+
+        filename = self._build_store_original_filename(store_num=store_num)
+
+        with transaction.atomic():
+            self.delete_store(store_num=store_num)
+
+            ulid_value = generate_ulid()
+            year = datetime.now(tz=UTC).strftime("%Y")
+            file_path = f"documents/{year}/{ulid_value}.pdf"
+            store_content_type = ContentType.objects.get_for_model(Store)
+            title = f"Store Field Chart - Store {store_num}"
+
+            document = Document.objects.create(
+                title=title,
+                original_filename=filename,
+                stored_filename=f"{ulid_value}.pdf",
+                file_path=file_path,
+                mime_type="application/pdf",
+                file_size=len(pdf_bytes),
+                sha256=sha256(pdf_bytes).hexdigest(),
+                uploaded_by=self.system_user,
+                status="ACTIVE",
+                category=self.tank_chart_category,
+                content_type=store_content_type,
+                object_id=str(store.pk),
+                is_public=True,
+                description=json.dumps(metadata),
+            )
+
+            tags_to_add = [self.tank_chart_tag]
+            if store.state:
+                state_slug = slugify(store.state)
+                state_tag, _ = Tag.objects.get_or_create(
+                    slug=state_slug,
+                    defaults={"name": store.state.upper()},
+                )
+                tags_to_add.append(state_tag)
+            document.tags.add(*tags_to_add)
+
+            default_storage.save(document.file_path, ContentFile(pdf_bytes))
+
+        return document
+
     def delete(self, *, store_num: int, fuel_type: str, tank_index: int) -> None:
         existing = self.find_existing(
             store_num=store_num,
             fuel_type=fuel_type,
             tank_index=tank_index,
         )
+        if not existing:
+            return
+
+        existing.status = "ARCHIVED"
+        existing.save(update_fields=["status", "updated_at"])
+
+    def delete_store(self, *, store_num: int) -> None:
+        existing = self.find_existing_store(store_num=store_num)
         if not existing:
             return
 
@@ -194,6 +302,12 @@ class DMSChartStorageService:
             fuel_type=fuel_type,
             tank_index=tank_index,
         )
+        if not existing:
+            return None
+        return reverse("dms:document_download", kwargs={"ulid": existing.id})
+
+    def get_store_download_url(self, *, store_num: int) -> str | None:
+        existing = self.find_existing_store(store_num=store_num)
         if not existing:
             return None
         return reverse("dms:document_download", kwargs={"ulid": existing.id})
@@ -292,6 +406,9 @@ class DMSChartStorageService:
         fuel_abbreviation = self._resolve_fuel_abbreviation(fuel_type=fuel_type)
         return f"{store_num}_{fuel_abbreviation}_T{tank_index}.pdf"
 
+    def _build_store_original_filename(self, *, store_num: int) -> str:
+        return f"{store_num}_STORE.pdf"
+
     def _resolve_fuel_abbreviation(self, *, fuel_type: str) -> str:
         fuel_type_obj = FuelType.objects.filter(name__iexact=fuel_type).first()
         if fuel_type_obj and fuel_type_obj.abbreviation:
@@ -338,3 +455,27 @@ class DMSChartStorageService:
             tank_type=mapping.tank_type,
             is_official=True,
         ).count()
+
+    def _tank_updated_after(
+        self,
+        *,
+        mapping: StoreTankMapping,
+        uploaded_at,
+    ) -> bool:
+        latest_ticket = (
+            VeederTicket.objects.filter(store=mapping.store)
+            .order_by("-uploaded_at")
+            .values_list("uploaded_at", flat=True)
+            .first()
+        )
+        latest_estimation = (
+            TankEstimation.objects.filter(tank_mapping=mapping)
+            .order_by("-created_at")
+            .values_list("created_at", flat=True)
+            .first()
+        )
+        if latest_ticket and latest_ticket > uploaded_at:
+            return True
+        if latest_estimation and latest_estimation > uploaded_at:
+            return True
+        return False

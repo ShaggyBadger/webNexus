@@ -94,3 +94,35 @@ class TankFieldChartServiceTests(TestCase):
             max_depth_inches=96,
         )
         self.assertEqual(coverage_percent, 0.0)
+
+    def test_build_store_returns_combined_rows_and_sorted_tanks(self):
+        tank_two = StoreTankMapping.objects.create(
+            store=self.store,
+            tank_type=self.tank_type,
+            fuel_type="diesel",
+            tank_index=2,
+        )
+        TankEstimation.objects.create(
+            tank_mapping=tank_two,
+            radius=48.0,
+            length=360.0,
+            confidence=0.8,
+            mean_error=4.2,
+            max_error=8.0,
+            sample_count=7,
+            algorithm_version="1.0.0",
+            is_active=True,
+        )
+
+        service = TankFieldChartService()
+        store_chart = service.build_store(store_num=self.store.store_num)
+
+        self.assertEqual(store_chart.store_num, self.store.store_num)
+        self.assertEqual([tank.tank_index for tank in store_chart.tanks], [1, 2])
+        self.assertGreater(len(store_chart.combined_table_rows), 0)
+        first_row = store_chart.combined_table_rows[0]
+        self.assertIn("tank_1_gallons", first_row)
+        self.assertIn("tank_2_gallons", first_row)
+
+        chunks = service.chunk_store_tanks(store_chart, page_size=4)
+        self.assertEqual(chunks, [[1, 2]])

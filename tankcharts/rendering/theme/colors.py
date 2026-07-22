@@ -18,3 +18,5 @@ class Colors:
     OFFICIAL_CURVE = HexColor("#a0aec0")
     ESTIMATED_CURVE = HexColor("#d4943a")
     VEEDER_POINTS = HexColor("#d63050")
+
+    TANK_COLORS = ["#3b82f6", "#d4943a", "#6b8e23", "#d63050"]
