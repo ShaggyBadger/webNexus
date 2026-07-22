@@ -8,6 +8,7 @@ from tankcharts.rendering.components import (
     GraphRenderer,
     HeaderRenderer,
     LookupTableRenderer,
+    SiteConfigurationRenderer,
 )
 from tankcharts.rendering.theme import PageLayout, Spacing, build_styles, register_fonts
 
@@ -21,6 +22,7 @@ class PDFRenderer:
         self.header_renderer = HeaderRenderer(self.styles)
         self.graph_renderer = GraphRenderer()
         self.table_renderer = LookupTableRenderer(self.styles)
+        self.site_configuration_renderer = SiteConfigurationRenderer(self.styles)
         self.footer_renderer = FooterRenderer(self.styles)
 
     def render(self, chart: TankFieldChart) -> bytes:
@@ -38,6 +40,8 @@ class PDFRenderer:
         elements.extend(self.header_renderer.render(chart))
         elements.extend(self.table_renderer.render(chart))
         elements.append(PageBreak())
+        elements.extend(self.site_configuration_renderer.render(chart))
+        elements.append(Spacer(1, Spacing.SECTION_GAP * 2))
         elements.extend(self.graph_renderer.render(chart))
         elements.append(Spacer(1, Spacing.SECTION_GAP))
         elements.extend(self.footer_renderer.render(chart))

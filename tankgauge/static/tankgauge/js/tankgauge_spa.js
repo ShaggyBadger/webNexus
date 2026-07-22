@@ -10,7 +10,7 @@ function tankGaugeApp() {
       currentInches: "",
     },
     results: null,
-    selectedDisplayMode: "AUTO",
+    selectedDisplayMode: "MATHEMATICAL",
     activeProfileKey: null,
     chartData: null,
     chartInstance: null,
@@ -58,17 +58,16 @@ function tankGaugeApp() {
     },
 
     get resolvedDisplayMode() {
-      if (this.results?.mode) {
-        return this.results.mode;
+      if (!this.selectedTank) {
+        return "MATHEMATICAL";
       }
-      const defaultMode = this.selectedTank?.default_mode || "MATHEMATICAL";
-      if (this.selectedDisplayMode === "AUTO") {
-        return defaultMode;
+      if (this.isModeAvailable(this.selectedDisplayMode)) {
+        return this.selectedDisplayMode;
       }
-      if (!this.isModeAvailable(this.selectedDisplayMode)) {
-        return defaultMode;
+      if (this.isModeAvailable("MATHEMATICAL")) {
+        return "MATHEMATICAL";
       }
-      return this.selectedDisplayMode;
+      return "OFFICIAL";
     },
 
     get selectedLimits() {
@@ -90,10 +89,50 @@ function tankGaugeApp() {
       return this.activeProfile?.warnings || [];
     },
 
-    get activeModeReason() {
-      if (this.selectedDisplayMode === "AUTO") {
-        return null;
+    get chartTableRows() {
+      const officialChart = this.chartData?.series?.official_chart || [];
+      const generatedCurve = this.chartData?.series?.generated_curve || [];
+      if (officialChart.length === 0 && generatedCurve.length === 0) {
+        return [];
       }
+
+      const officialByInches = new Map(
+        officialChart.map((point) => [Number(point.inches), Number(point.gallons)]),
+      );
+      const veederByInches = new Map(
+        generatedCurve.map((point) => [Number(point.inches), Number(point.gallons)]),
+      );
+
+      const allInches = Array.from(
+        new Set([...officialByInches.keys(), ...veederByInches.keys()]),
+      ).sort((left, right) => left - right);
+
+      return allInches.map((inches) => {
+        const officialGallons = officialByInches.has(inches)
+          ? officialByInches.get(inches)
+          : null;
+        const veederGallons = veederByInches.has(inches) ? veederByInches.get(inches) : null;
+
+        let deltaGallons = null;
+        let deltaPercent = null;
+        if (officialGallons !== null && veederGallons !== null) {
+          deltaGallons = veederGallons - officialGallons;
+          if (officialGallons !== 0) {
+            deltaPercent = (deltaGallons / officialGallons) * 100;
+          }
+        }
+
+        return {
+          inches,
+          officialGallons,
+          veederGallons,
+          deltaGallons,
+          deltaPercent,
+        };
+      });
+    },
+
+    get activeModeReason() {
       const selectedAvailability = this.getModeAvailability(this.selectedDisplayMode);
       if (!selectedAvailability) {
         return null;
@@ -128,7 +167,7 @@ function tankGaugeApp() {
 
     resetTankState() {
       this.selectedTank = null;
-      this.selectedDisplayMode = "AUTO";
+      this.selectedDisplayMode = "MATHEMATICAL";
       this.inputs.deliveryGallons = "";
       this.inputs.currentInches = "";
       this.results = null;
@@ -318,7 +357,7 @@ function tankGaugeApp() {
     },
 
     async setDisplayMode(mode) {
-      if (mode !== "AUTO" && !this.isModeAvailable(mode)) {
+      if (!this.isModeAvailable(mode)) {
         return;
       }
       if (this.selectedDisplayMode === mode) {
@@ -359,6 +398,38 @@ function tankGaugeApp() {
         pointHoverRadius: 9,
         order: 0,
       };
+    },
+
+    formatChartGallons(value) {
+      if (value === null || value === undefined || Number.isNaN(value)) {
+        return "-";
+      }
+      return Number(value).toFixed(1);
+    },
+
+    formatDeltaCell(row) {
+      if (row.deltaGallons === null || row.deltaGallons === undefined) {
+        return "-";
+      }
+      const gallons = `${row.deltaGallons >= 0 ? "+" : ""}${Number(row.deltaGallons).toFixed(1)} gal`;
+      if (row.deltaPercent === null || row.deltaPercent === undefined) {
+        return gallons;
+      }
+      const pct = `${row.deltaPercent >= 0 ? "+" : ""}${Number(row.deltaPercent).toFixed(1)}%`;
+      return `${gallons} (${pct})`;
+    },
+
+    deltaClass(row) {
+      if (row.deltaGallons === null || row.deltaGallons === undefined) {
+        return "text-muted-custom";
+      }
+      if (row.deltaGallons > 0) {
+        return "text-tactical-warning";
+      }
+      if (row.deltaGallons < 0) {
+        return "text-info";
+      }
+      return "text-muted-custom";
     },
 
     async apiGet(url, fallbackMessage) {
@@ -518,7 +589,7 @@ function tankGaugeApp() {
         this.activeProfileKey = null;
       }
       this.selectedTank = tank;
-      this.selectedDisplayMode = "AUTO";
+      this.selectedDisplayMode = this.preferredModeForTank(tank);
       this.activeProfileKey = this.resolvedDisplayMode;
       this.step = 3;
       this.info = `Tank ${tank.tank_index || "?"} selected. Enter delivery telemetry.`;
@@ -703,3 +774,13 @@ function tankGaugeApp() {
 document.addEventListener("alpine:init", () => {
   Alpine.data("tankGaugeApp", tankGaugeApp);
 });
+    preferredModeForTank(tank) {
+      const availableModes = tank?.available_modes || [];
+      const hasMath = availableModes.some(
+        (item) => item.mode === "MATHEMATICAL" && item.available,
+      );
+      if (hasMath) {
+        return "MATHEMATICAL";
+      }
+      return "OFFICIAL";
+    },

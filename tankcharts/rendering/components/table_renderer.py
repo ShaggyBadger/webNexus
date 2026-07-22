@@ -55,7 +55,7 @@ class LookupTableRenderer:
                     )
             table_data.append(row_cells)
 
-        inches_col_width = 35
+        inches_col_width = 52
         gallons_col_width = (
             PageLayout.CONTENT_WIDTH - (inches_col_width * group_count)
         ) / group_count
@@ -85,6 +85,9 @@ class LookupTableRenderer:
                     ("ALIGN", (0, 0), (-1, 0), "CENTER"),
                     ("BOX", (0, 0), (-1, -1), 0.5, Colors.BORDER),
                     ("INNERGRID", (0, 0), (-1, -1), 0.3, Colors.BORDER),
+                    ("LINEAFTER", (1, 0), (1, -1), 1.2, Colors.ESTIMATED_CURVE),
+                    ("LINEAFTER", (3, 0), (3, -1), 1.2, Colors.ESTIMATED_CURVE),
+                    ("LINEAFTER", (5, 0), (5, -1), 1.2, Colors.ESTIMATED_CURVE),
                     (
                         "ROWBACKGROUNDS",
                         (0, 1),

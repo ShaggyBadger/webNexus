@@ -110,6 +110,16 @@
                 </label>
             </template>
         </div>
+        <div class="mt-3" x-show="storeData && selectedTank" x-cloak>
+            <a
+                class="btn btn-primary btn-tactical-amber mono fw-bold w-100"
+                :href="`/tankcharts/chart/${storeData.store_num}/${selectedTank.tank_index}/`"
+                target="_blank"
+                rel="noopener"
+            >
+                PRINT FIELD CHART
+            </a>
+        </div>
     </div>
 
     <div class="tactical-card" x-show="step >= 3" x-transition x-ref="inputStepCard">
@@ -121,23 +131,17 @@
                 <button
                     type="button"
                     class="btn mono fw-bold"
-                    :class="selectedDisplayMode === 'AUTO' ? 'btn-tactical-amber' : 'btn-tactical-secondary'"
-                    @click="setDisplayMode('AUTO')"
-                >AUTO</button>
+                    :class="selectedDisplayMode === 'MATHEMATICAL' ? 'btn-tactical-amber' : 'btn-tactical-secondary'"
+                    @click="setDisplayMode('MATHEMATICAL')"
+                    :disabled="!isModeAvailable('MATHEMATICAL')"
+                >OPS-MATH</button>
                 <button
                     type="button"
                     class="btn mono fw-bold"
                     :class="selectedDisplayMode === 'OFFICIAL' ? 'btn-tactical-amber' : 'btn-tactical-secondary'"
                     @click="setDisplayMode('OFFICIAL')"
                     :disabled="!isModeAvailable('OFFICIAL')"
-                >OFFICIAL CHART</button>
-                <button
-                    type="button"
-                    class="btn mono fw-bold"
-                    :class="selectedDisplayMode === 'MATHEMATICAL' ? 'btn-tactical-amber' : 'btn-tactical-secondary'"
-                    @click="setDisplayMode('MATHEMATICAL')"
-                    :disabled="!isModeAvailable('MATHEMATICAL')"
-                >VEEDER MATH</button>
+                >OPS-CHART</button>
             </div>
             <div class="mt-2 small text-muted-custom" x-show="resolvedDisplayMode" x-cloak>
                 ACTIVE: <span x-text="resolvedDisplayMode"></span>
@@ -245,12 +249,37 @@
                 target="_blank"
                 rel="noopener"
             >
-                VIEW FIELD CHART
+                PRINT CHART PDF
             </a>
         </div>
         <div x-show="loading.chart" class="text-muted-custom mono">LOADING_CHART_DATA...</div>
         <div class="chart-wrap" x-show="!loading.chart">
             <canvas id="tankChart"></canvas>
+        </div>
+        <div class="mt-3" x-show="!loading.chart && chartTableRows.length > 0" x-cloak>
+            <div class="mono small text-muted-custom mb-2">DELTA shows raw gallons with percent offset vs official chart.</div>
+            <div class="table-responsive border border-secondary rounded" style="max-height: 320px; overflow-y: auto;">
+                <table class="table table-sm table-dark table-hover mb-0 mono small align-middle">
+                    <thead>
+                        <tr>
+                            <th scope="col">IN</th>
+                            <th scope="col">OFFICIAL GAL</th>
+                            <th scope="col">VEEDER GAL</th>
+                            <th scope="col">DELTA</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="row in chartTableRows" :key="row.inches">
+                            <tr>
+                                <td x-text="row.inches"></td>
+                                <td x-text="formatChartGallons(row.officialGallons)"></td>
+                                <td x-text="formatChartGallons(row.veederGallons)"></td>
+                                <td :class="deltaClass(row)" x-text="formatDeltaCell(row)"></td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 

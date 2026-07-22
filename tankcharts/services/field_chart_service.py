@@ -60,10 +60,15 @@ class TankFieldChartService:
 
         return TankFieldChart(
             store_num=mapping.store.store_num,
+            riso_num=mapping.store.riso_num,
             store_name=mapping.store.store_name or "",
+            store_type=mapping.store.store_type or "",
             address=mapping.store.address or "",
             city=mapping.store.city or "",
             state=mapping.store.state or "",
+            zip_code=mapping.store.zip_code or "",
+            latitude=mapping.store.lat,
+            longitude=mapping.store.lon,
             tank_index=mapping.tank_index or tank_index,
             fuel_type=(mapping.fuel_type or "unknown").lower(),
             tank_type_name=mapping.tank_type.name if mapping.tank_type else "Unknown",
@@ -82,6 +87,16 @@ class TankFieldChartService:
             veeder_points=veeder_points,
             official_row_count=len(official_curve),
             estimation_id=estimation.id if estimation else None,
+            estimation_radius_inches=(
+                float(estimation.radius)
+                if estimation and estimation.radius is not None
+                else None
+            ),
+            estimation_length_inches=(
+                float(estimation.length)
+                if estimation and estimation.length is not None
+                else None
+            ),
             generated_at=datetime.utcnow(),
         )
 
