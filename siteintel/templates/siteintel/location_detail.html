@@ -145,10 +145,23 @@
                     TARGET: {{ location.name }}
                 </div>
             </div>
-            <a href="{% url 'siteintel:dashboard' %}" class="btn btn-tactical-secondary btn-sm mono ms-2 flex-shrink-0">
-                <span class="d-none d-md-inline">[ RETURN TO HUB ]</span>
-                <span class="d-md-none">HUB</span>
-            </a>
+            <div class="d-flex align-items-start gap-2 ms-2 flex-shrink-0">
+                {% if store and store.store_num %}
+                <a
+                    href="/tankcharts/store/{{ store.store_num }}/"
+                    target="_blank"
+                    rel="noopener"
+                    class="btn btn-tactical-olive btn-sm mono"
+                >
+                    <span class="d-none d-md-inline">[ PRINT STORE CHART PACK ]</span>
+                    <span class="d-md-none">STORE CHART</span>
+                </a>
+                {% endif %}
+                <a href="{% url 'siteintel:dashboard' %}" class="btn btn-tactical-secondary btn-sm mono">
+                    <span class="d-none d-md-inline">[ RETURN TO HUB ]</span>
+                    <span class="d-md-none">HUB</span>
+                </a>
+            </div>
         </div>
     </div>
 
