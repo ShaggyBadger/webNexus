@@ -1,5 +1,4 @@
 import logging
-import math
 import random
 
 from atg.models import VeederReading
@@ -8,6 +7,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
 
 from ...logic.mode_resolver import ModeResolver
+from ...logic.curve_generator import generate_inch_gallon_curve
 from ...logic.store_lookup import get_store_by_any_id
 from ...logic.tank_limits import resolve_tank_limits
 from ...models import StoreTankMapping, TankChart, TankEstimation
@@ -31,7 +31,6 @@ class StoreTanksAPIView(APIView):
             "max_depth_inches": None,
             "ninety_percent_gallons": None,
             "source": "UNAVAILABLE",
-            "confidence": "NONE",
             "mode": mode_value,
             "warnings": [reason] if reason else [],
         }
@@ -149,40 +148,30 @@ class TankChartDataAPIView(APIView):
         )
 
     def _get_generated_curve(self, mapping, max_depth):
-        generated_curve = []
-        skipped_points = 0
         estimation = TankEstimation.objects.filter(
             tank_mapping=mapping,
             is_active=True,
         ).first()
         if not estimation or not estimation.radius or not estimation.length:
-            return generated_curve
+            return []
 
-        radius = estimation.radius
-        length = estimation.length
-        for inch in range(1, int(max_depth) + 1):
-            height = min(float(inch), 2 * radius)
-            try:
-                area = (radius**2) * math.acos((radius - height) / radius) - (
-                    radius - height
-                ) * math.sqrt(max(0, 2 * radius * height - height**2))
-                volume_gallons = (area * length) / 231.0
-                generated_curve.append(
-                    {"inches": inch, "gallons": round(volume_gallons, 1)}
-                )
-            except Exception:
-                skipped_points += 1
-
-        if skipped_points:
+        try:
+            return generate_inch_gallon_curve(
+                radius_inches=float(estimation.radius),
+                length_inches=float(estimation.length),
+                max_depth=int(max_depth),
+            )
+        except ValueError:
             logger.warning(
-                "TANK_CHART_GENERATED_CURVE_SKIPPED_POINTS",
+                "TANK_CHART_GENERATED_CURVE_INVALID_PARAMS",
                 extra={
                     "tank_mapping_id": mapping.id,
-                    "skipped_points": skipped_points,
-                    "reason_code": "curve_math_error",
+                    "radius_inches": float(estimation.radius),
+                    "length_inches": float(estimation.length),
+                    "reason_code": "curve_math_invalid_params",
                 },
             )
-        return generated_curve
+            return []
 
     def _get_scatter_points(self, mapping):
         readings = VeederReading.objects.filter(

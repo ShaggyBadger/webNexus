@@ -20,7 +20,6 @@ class CalcResponseSerializer(serializers.Serializer):
     fuel_type = serializers.CharField()
     mode = serializers.CharField()
     data_source = serializers.CharField()
-    confidence = serializers.FloatField()
     initial_inches = serializers.FloatField()
     initial_gallons = serializers.IntegerField()
     delivery_gallons = serializers.IntegerField()

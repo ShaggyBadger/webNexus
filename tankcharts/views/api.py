@@ -161,7 +161,6 @@ class TankChartMetaAPIView(APIView):
         has_estimation = False
         coverage_percent = 0.0
         veeder_count = 0
-        confidence_level = "LOW"
 
         try:
             chart = self.chart_service.build(store_num=store_num, tank_index=tank_index)
@@ -169,7 +168,6 @@ class TankChartMetaAPIView(APIView):
             has_estimation = chart.estimation_id is not None
             coverage_percent = chart.coverage_percent
             veeder_count = chart.veeder_observation_count
-            confidence_level = chart.confidence_level
         except Exception:
             has_official = False
             has_estimation = False
@@ -183,7 +181,6 @@ class TankChartMetaAPIView(APIView):
                 "has_estimation": has_estimation,
                 "coverage_percent": coverage_percent,
                 "veeder_count": veeder_count,
-                "confidence_level": confidence_level,
                 "available": existing is not None,
                 "is_stale": is_stale,
                 "dms_document_id": existing.id if existing else None,

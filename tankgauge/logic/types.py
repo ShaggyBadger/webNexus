@@ -34,7 +34,6 @@ class ModeAvailability:
             "mode": self.mode.value,
             "available": self.available,
             "reason": self.reason,
-            "confidence": self.confidence.value,
         }
 
 
@@ -56,7 +55,6 @@ class TankLimits:
             "max_depth_inches": self.max_depth_inches,
             "ninety_percent_gallons": self.ninety_percent_gallons,
             "source": self.source,
-            "confidence": self.confidence.value,
             "mode": self.mode.value,
             "warnings": list(self.warnings),
         }
@@ -92,7 +90,6 @@ class CalculationProfile:
             "fillable_to_90": self.fillable_to_90,
             "ninety_limit": self.ninety_limit,
             "no_fit_warning": self.no_fit_warning,
-            "confidence": self.confidence.value,
             "data_source": self.data_source,
             "warnings": list(self.warnings),
         }

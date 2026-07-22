@@ -166,7 +166,6 @@ class EstimationHealthAPIView(APIView):
             "has_active_estimation": bool(active),
             "reading_count": reading_count,
             "sample_count": active.sample_count if active else 0,
-            "confidence": active.confidence if active else 0.0,
             "mean_error_gallons": active.mean_error if active else None,
             "max_error_gallons": active.max_error if active else None,
             "mean_error_delta_gallons": mean_error_delta,

@@ -24,9 +24,6 @@ class TankFieldChart:
     official_chart_source: str | None
     coverage_percent: float
     veeder_observation_count: int
-    confidence_level: str
-    avg_difference_gallons: float
-    max_difference_gallons: float
 
     curves: list[dict]
     veeder_points: list[dict]

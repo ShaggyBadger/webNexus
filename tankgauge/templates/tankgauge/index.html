@@ -140,8 +140,7 @@
                 >VEEDER MATH</button>
             </div>
             <div class="mt-2 small text-muted-custom" x-show="resolvedDisplayMode" x-cloak>
-                ACTIVE: <span x-text="resolvedDisplayMode"></span> |
-                CONFIDENCE: <span x-text="activeModeConfidence"></span>
+                ACTIVE: <span x-text="resolvedDisplayMode"></span>
             </div>
             <div class="text-tactical-danger mt-2 small" x-show="activeModeReason" x-text="activeModeReason" x-cloak></div>
             <template x-for="warning in selectedLimitWarnings" :key="warning">
@@ -188,8 +187,7 @@
                 <template x-if="results.status === 'SUCCESS'">
                     <div class="mono">
                         <div class="mb-3 small text-muted-custom" x-show="activeProfile" x-cloak>
-                            MODE: <span x-text="resolvedDisplayMode"></span> |
-                            CONFIDENCE: <span x-text="activeProfile?.confidence_level || activeModeConfidence"></span>
+                            MODE: <span x-text="resolvedDisplayMode"></span>
                         </div>
 
                         <div class="result-panel">

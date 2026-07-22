@@ -1,7 +1,7 @@
-import math
 from datetime import datetime
 
 from atg.models import VeederReading
+from tankgauge.logic.curve_generator import generate_inch_gallon_curve
 from tankgauge.models import StoreTankMapping, TankChart, TankEstimation
 
 from tankcharts.domain import TankFieldChart
@@ -19,51 +19,44 @@ class TankFieldChartService:
         estimation = collected["estimation"]
         max_depth_inches = collected["max_depth_inches"]
 
-        estimated_curve = self._generate_estimated_curve(
+        generated_curve = self._generate_estimated_curve(
             estimation=estimation,
             max_depth_inches=max_depth_inches,
         )
 
-        if not official_curve and not estimated_curve:
+        if not official_curve and not generated_curve:
             raise ValueError(
                 "Cannot generate chart: no official chart rows and no active estimation."
             )
 
         table_rows = self._build_lookup_table(
             official_curve=official_curve,
-            estimated_curve=estimated_curve,
-            max_depth_inches=max_depth_inches,
+            generated_curve=generated_curve,
         )
 
         coverage_percent = self._compute_coverage(
             veeder_points=veeder_points,
             max_depth_inches=max_depth_inches,
         )
-        confidence = self._compute_confidence(
-            has_official_chart=bool(official_curve),
-            coverage_percent=coverage_percent,
-            veeder_count=len(veeder_points),
-            table_rows=table_rows,
-            capacity_gallons=mapping.tank_type.capacity if mapping.tank_type else None,
-        )
-
         curves = []
         if official_curve:
             curves.append(
                 {
-                    "label": "Official Chart",
-                    "color": "#3b82f6",
+                    "label": "Official Tank Chart",
+                    "color": "#a0aec0",
                     "points": official_curve,
                 }
             )
-        if estimated_curve:
+        if generated_curve:
             curves.append(
                 {
-                    "label": "Estimated Curve",
-                    "color": "#f97316",
-                    "points": estimated_curve,
+                    "label": "Generated Curve (Math)",
+                    "color": "#d4943a",
+                    "points": generated_curve,
                 }
             )
+
+        fallback_capacity = int(round(table_rows[-1]["gallons"])) if table_rows else 0
 
         return TankFieldChart(
             store_num=mapping.store.store_num,
@@ -77,7 +70,7 @@ class TankFieldChartService:
             capacity_gallons=(
                 int(mapping.tank_type.capacity)
                 if mapping.tank_type and mapping.tank_type.capacity
-                else int(round(table_rows[-1]["official_gallons"] or 0))
+                else fallback_capacity
             ),
             max_depth_inches=max_depth_inches,
             table_rows=table_rows,
@@ -85,9 +78,6 @@ class TankFieldChartService:
             official_chart_source=collected["official_chart_source"],
             coverage_percent=coverage_percent,
             veeder_observation_count=len(veeder_points),
-            confidence_level=confidence["confidence_level"],
-            avg_difference_gallons=confidence["avg_difference_gallons"],
-            max_difference_gallons=confidence["max_difference_gallons"],
             curves=curves,
             veeder_points=veeder_points,
             official_row_count=len(official_curve),
@@ -213,85 +203,27 @@ class TankFieldChartService:
     ) -> list[dict]:
         if not estimation:
             return []
+        if not estimation.radius or not estimation.length:
+            return []
 
-        radius_inches = float(estimation.radius)
-        length_inches = float(estimation.length)
-        points: list[dict] = []
-
-        for inches in range(1, max_depth_inches + 1):
-            fluid_height_inches = min(float(inches), 2 * radius_inches)
-            gallons = self._horizontal_cylinder_volume_gallons(
-                radius_inches=radius_inches,
-                length_inches=length_inches,
-                fluid_height_inches=fluid_height_inches,
+        try:
+            return generate_inch_gallon_curve(
+                radius_inches=float(estimation.radius),
+                length_inches=float(estimation.length),
+                max_depth=max_depth_inches,
             )
-            points.append({"inches": inches, "gallons": round(gallons, 1)})
-
-        return points
-
-    def _horizontal_cylinder_volume_gallons(
-        self,
-        *,
-        radius_inches: float,
-        length_inches: float,
-        fluid_height_inches: float,
-    ) -> float:
-        if fluid_height_inches <= 0:
-            return 0.0
-
-        full_volume_gallons = (math.pi * (radius_inches**2) * length_inches) / 231.0
-        if fluid_height_inches >= 2 * radius_inches:
-            return full_volume_gallons
-
-        segment_theta_radians = 2 * math.acos(
-            max(
-                -1.0,
-                min(1.0, (radius_inches - fluid_height_inches) / radius_inches),
-            )
-        )
-        sector_area_square_inches = (radius_inches**2 * segment_theta_radians) / 2.0
-        triangle_area_square_inches = (
-            0.5 * (radius_inches**2) * math.sin(segment_theta_radians)
-        )
-        segment_area_square_inches = (
-            sector_area_square_inches - triangle_area_square_inches
-        )
-
-        return (segment_area_square_inches * length_inches) / 231.0
+        except ValueError:
+            return []
 
     def _build_lookup_table(
         self,
         *,
         official_curve: list[dict],
-        estimated_curve: list[dict],
-        max_depth_inches: int,
+        generated_curve: list[dict],
     ) -> list[dict]:
-        official_by_inches = {
-            row["inches"]: float(row["gallons"]) for row in official_curve
-        }
-        estimated_by_inches = {
-            row["inches"]: float(row["gallons"]) for row in estimated_curve
-        }
-
-        rows = []
-        for inches in range(1, max_depth_inches + 1):
-            official_gallons = official_by_inches.get(inches)
-            estimated_gallons = estimated_by_inches.get(inches)
-
-            difference = None
-            if official_gallons is not None and estimated_gallons is not None:
-                difference = round(estimated_gallons - official_gallons, 1)
-
-            rows.append(
-                {
-                    "inches": inches,
-                    "official_gallons": official_gallons,
-                    "estimated_gallons": estimated_gallons,
-                    "difference": difference,
-                }
-            )
-
-        return rows
+        if generated_curve:
+            return generated_curve
+        return official_curve
 
     def _compute_coverage(
         self,
@@ -311,55 +243,3 @@ class TankFieldChartService:
             covered_inches.update(range(start_inch, end_inch + 1))
 
         return round((len(covered_inches) / max_depth_inches) * 100.0, 1)
-
-    def _compute_confidence(
-        self,
-        *,
-        has_official_chart: bool,
-        coverage_percent: float,
-        veeder_count: int,
-        table_rows: list[dict],
-        capacity_gallons: int | None,
-    ) -> dict:
-        comparable_differences = [
-            abs(row["difference"])
-            for row in table_rows
-            if row["difference"] is not None
-        ]
-        avg_difference_gallons = (
-            round(sum(comparable_differences) / len(comparable_differences), 1)
-            if comparable_differences
-            else 0.0
-        )
-        max_difference_gallons = (
-            round(max(comparable_differences), 1) if comparable_differences else 0.0
-        )
-
-        maturity_max_difference = 0.0
-        if capacity_gallons:
-            maturity_max_difference = capacity_gallons * 0.02
-
-        if (
-            coverage_percent >= 90
-            and has_official_chart
-            and (
-                maturity_max_difference <= 0
-                or max_difference_gallons <= maturity_max_difference
-            )
-        ):
-            confidence_level = "MATURE"
-        elif coverage_percent >= 75 and veeder_count >= 5:
-            confidence_level = "HIGH"
-        elif coverage_percent >= 50 and veeder_count >= 3:
-            confidence_level = "MEDIUM"
-        else:
-            confidence_level = "LOW"
-
-        if not has_official_chart and confidence_level in {"HIGH", "MATURE"}:
-            confidence_level = "MEDIUM"
-
-        return {
-            "confidence_level": confidence_level,
-            "avg_difference_gallons": avg_difference_gallons,
-            "max_difference_gallons": max_difference_gallons,
-        }

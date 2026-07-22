@@ -118,7 +118,7 @@ def perform_tank_calc(
                     mode=mode_enum,
                     available=True,
                     reason=None,
-                    confidence=ConfidenceLevel(candidate_profile["confidence_level"]),
+                    confidence=ConfidenceLevel(candidate_profile["_confidence_level"]),
                 )
             )
         else:
@@ -186,9 +186,10 @@ def perform_tank_calc(
 
     default_mode = mode_resolver.select_default_mode(available_mode_objects).value
     selected = profiles[active_mode]
+    selected_public = _public_profile_payload(selected)
     active_profile = {
-        **selected,
-        "warnings": list(selected.get("warnings") or []),
+        **selected_public,
+        "warnings": list(selected_public.get("warnings") or []),
     }
     profile_payload = {
         MODE_OFFICIAL: profiles.get(MODE_OFFICIAL),
@@ -197,9 +198,10 @@ def perform_tank_calc(
 
     for mode_key, profile in profile_payload.items():
         if profile:
+            public_profile = _public_profile_payload(profile)
             profile_payload[mode_key] = {
-                **profile,
-                "warnings": list(profile.get("warnings") or []),
+                **public_profile,
+                "warnings": list(public_profile.get("warnings") or []),
             }
 
     preferred_mode = (
@@ -229,7 +231,6 @@ def perform_tank_calc(
         },
         # Backward-compatible selected profile fields
         "data_source": selected["data_source"],
-        "confidence": selected["confidence"],
         "initial_inches": selected["initial_inches"],
         "initial_gallons": selected["initial_gallons"],
         "delivery_gallons": selected["delivery_gallons"],
@@ -255,6 +256,14 @@ def perform_tank_calc(
         },
     )
     return result
+
+
+def _public_profile_payload(profile: dict) -> dict:
+    return {
+        key: value
+        for key, value in profile.items()
+        if key not in {"confidence", "confidence_level", "_confidence_level"}
+    }
 
 
 def _calculate_profile_for_mode(
@@ -335,7 +344,7 @@ def _calculate_profile_for_mode(
         "capacity": limits.to_dict(),
         "data_source": source_meta.get("name", mode),
         "confidence": source_meta.get("confidence", 1.0),
-        "confidence_level": limits.confidence.value,
+        "_confidence_level": limits.confidence.value,
         "initial_inches": float(current_inches),
         "initial_gallons": int(initial_gallons),
         "delivery_gallons": int(delivery_gallons),

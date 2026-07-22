@@ -1,10 +1,9 @@
 import io
 
-from reportlab.platypus import SimpleDocTemplate, Spacer
+from reportlab.platypus import PageBreak, SimpleDocTemplate, Spacer
 
 from tankcharts.domain import TankFieldChart
 from tankcharts.rendering.components import (
-    ConfidenceRenderer,
     FooterRenderer,
     GraphRenderer,
     HeaderRenderer,
@@ -20,7 +19,6 @@ class PDFRenderer:
         register_fonts()
         self.styles = build_styles()
         self.header_renderer = HeaderRenderer(self.styles)
-        self.confidence_renderer = ConfidenceRenderer(self.styles)
         self.graph_renderer = GraphRenderer()
         self.table_renderer = LookupTableRenderer(self.styles)
         self.footer_renderer = FooterRenderer(self.styles)
@@ -38,11 +36,9 @@ class PDFRenderer:
 
         elements = []
         elements.extend(self.header_renderer.render(chart))
-        elements.extend(self.confidence_renderer.render(chart))
-        elements.append(Spacer(1, Spacing.SECTION_GAP))
-        elements.extend(self.graph_renderer.render(chart))
-        elements.append(Spacer(1, Spacing.SECTION_GAP))
         elements.extend(self.table_renderer.render(chart))
+        elements.append(PageBreak())
+        elements.extend(self.graph_renderer.render(chart))
         elements.append(Spacer(1, Spacing.SECTION_GAP))
         elements.extend(self.footer_renderer.render(chart))
 

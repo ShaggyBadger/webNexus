@@ -82,6 +82,8 @@ class TankFieldChartServiceTests(TestCase):
         self.assertEqual(chart.max_depth_inches, 96)
         self.assertTrue(chart.has_official_chart)
         self.assertEqual(len(chart.table_rows), 96)
+        self.assertIn("gallons", chart.table_rows[0])
+        self.assertNotIn("official_gallons", chart.table_rows[0])
         self.assertGreaterEqual(chart.coverage_percent, 0.0)
         self.assertGreaterEqual(chart.veeder_observation_count, 2)
 

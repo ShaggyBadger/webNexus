@@ -13,7 +13,10 @@ class FooterRenderer:
 
     def render(self, chart: TankFieldChart) -> list:
         generated_label = datetime.now(tz=UTC).strftime("Generated %Y-%m-%d %H:%M UTC")
-        trust_line = f"Estimated curve derived from {chart.veeder_observation_count} Veeder observations."
+        trust_line = (
+            f"Estimated curve derived from {chart.veeder_observation_count} "
+            "Veeder observations."
+        )
         return [
             Paragraph(generated_label, self.styles["footer"]),
             Paragraph(trust_line, self.styles["footer"]),

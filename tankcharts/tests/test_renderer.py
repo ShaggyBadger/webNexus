@@ -58,3 +58,4 @@ class PDFRendererTests(TestCase):
 
         self.assertTrue(pdf_bytes.startswith(b"%PDF"))
         self.assertGreater(len(pdf_bytes), 1000)
+        self.assertGreaterEqual(pdf_bytes.count(b"/Type /Page"), 2)

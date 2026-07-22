@@ -62,6 +62,7 @@ class TankChartAPITests(TestCase):
         payload = response.json()
         self.assertEqual(payload["status"], "success")
         self.assertEqual(payload["data"]["store_num"], self.store_num)
+        self.assertNotIn("confidence_level", payload["data"])
 
     def test_chart_endpoint_redirects_to_dms_download(self):
         response = self.client.get(f"/tankcharts/chart/{self.store_num}/1/")

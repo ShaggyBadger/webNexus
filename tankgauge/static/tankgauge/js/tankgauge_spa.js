@@ -90,11 +90,6 @@ function tankGaugeApp() {
       return this.activeProfile?.warnings || [];
     },
 
-    get activeModeConfidence() {
-      const modeAvailability = this.getModeAvailability(this.resolvedDisplayMode);
-      return modeAvailability?.confidence || "NONE";
-    },
-
     get activeModeReason() {
       if (this.selectedDisplayMode === "AUTO") {
         return null;

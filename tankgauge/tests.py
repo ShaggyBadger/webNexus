@@ -14,6 +14,7 @@ from atg.models import VeederReading, VeederTicket
 from missionlog.models import FuelType
 from tankgauge.admin.hardware_admin import TankTypeAdmin
 from tankgauge.admin.store_admin import StoreTankMappingAdmin
+from tankgauge.logic.curve_generator import generate_inch_gallon_curve
 from tankgauge.logic.estimation_service import EstimationService
 from tankgauge.logic.tank_lookup import (
     get_mapping_resolution_metrics,
@@ -108,6 +109,26 @@ class TankLookupTests(TestCase):
         metrics = get_mapping_resolution_metrics()
         self.assertEqual(metrics["strict_match"], 1)
         self.assertEqual(metrics["fallback_no_index_provided"], 1)
+
+
+class CurveGeneratorTests(TestCase):
+    def test_generate_curve_returns_one_point_per_inch(self):
+        curve = generate_inch_gallon_curve(
+            radius_inches=48.0,
+            length_inches=384.0,
+            max_depth=96,
+        )
+
+        self.assertEqual(len(curve), 96)
+        self.assertEqual(curve[0]["inches"], 1)
+        self.assertEqual(curve[-1]["inches"], 96)
+        self.assertGreater(curve[-1]["gallons"], curve[0]["gallons"])
+
+    def test_generate_curve_rejects_invalid_geometry(self):
+        with self.assertRaises(ValueError):
+            generate_inch_gallon_curve(
+                radius_inches=0.0, length_inches=384.0, max_depth=96
+            )
 
 
 @override_settings(TANKGAUGE_ENABLE_GENERATED_CHART_FALLBACK=False)
@@ -252,6 +273,8 @@ class EstimationAndApiTests(APITestCase):
         self.assertIsNotNone(response.data["data"]["profiles"]["OFFICIAL"])
         self.assertEqual(response.data["data"]["display_mode"], "AUTO")
         self.assertIn("active_profile", response.data["data"])
+        self.assertNotIn("confidence", response.data["data"])
+        self.assertNotIn("confidence", response.data["data"]["active_profile"])
 
     def test_api_calc_honors_display_mode_override(self):
         url = reverse("tankgauge:calculate_tank_api")
@@ -381,6 +404,7 @@ class EstimationAndApiTests(APITestCase):
         self.assertEqual(data["identity"]["source"], "mapped")
         self.assertEqual(data["sample_count"], 3)
         self.assertEqual(data["reading_count"], 3)
+        self.assertNotIn("confidence", data)
 
     def test_estimation_health_api_for_virtual_identity(self):
         VirtualTankEstimation.objects.create(
@@ -423,6 +447,7 @@ class EstimationAndApiTests(APITestCase):
         self.assertEqual(data["identity"]["source"], "virtual")
         self.assertEqual(data["sample_count"], 5)
         self.assertEqual(data["reading_count"], 1)
+        self.assertNotIn("confidence", data)
 
     def test_api_validation_returns_structured_error_contract(self):
         user = User.objects.create_user(username="testuser3", password="password")
@@ -617,6 +642,9 @@ class StoreChartApiTests(TestCase):
         self.assertIn("default_mode", first_tank)
         self.assertIn("limits", first_tank)
         self.assertIn("limits_by_mode", first_tank)
+        self.assertNotIn("confidence", first_tank["limits"])
+        for mode in first_tank["available_modes"]:
+            self.assertNotIn("confidence", mode)
 
     def test_store_tanks_api_not_found_uses_error_contract(self):
         response = self.client.get(

@@ -10,9 +10,9 @@ def build_styles() -> dict[str, ParagraphStyle]:
         "title": ParagraphStyle(
             name="title",
             fontName=Fonts.PRIMARY_BOLD,
-            fontSize=13,
-            textColor=Colors.AMBER,
-            leading=15,
+            fontSize=11,
+            textColor=Colors.TEXT_PRIMARY,
+            leading=13,
             alignment=TA_LEFT,
         ),
         "heading": ParagraphStyle(
@@ -42,9 +42,9 @@ def build_styles() -> dict[str, ParagraphStyle]:
         "footer": ParagraphStyle(
             name="footer",
             fontName=Fonts.PRIMARY,
-            fontSize=7,
+            fontSize=8,
             textColor=Colors.TEXT_SECONDARY,
-            leading=9,
+            leading=10,
             alignment=TA_LEFT,
         ),
     }

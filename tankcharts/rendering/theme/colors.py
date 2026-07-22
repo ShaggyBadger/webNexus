@@ -2,17 +2,19 @@ from reportlab.lib.colors import HexColor
 
 
 class Colors:
-    PRIMARY_BG = HexColor("#121417")
-    PANEL_BG = HexColor("#1c1f23")
-    BORDER = HexColor("#2a2e33")
+    PRIMARY_BG = HexColor("#ffffff")
+    PANEL_BG = HexColor("#ffffff")
+    BORDER = HexColor("#cbd5e0")
+    HEADER_BG = HexColor("#e2e8f0")
+    ROW_ALT = HexColor("#f7fafc")
 
-    AMBER = HexColor("#ffb86c")
-    OLIVE = HexColor("#8da35d")
-    DANGER = HexColor("#e94560")
+    AMBER = HexColor("#111111")
+    OLIVE = HexColor("#111111")
+    DANGER = HexColor("#d63050")
 
-    TEXT_PRIMARY = HexColor("#f8f9fa")
-    TEXT_SECONDARY = HexColor("#a0aec0")
+    TEXT_PRIMARY = HexColor("#111111")
+    TEXT_SECONDARY = HexColor("#4a5568")
 
-    OFFICIAL_CURVE = HexColor("#3b82f6")
-    ESTIMATED_CURVE = HexColor("#f97316")
-    VEEDER_POINTS = HexColor("#111111")
+    OFFICIAL_CURVE = HexColor("#a0aec0")
+    ESTIMATED_CURVE = HexColor("#d4943a")
+    VEEDER_POINTS = HexColor("#d63050")

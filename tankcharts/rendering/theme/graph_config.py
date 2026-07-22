@@ -1,7 +1,10 @@
 class GraphConfig:
-    FIGSIZE = (7.2, 2.2)
-    GRID_COLOR = "#d7d9dd"
-    OFFICIAL_LINE_WIDTH = 1.8
-    ESTIMATED_LINE_WIDTH = 1.8
-    VEEDER_MARKER_SIZE = 16
-    FONT_SIZE = 8
+    FIGSIZE = (7.2, 3.0)
+    GRID_COLOR = "#cccccc"
+    OFFICIAL_LINE_WIDTH = 2.5
+    GENERATED_LINE_WIDTH = 1.8
+    GENERATED_LINE_DASH = (8, 4)
+    VEEDER_MARKER_SIZE = 40
+    VEEDER_EDGE_COLOR = "#ffffff"
+    VEEDER_EDGE_WIDTH = 1.0
+    FONT_SIZE = 9
