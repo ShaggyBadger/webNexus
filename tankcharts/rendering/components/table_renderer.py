@@ -106,4 +106,4 @@ class LookupTableRenderer:
     def _format_number(self, value: float | None) -> str:
         if value is None:
             return "-"
-        return f"{value:,.1f}"
+        return f"{int(round(value)):,}"
