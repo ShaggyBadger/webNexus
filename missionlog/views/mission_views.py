@@ -1,5 +1,6 @@
 import json
 import logging
+from decimal import Decimal, InvalidOperation
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
@@ -16,6 +17,10 @@ def serialize_mission(mission):
     """Helper to perform deep relational serialization of a single Mission log."""
     return {
         "id": mission.id,
+        "entry_type": mission.entry_type,
+        "total_gallons": (
+            float(mission.total_gallons) if mission.total_gallons is not None else None
+        ),
         "shift_start": mission.shift_start.isoformat(),
         "shift_end": mission.shift_end.isoformat() if mission.shift_end else None,
         "start_miles": mission.start_miles,
@@ -130,12 +135,22 @@ def mission_list_or_create(request):
                     status_code=400,
                 )
 
+            entry_type = data.get("entry_type", "basic")
+            total_gallons = data.get("total_gallons")
+            if total_gallons is not None:
+                try:
+                    total_gallons = Decimal(str(total_gallons))
+                except (ValueError, TypeError, InvalidOperation):
+                    total_gallons = None
+
             mission = Mission.objects.create(
                 user=request.user,
                 shift_start=shift_start,
                 start_miles=data.get("start_miles"),
                 hours_on_duty_not_driving=data.get("hours_on_duty_not_driving"),
                 notes=data.get("notes", ""),
+                entry_type=entry_type,
+                total_gallons=total_gallons,
             )
             logger.info(
                 "MISSION_INIT: Mission #%s initialized by operator %s at %s.",
@@ -210,7 +225,29 @@ def mission_detail_or_update(request, pk):
                 mission.hours_on_duty = data["hours_on_duty"]
             if "hours_on_duty_not_driving" in data:
                 mission.hours_on_duty_not_driving = data["hours_on_duty_not_driving"]
+            
+            if "entry_type" in data:
+                existing_entry_type = mission.entry_type
+                requested_entry_type = data["entry_type"]
+                if existing_entry_type == "basic" and requested_entry_type == "advanced":
+                    mission.entry_type = "advanced"
+                elif existing_entry_type is None:
+                    pass
+                else:
+                    mission.entry_type = requested_entry_type
+
+            if "total_gallons" in data:
+                if mission.entry_type == "basic":
+                    val = data["total_gallons"]
+                    if val is not None:
+                        mission.total_gallons = Decimal(str(val))
+                    else:
+                        mission.total_gallons = None
+
             mission.save()
+
+            if mission.entry_type in ["advanced", None]:
+                mission.sync_derived_totals(save_after_sync=True)
             logger.info(
                 "MISSION_UPDATE: Mission #%s updated by %s.",
                 mission.id,
@@ -304,6 +341,9 @@ def complete_mission(request, pk):
 
             mission.is_completed = True
             mission.save()
+
+            if mission.entry_type in ["advanced", None]:
+                mission.sync_derived_totals(save_after_sync=True)
 
             logger.info(
                 "MISSION_COMPLETE: Mission #%s signed off by operator %s. Odometer end: %s. stops: %s.",

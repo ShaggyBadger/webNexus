@@ -86,6 +86,40 @@ class Mission(models.Model):
         blank=True, null=True, help_text="General shift debrief observations."
     )
 
+    entry_type = models.CharField(
+        max_length=10,
+        choices=[("basic", "Basic"), ("advanced", "Advanced")],
+        null=True,
+        blank=True,
+        help_text="Entry workflow used at mission creation. NULL indicates legacy mission.",
+    )
+
+    total_gallons = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Total gallons delivered. Auto-calculated from LoadDelivery in advanced mode, manually entered in basic mode.",
+    )
+
+    def sync_derived_totals(self, save_after_sync=False):
+        """
+        Syncs total_gallons and total_stops for Advanced or legacy (NULL) missions.
+        Basic mode missions keep user-entered total_gallons.
+        
+        Delegates actual computation to MissionCalculator.
+        
+        Args:
+            save_after_sync: If True and instance has a PK, persists changes to database.
+        """
+        from missionlog.services.mission_calculator import MissionCalculator
+        
+        if self.entry_type in ["advanced", None]:
+            MissionCalculator.sync_totals(self)
+            
+            if save_after_sync and self.pk:
+                self.save(update_fields=["total_gallons", "total_stops"])
+
     class Meta:
         verbose_name = "Mission"
         verbose_name_plural = "Missions"

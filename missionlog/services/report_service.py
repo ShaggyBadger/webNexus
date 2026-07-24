@@ -54,7 +54,7 @@ class ReportService:
                 "user": mission.user.email,
             },
             "metrics": {
-                "fuel": calculate_fuel_metrics(context.shift.deliveries),
+                "fuel": calculate_fuel_metrics(context.shift),
                 "mileage": calculate_mileage_metrics(context.shift),
                 "efficiency": calculate_efficiency_metrics(context.shift),
                 "earnings": calculate_earnings(context.shift, hourly_rate=hourly_rate),

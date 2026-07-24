@@ -62,6 +62,8 @@ class Shift:
     deliveries: List[Delivery] = field(default_factory=list)
     truck_fuel_logs: List[TruckFuel] = field(default_factory=list)
     events: List[TimelineEvent] = field(default_factory=list)
+    entry_type: Optional[str] = None
+    total_gallons: Optional[Decimal] = None
 
     @property
     def duration_hours(self) -> Optional[float]:
@@ -109,6 +111,8 @@ class ReportContext:
             is_completed=mission.is_completed,
             deliveries=deliveries,
             truck_fuel_logs=truck_fuel,
+            entry_type=mission.entry_type,
+            total_gallons=mission.total_gallons,
         )
 
     def _normalize_delivery(self, load: LoadDelivery) -> Delivery:

@@ -11,6 +11,10 @@ function missionlogApp() {
     errorMessage: "",
     successMessage: "",
     agentLabel: "RECOGNIZING...",
+    showModeConfirm: false,
+    pendingMode: "",
+    showUpgradeConfirm: false,
+    showCompleteConfirm: false,
     form: {
       shift_start: "",
       hours_on_duty: "",
@@ -21,6 +25,15 @@ function missionlogApp() {
       notes: "",
       truck_fuel: { gallons: "", price_per_gallon: "" },
       deliveries: [],
+      entry_type: "basic",
+      total_gallons: "",
+    },
+
+    get entryType() {
+      return this.form.entry_type;
+    },
+    set entryType(val) {
+      this.form.entry_type = val;
     },
 
     async init() {
@@ -43,21 +56,117 @@ function missionlogApp() {
         notes: "",
         truck_fuel: { gallons: "", price_per_gallon: "" },
         deliveries: [],
+        entry_type: "basic",
+        total_gallons: "",
       };
       this.addDelivery();
       this.activeMission = null;
       this.autoCalculateTotalMiles = true;
       this.showEntryForm = false;
+      this.showModeConfirm = false;
+      this.pendingMode = "";
+      this.showUpgradeConfirm = false;
+      this.showCompleteConfirm = false;
     },
 
     beginNewEntry() {
       this.showEntryForm = true;
       this.errorMessage = "";
       this.successMessage = "";
+      this.showCompleteConfirm = false;
       if (!this.form.shift_start) {
         this.form.shift_start = this.toDateTimeLocal(new Date().toISOString());
       }
       window.scrollTo({ top: 0, behavior: "smooth" });
+    },
+
+    toggleCompleteConfirm() {
+      this.showCompleteConfirm = !this.showCompleteConfirm;
+    },
+
+    confirmCompleteMission() {
+      this.showCompleteConfirm = false;
+      this.submitMission(true);
+    },
+
+    confirmAndSetEntryType(newType) {
+      if (this.form.entry_type === newType) {
+        return;
+      }
+      if (this.activeMission) {
+        return;
+      }
+
+      const startMiles = this.toNumeric(this.form.start_miles);
+      const endMiles = this.toNumeric(this.form.end_miles);
+      const hoursOnDuty = this.toNumeric(this.form.hours_on_duty);
+      const hoursNotDriving = this.toNumeric(this.form.hours_on_duty_not_driving);
+      const totalGallons = this.toNumeric(this.form.total_gallons);
+      
+      const hasDeliveries = this.form.deliveries.length > 0 && 
+        (this.form.deliveries[0].store_number_or_riso !== "" || 
+         (this.form.deliveries[0].fuel_entries && this.form.deliveries[0].fuel_entries.length > 0 && String(this.form.deliveries[0].fuel_entries[0].gallons || "").trim() !== ""));
+
+      const isDirty = (hoursOnDuty !== null || hoursNotDriving !== null || totalGallons !== null || startMiles !== null || endMiles !== null || this.form.notes !== "" || hasDeliveries);
+
+      if (isDirty) {
+        this.pendingMode = newType;
+        this.showModeConfirm = true;
+      } else {
+        this.form.entry_type = newType;
+        this.showModeConfirm = false;
+      }
+    },
+
+    executeModeSwitch() {
+      const targetType = this.pendingMode;
+      this.resetForm();
+      this.form.entry_type = targetType;
+      this.showModeConfirm = false;
+      this.pendingMode = "";
+      this.showEntryForm = true;
+    },
+
+    async executeUpgradeToAdvanced() {
+      // If there's no saved mission yet, just flip the form mode locally.
+      // There's nothing persisted on the server to upgrade.
+      if (!this.activeMission) {
+        this.form.entry_type = "advanced";
+        this.showUpgradeConfirm = false;
+        return;
+      }
+
+      this.submitting = true;
+      this.errorMessage = "";
+      this.successMessage = "";
+      try {
+        const endpoint = `/missionlog/api/missions/post-trip/${this.activeMission.id}/`;
+        const payload = {
+          ...this.buildPayload(false),
+          entry_type: "advanced",
+        };
+        
+        const data = await this.fetchJson(endpoint, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": this.getCsrfToken(),
+          },
+          body: JSON.stringify(payload),
+        });
+
+        if (data.mission) {
+          this.activeMission = data.mission;
+          this.hydrateFormFromMission(data.mission);
+          this.successMessage = "Upgraded to Advanced mode. You can now log deliveries.";
+        }
+        this.showUpgradeConfirm = false;
+      } catch (error) {
+        console.error("MISSIONLOG_UPGRADE_FAILED", error);
+        this.errorMessage = error.message;
+      } finally {
+        this.submitting = false;
+      }
     },
 
     toNumeric(value) {
@@ -212,6 +321,8 @@ function missionlogApp() {
       this.form.end_miles = mission.end_miles != null ? String(mission.end_miles) : "";
       this.form.total_miles = mission.total_miles != null ? String(mission.total_miles) : "";
       this.form.notes = mission.notes || "";
+      this.form.entry_type = mission.entry_type || "basic";
+      this.form.total_gallons = mission.total_gallons != null ? String(mission.total_gallons) : "";
 
       if (mission.fuel_logs && mission.fuel_logs.length) {
         const fuel = mission.fuel_logs[0];
@@ -305,6 +416,16 @@ function missionlogApp() {
     },
 
     buildPayload(isCompleted) {
+      if (this.form.entry_type === "basic") {
+        return {
+          shift_start: this.form.shift_start,
+          entry_type: "basic",
+          total_gallons: this.toNumeric(this.form.total_gallons),
+          hours_on_duty_not_driving: this.toNumeric(this.form.hours_on_duty_not_driving),
+          is_completed: Boolean(isCompleted),
+        };
+      }
+
       const startMiles = this.toNumeric(this.form.start_miles);
       const endMiles = this.toNumeric(this.form.end_miles);
       const derivedTotalMiles =
@@ -315,6 +436,8 @@ function missionlogApp() {
 
       const payload = {
         shift_start: this.form.shift_start,
+        entry_type: this.form.entry_type,
+        total_gallons: null,
         hours_on_duty: this.form.hours_on_duty || null,
         hours_on_duty_not_driving: this.form.hours_on_duty_not_driving || null,
         total_miles: totalMiles,
@@ -350,6 +473,7 @@ function missionlogApp() {
     },
 
     async submitMission(isCompleted) {
+      this.showCompleteConfirm = false;
       this.submitting = true;
       this.errorMessage = "";
       this.successMessage = "";
@@ -381,6 +505,43 @@ function missionlogApp() {
         window.scrollTo({ top: 0, behavior: "smooth" });
       } catch (error) {
         console.error("MISSIONLOG_SUBMIT_FAILED", error);
+        this.errorMessage = error.message;
+      } finally {
+        this.submitting = false;
+      }
+    },
+
+    async cancelActiveMission() {
+      if (!this.activeMission) {
+        return;
+      }
+
+      const missionId = this.activeMission.id;
+      const confirmed = window.confirm(
+        "Cancel the active mission? This will permanently delete it and reset MissionLog.",
+      );
+      if (!confirmed) {
+        return;
+      }
+
+      this.submitting = true;
+      this.errorMessage = "";
+      this.successMessage = "";
+      try {
+        await this.fetchJson(`/missionlog/api/missions/${missionId}/`, {
+          method: "DELETE",
+          headers: {
+            "X-CSRFToken": this.getCsrfToken(),
+          },
+        });
+
+        this.resetForm();
+        this.view = "active";
+        this.missions = [];
+        this.successMessage = `Mission #${missionId} cancelled and removed.`;
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      } catch (error) {
+        console.error("MISSIONLOG_CANCEL_FAILED", error);
         this.errorMessage = error.message;
       } finally {
         this.submitting = false;
@@ -473,16 +634,20 @@ function missionlogApp() {
         return "N/A";
       }
 
-      let totalGallons = 0;
-      const orders = mission.order_numbers || [];
-      for (let i = 0; i < orders.length; i += 1) {
-        const purchaseOrders = orders[i].purchase_orders || [];
-        for (let p = 0; p < purchaseOrders.length; p += 1) {
-          const loads = purchaseOrders[p].loads || [];
-          for (let l = 0; l < loads.length; l += 1) {
-            const gallons = this.toNumeric(loads[l].gross_gal);
-            if (gallons !== null) {
-              totalGallons += gallons;
+      let totalGallons = this.toNumeric(mission.total_gallons);
+      
+      if (totalGallons === null || totalGallons === 0) {
+        totalGallons = 0;
+        const orders = mission.order_numbers || [];
+        for (let i = 0; i < orders.length; i += 1) {
+          const purchaseOrders = orders[i].purchase_orders || [];
+          for (let p = 0; p < purchaseOrders.length; p += 1) {
+            const loads = purchaseOrders[p].loads || [];
+            for (let l = 0; l < loads.length; l += 1) {
+              const gallons = this.toNumeric(loads[l].gross_gal);
+              if (gallons !== null) {
+                totalGallons += gallons;
+              }
             }
           }
         }

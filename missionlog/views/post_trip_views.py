@@ -84,14 +84,62 @@ def post_trip_create(request):
                 hours_on_duty = None
                 shift_end = None
 
-            hours_on_duty_not_driving = data.get("hours_on_duty_not_driving")
+            hours_on_duty_not_driving_raw = data.get("hours_on_duty_not_driving")
             if (
-                hours_on_duty_not_driving is not None
-                and str(hours_on_duty_not_driving).strip() != ""
+                hours_on_duty_not_driving_raw is not None
+                and str(hours_on_duty_not_driving_raw).strip() != ""
             ):
-                hours_on_duty_not_driving = float(hours_on_duty_not_driving)
+                hours_on_duty_not_driving = float(hours_on_duty_not_driving_raw)
             else:
                 hours_on_duty_not_driving = None
+
+            entry_type = data.get("entry_type")
+            if entry_type is None:
+                entry_type = "basic"
+
+            if entry_type not in ["basic", "advanced"]:
+                return json_error_response(
+                    request=request,
+                    code="INVALID_ENTRY_TYPE",
+                    message="Invalid entry type.",
+                    details={"entry_type": "Must be 'basic' or 'advanced'."},
+                    status_code=400,
+                )
+
+            total_gallons = None
+            if entry_type == "basic":
+                # Validate total_gallons
+                total_gallons_raw = data.get("total_gallons")
+                if total_gallons_raw is None or str(total_gallons_raw).strip() == "":
+                    return json_error_response(
+                        request=request,
+                        code="INVALID_BASIC_SUBMISSION",
+                        message="total_gallons is required when entry_type is 'basic'",
+                        details={"field_errors": {"total_gallons": ["This field may not be null or negative in basic mode."]}},
+                        status_code=400,
+                    )
+                try:
+                    total_gallons = Decimal(str(total_gallons_raw))
+                    if total_gallons < 0:
+                        raise ValueError()
+                except (ValueError, TypeError, InvalidOperation):
+                    return json_error_response(
+                        request=request,
+                        code="INVALID_BASIC_SUBMISSION",
+                        message="total_gallons is required when entry_type is 'basic'",
+                        details={"field_errors": {"total_gallons": ["This field may not be null or negative in basic mode."]}},
+                        status_code=400,
+                    )
+
+                # Validate hours_on_duty_not_driving
+                if hours_on_duty_not_driving is None or hours_on_duty_not_driving < 0:
+                    return json_error_response(
+                        request=request,
+                        code="INVALID_BASIC_SUBMISSION",
+                        message="hours_on_duty_not_driving is required when entry_type is 'basic'",
+                        details={"field_errors": {"hours_on_duty_not_driving": ["This field may not be null or negative in basic mode."]}},
+                        status_code=400,
+                    )
 
             start_miles, end_miles = _resolve_mileage_bounds(data)
 
@@ -138,6 +186,8 @@ def post_trip_create(request):
                 hours_on_duty_not_driving=hours_on_duty_not_driving,
                 is_completed=is_completed,
                 notes=notes,
+                entry_type=entry_type,
+                total_gallons=total_gallons,
             )
 
             # 2. Handle Truck Fuel (Single Entry for now)
@@ -233,6 +283,9 @@ def post_trip_create(request):
                 mission.total_stops = len(distinct_stores)
                 mission.save()
 
+            if mission.entry_type == "advanced":
+                mission.sync_derived_totals(save_after_sync=True)
+
             logger.info(
                 f"POST_TRIP_SUCCESS: Mission #{mission.id} ingested successfully. status: {'COMPLETED' if is_completed else 'ACTIVE'}."
             )
@@ -293,20 +346,88 @@ def post_trip_update(request, pk):
                 hours_on_duty = None
                 shift_end = None
 
-            hours_on_duty_not_driving = data.get("hours_on_duty_not_driving")
+            hours_on_duty_not_driving_raw = data.get("hours_on_duty_not_driving")
             if (
-                hours_on_duty_not_driving is not None
-                and str(hours_on_duty_not_driving).strip() != ""
+                hours_on_duty_not_driving_raw is not None
+                and str(hours_on_duty_not_driving_raw).strip() != ""
             ):
-                hours_on_duty_not_driving = float(hours_on_duty_not_driving)
+                hours_on_duty_not_driving = float(hours_on_duty_not_driving_raw)
             else:
                 hours_on_duty_not_driving = None
+
+            existing_entry_type = mission.entry_type
+            requested_entry_type = data.get("entry_type")
+            if requested_entry_type is None:
+                if existing_entry_type == "advanced":
+                    requested_entry_type = "advanced"
+                elif existing_entry_type is None:
+                    requested_entry_type = None
+                else:
+                    requested_entry_type = "basic"
+
+            if requested_entry_type not in ["basic", "advanced", None]:
+                return json_error_response(
+                    request=request,
+                    code="INVALID_ENTRY_TYPE",
+                    message="Invalid entry type.",
+                    details={"entry_type": "Must be 'basic' or 'advanced'."},
+                    status_code=400,
+                )
+
+            # Prevent Advanced/Legacy -> Basic downgrade
+            if existing_entry_type in ["advanced", None] and requested_entry_type == "basic":
+                return json_error_response(
+                    request=request,
+                    code="ILLEGAL_DOWNGRADE",
+                    message="Cannot downgrade an advanced or legacy mission to basic mode.",
+                    details={"entry_type": "Reverting to basic would orphan existing delivery records."},
+                    status_code=400,
+                )
+
+            total_gallons = None
+            if requested_entry_type == "basic":
+                # Validate total_gallons
+                total_gallons_raw = data.get("total_gallons")
+                if total_gallons_raw is None or str(total_gallons_raw).strip() == "":
+                    return json_error_response(
+                        request=request,
+                        code="INVALID_BASIC_SUBMISSION",
+                        message="total_gallons is required when entry_type is 'basic'",
+                        details={"field_errors": {"total_gallons": ["This field may not be null or negative in basic mode."]}},
+                        status_code=400,
+                    )
+                try:
+                    total_gallons = Decimal(str(total_gallons_raw))
+                    if total_gallons < 0:
+                        raise ValueError()
+                except (ValueError, TypeError, InvalidOperation):
+                    return json_error_response(
+                        request=request,
+                        code="INVALID_BASIC_SUBMISSION",
+                        message="total_gallons is required when entry_type is 'basic'",
+                        details={"field_errors": {"total_gallons": ["This field may not be null or negative in basic mode."]}},
+                        status_code=400,
+                    )
+
+                # Validate hours_on_duty_not_driving
+                if hours_on_duty_not_driving is None or hours_on_duty_not_driving < 0:
+                    return json_error_response(
+                        request=request,
+                        code="INVALID_BASIC_SUBMISSION",
+                        message="hours_on_duty_not_driving is required when entry_type is 'basic'",
+                        details={"field_errors": {"hours_on_duty_not_driving": ["This field may not be null or negative in basic mode."]}},
+                        status_code=400,
+                    )
 
             start_miles, end_miles = _resolve_mileage_bounds(data)
 
             notes = data.get("notes", "")
             deliveries_data = data.get("deliveries", [])
             truck_fuel = data.get("truck_fuel")
+
+            # Force empty deliveries in basic mode
+            if requested_entry_type == "basic":
+                deliveries_data = []
 
             # Update Mission core parameters
             mission.shift_start = shift_start
@@ -317,6 +438,18 @@ def post_trip_update(request, pk):
             mission.hours_on_duty_not_driving = hours_on_duty_not_driving
             mission.is_completed = is_completed
             mission.notes = notes
+
+            # Handle entry_type upgrade and value assignment
+            if existing_entry_type == "basic" and requested_entry_type == "advanced":
+                mission.entry_type = "advanced"
+            elif existing_entry_type is None:
+                pass
+            else:
+                mission.entry_type = requested_entry_type
+
+            if mission.entry_type == "basic":
+                mission.total_gallons = total_gallons
+
             mission.save()
 
             # Handle Truck Fuel (Single Entry logic: clear and recreate)
@@ -414,6 +547,9 @@ def post_trip_update(request, pk):
             else:
                 mission.total_stops = 0
                 mission.save()
+
+            if mission.entry_type in ["advanced", None]:
+                mission.sync_derived_totals(save_after_sync=True)
 
             logger.info(
                 f"POST_TRIP_UPDATE_SUCCESS: Mission #{mission.id} updated. status: {'COMPLETED' if is_completed else 'ACTIVE'}."

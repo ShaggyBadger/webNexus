@@ -22,6 +22,20 @@
         background: #14171a;
         color: #fff;
     }
+    .ml-btn-od {
+        background: #6b8e23;
+        border-color: #6b8e23;
+        color: #f8fafc;
+    }
+    .ml-btn-od:hover,
+    .ml-btn-od:focus {
+        background: #5f7f1f;
+        border-color: #5f7f1f;
+        color: #ffffff;
+    }
+    .ml-btn-od:focus {
+        box-shadow: 0 0 0 0.15rem rgba(107, 142, 35, 0.35);
+    }
 </style>
 {% endblock %}
 
@@ -84,9 +98,42 @@
                             <label class="form-label small text-muted-custom">SHIFT_START</label>
                             <input type="datetime-local" class="form-control ml-input mono" x-model="form.shift_start" required>
                         </div>
+                        <!-- Basic Mode Fields -->
+                        <div class="col-12 col-md-3" x-show="form.entry_type === 'basic'" x-cloak>
+                            <label class="form-label small text-muted-custom">TOTAL_GALLONS</label>
+                            <input type="number" step="any" inputmode="decimal" class="form-control ml-input mono" x-model="form.total_gallons" :required="form.entry_type === 'basic'">
+                        </div>
+                        <div class="col-12 col-md-4" x-show="form.entry_type === 'basic'" x-cloak>
+                            <label class="form-label small text-muted-custom">HOURS_ON_DUTY_NOT_DRIVING</label>
+                            <input type="number" step="0.01" inputmode="decimal" class="form-control ml-input mono" x-model="form.hours_on_duty_not_driving" :required="form.entry_type === 'basic'">
+                        </div>
                     </div>
 
-                    <div class="border-top border-secondary mt-3 pt-3">
+                    <!-- Switch to Advanced Mode -->
+                    <div class="d-flex align-items-center gap-3 mt-3 pt-3 border-top border-secondary"
+                         x-show="form.entry_type === 'basic'" x-cloak>
+                        <button type="button" class="btn mono ml-btn-od text-nowrap"
+                                @click="showUpgradeConfirm = !showUpgradeConfirm">
+                            <span x-text="showUpgradeConfirm ? 'CANCEL' : 'ADVANCED_MODE'"></button>
+                        <span class="small text-muted-custom" x-show="!showUpgradeConfirm">
+                            Unlock itemized delivery tracking</span>
+                    </div>
+
+                    <!-- Inline Upgrade Confirmation -->
+                    <div x-show="showUpgradeConfirm"
+                         class="mt-2 p-2 border border-warning mb-2" x-cloak>
+                        <div class="small text-warning mb-1">
+                            Upgrading is permanent. Basic fields will be replaced by itemized deliveries.
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-sm btn-warning text-dark mono"
+                                    @click="executeUpgradeToAdvanced()">[ CONFIRM ]</button>
+                            <button type="button" class="btn btn-sm btn-secondary mono"
+                                    @click="showUpgradeConfirm = false">[ CANCEL ]</button>
+                        </div>
+                    </div>
+
+                    <div class="border-top border-secondary mt-3 pt-3" x-show="form.entry_type !== 'basic'" x-cloak>
                         <div class="text-primary mb-2">DELIVERIES</div>
 
                         <template x-for="(delivery, dIdx) in form.deliveries" :key="'delivery-' + dIdx">
@@ -136,7 +183,7 @@
                         </div>
                     </div>
 
-                    <div class="row g-2 mt-1">
+                    <div class="row g-2 mt-1" x-show="form.entry_type !== 'basic'" x-cloak>
                         <div class="col-12 col-md-6">
                             <label class="form-label small text-muted-custom">HOURS_ON_DUTY</label>
                             <input type="number" step="0.01" inputmode="decimal" class="form-control ml-input mono" x-model="form.hours_on_duty">
@@ -171,7 +218,7 @@
                         </div>
                     </div>
 
-                    <div class="border-top border-secondary mt-3 pt-3">
+                    <div class="border-top border-secondary mt-3 pt-3" x-show="form.entry_type !== 'basic'" x-cloak>
                         <div class="text-primary mb-2">TRUCK_FUEL</div>
                         <div class="row g-2">
                             <div class="col-12 col-md-6">
@@ -187,8 +234,19 @@
 
                     <div class="d-flex flex-wrap gap-2 mt-3">
                         <button type="submit" class="btn btn-primary mono" :disabled="submitting">[ SAVE_PROGRESS ]</button>
-                        <button type="button" class="btn btn-warning text-dark mono" @click="submitMission(true)" :disabled="submitting">[ COMPLETE_SHIFT ]</button>
+                        <button type="button" class="btn btn-warning text-dark mono" @click="toggleCompleteConfirm()" :disabled="submitting">[ COMPLETE_SHIFT ]</button>
+                        <button type="button" class="btn btn-danger mono" x-show="activeMission" x-cloak @click="cancelActiveMission()" :disabled="submitting">[ CANCEL_MISSION ]</button>
                         <button type="button" class="btn btn-secondary mono" @click="refreshActiveMission()">[ REFRESH ]</button>
+                    </div>
+
+                    <div x-show="showCompleteConfirm" class="mt-2 p-2 border border-warning" x-cloak>
+                        <div class="small text-warning mb-1">
+                            Complete and archive this mission now?
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-sm btn-warning text-dark mono" @click="confirmCompleteMission()">[ CONFIRM_COMPLETE ]</button>
+                            <button type="button" class="btn btn-sm btn-secondary mono" @click="showCompleteConfirm = false">[ CANCEL ]</button>
+                        </div>
                     </div>
                 </form>
             </div>

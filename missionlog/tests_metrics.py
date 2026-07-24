@@ -37,6 +37,7 @@ class ReportingMetricsTests(TestCase):
             start_miles=1000,
             end_miles=1200,
             is_completed=True,
+            entry_type="advanced",  # Ensure delivery-based calculation is used
         )
 
         # Add truck fuel
@@ -71,11 +72,13 @@ class ReportingMetricsTests(TestCase):
 
     def test_fuel_calculations(self):
         context = ReportContext(self.mission)
-        metrics = calculate_fuel_metrics(context.shift.deliveries)
+        metrics = calculate_fuel_metrics(context.shift)
 
         self.assertEqual(metrics["total_gross_gallons"]["value"], 8000)
+        self.assertEqual(metrics["total_gross_gallons"]["fidelity"], "measured_itemized")
         self.assertEqual(metrics["thermal_variance"]["value"], -50)
         self.assertEqual(metrics["thermal_variance"]["math"], "7950 - 8000")
+        self.assertEqual(metrics["thermal_variance"]["status"], "COMPUTED")
 
     def test_efficiency_mpg(self):
         context = ReportContext(self.mission)
@@ -86,7 +89,7 @@ class ReportingMetricsTests(TestCase):
 
     def test_fuel_product_mix_contract(self):
         context = ReportContext(self.mission)
-        metrics = calculate_fuel_metrics(context.shift.deliveries)
+        metrics = calculate_fuel_metrics(context.shift)
 
         self.assertIn("Regular", metrics["product_mix"])
         self.assertEqual(metrics["product_mix"]["Regular"]["value"], 8000)

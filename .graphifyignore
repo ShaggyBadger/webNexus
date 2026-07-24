@@ -113,6 +113,22 @@ vevFiles_backup/
 # Static files (output of collectstatic)
 staticfiles/
 
+# Vendor/static assets (Bootstrap, jQuery, etc.)
+*.min.js
+*.min.css
+#  **/static_common/**
+# **/static/**
+# **/assets/**
+node_modules/
+
+# Block all Bootstrap JavaScript files explicitly
+**/bootstrap/**/*.js
+**/bootstrap*.js
+bootstrap.bundle.js
+
+# Or block the specific folder path directly
+static_common/css/bootstrap/
+
 # mkdocs documentation 
 /site 
 
