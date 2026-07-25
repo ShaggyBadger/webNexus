@@ -115,7 +115,13 @@ def post_trip_create(request):
                         request=request,
                         code="INVALID_BASIC_SUBMISSION",
                         message="total_gallons is required when entry_type is 'basic'",
-                        details={"field_errors": {"total_gallons": ["This field may not be null or negative in basic mode."]}},
+                        details={
+                            "field_errors": {
+                                "total_gallons": [
+                                    "This field may not be null or negative in basic mode."
+                                ]
+                            }
+                        },
                         status_code=400,
                     )
                 try:
@@ -127,7 +133,13 @@ def post_trip_create(request):
                         request=request,
                         code="INVALID_BASIC_SUBMISSION",
                         message="total_gallons is required when entry_type is 'basic'",
-                        details={"field_errors": {"total_gallons": ["This field may not be null or negative in basic mode."]}},
+                        details={
+                            "field_errors": {
+                                "total_gallons": [
+                                    "This field may not be null or negative in basic mode."
+                                ]
+                            }
+                        },
                         status_code=400,
                     )
 
@@ -137,7 +149,13 @@ def post_trip_create(request):
                         request=request,
                         code="INVALID_BASIC_SUBMISSION",
                         message="hours_on_duty_not_driving is required when entry_type is 'basic'",
-                        details={"field_errors": {"hours_on_duty_not_driving": ["This field may not be null or negative in basic mode."]}},
+                        details={
+                            "field_errors": {
+                                "hours_on_duty_not_driving": [
+                                    "This field may not be null or negative in basic mode."
+                                ]
+                            }
+                        },
                         status_code=400,
                     )
 
@@ -375,12 +393,17 @@ def post_trip_update(request, pk):
                 )
 
             # Prevent Advanced/Legacy -> Basic downgrade
-            if existing_entry_type in ["advanced", None] and requested_entry_type == "basic":
+            if (
+                existing_entry_type in ["advanced", None]
+                and requested_entry_type == "basic"
+            ):
                 return json_error_response(
                     request=request,
                     code="ILLEGAL_DOWNGRADE",
                     message="Cannot downgrade an advanced or legacy mission to basic mode.",
-                    details={"entry_type": "Reverting to basic would orphan existing delivery records."},
+                    details={
+                        "entry_type": "Reverting to basic would orphan existing delivery records."
+                    },
                     status_code=400,
                 )
 
@@ -393,7 +416,13 @@ def post_trip_update(request, pk):
                         request=request,
                         code="INVALID_BASIC_SUBMISSION",
                         message="total_gallons is required when entry_type is 'basic'",
-                        details={"field_errors": {"total_gallons": ["This field may not be null or negative in basic mode."]}},
+                        details={
+                            "field_errors": {
+                                "total_gallons": [
+                                    "This field may not be null or negative in basic mode."
+                                ]
+                            }
+                        },
                         status_code=400,
                     )
                 try:
@@ -405,7 +434,13 @@ def post_trip_update(request, pk):
                         request=request,
                         code="INVALID_BASIC_SUBMISSION",
                         message="total_gallons is required when entry_type is 'basic'",
-                        details={"field_errors": {"total_gallons": ["This field may not be null or negative in basic mode."]}},
+                        details={
+                            "field_errors": {
+                                "total_gallons": [
+                                    "This field may not be null or negative in basic mode."
+                                ]
+                            }
+                        },
                         status_code=400,
                     )
 
@@ -415,7 +450,13 @@ def post_trip_update(request, pk):
                         request=request,
                         code="INVALID_BASIC_SUBMISSION",
                         message="hours_on_duty_not_driving is required when entry_type is 'basic'",
-                        details={"field_errors": {"hours_on_duty_not_driving": ["This field may not be null or negative in basic mode."]}},
+                        details={
+                            "field_errors": {
+                                "hours_on_duty_not_driving": [
+                                    "This field may not be null or negative in basic mode."
+                                ]
+                            }
+                        },
                         status_code=400,
                     )
 

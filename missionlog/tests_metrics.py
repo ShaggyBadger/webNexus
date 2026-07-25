@@ -75,7 +75,9 @@ class ReportingMetricsTests(TestCase):
         metrics = calculate_fuel_metrics(context.shift)
 
         self.assertEqual(metrics["total_gross_gallons"]["value"], 8000)
-        self.assertEqual(metrics["total_gross_gallons"]["fidelity"], "measured_itemized")
+        self.assertEqual(
+            metrics["total_gross_gallons"]["fidelity"], "measured_itemized"
+        )
         self.assertEqual(metrics["thermal_variance"]["value"], -50)
         self.assertEqual(metrics["thermal_variance"]["math"], "7950 - 8000")
         self.assertEqual(metrics["thermal_variance"]["status"], "COMPUTED")

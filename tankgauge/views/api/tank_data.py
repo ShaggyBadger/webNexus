@@ -15,6 +15,46 @@ from .error_contract import drf_error_response, drf_success_response
 
 logger = logging.getLogger("tankgauge")
 
+_TRUTHY_METADATA_VALUES = {"1", "true", "yes", "y", "on"}
+_FALSY_METADATA_VALUES = {"0", "false", "no", "n", "off"}
+_UNKNOWN_METADATA_VALUES = {"", "unknown", "n/a", "na", "null", "none"}
+
+
+def _coerce_metadata_boolean(value):
+    """Normalize SiteIntel metadata values into True / False / None."""
+    if value is None:
+        return None
+
+    if isinstance(value, bool):
+        return value
+
+    if isinstance(value, (int, float)):
+        return bool(value)
+
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in _UNKNOWN_METADATA_VALUES:
+            return None
+        if normalized in _TRUTHY_METADATA_VALUES:
+            return True
+        if normalized in _FALSY_METADATA_VALUES:
+            return False
+        return None
+
+    return None
+
+
+def _resolve_vapor_manifold(store):
+    """
+    Resolve vapor manifold status from store's linked Location metadata.
+
+    Returns True (manifolded), False (not manifolded), or None (unknown).
+    """
+    if not store.location or not store.location.metadata:
+        return None
+    value = store.location.metadata.get("vapor_manifold")
+    return _coerce_metadata_boolean(value)
+
 
 class StoreTanksAPIView(APIView):
     """Return tank mapping records for a store number."""
@@ -114,6 +154,7 @@ class StoreTanksAPIView(APIView):
                     "address": store.address,
                     "city": store.city,
                     "state": store.state,
+                    "vapor_manifold": _resolve_vapor_manifold(store),
                 },
                 "tanks": tanks,
             }

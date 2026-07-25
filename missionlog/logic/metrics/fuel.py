@@ -1,11 +1,12 @@
 from typing import Any, Dict
 from ..reports.context import Shift
 
+
 def calculate_fuel_metrics(shift: Shift) -> Dict[str, Any]:
     """
     Computes aggregated fuel metrics and thermal variance.
     """
-    is_basic = (shift.entry_type == "basic")
+    is_basic = shift.entry_type == "basic"
 
     if shift.total_gallons is not None:
         total_gross = shift.total_gallons

@@ -106,17 +106,17 @@ class Mission(models.Model):
         """
         Syncs total_gallons and total_stops for Advanced or legacy (NULL) missions.
         Basic mode missions keep user-entered total_gallons.
-        
+
         Delegates actual computation to MissionCalculator.
-        
+
         Args:
             save_after_sync: If True and instance has a PK, persists changes to database.
         """
         from missionlog.services.mission_calculator import MissionCalculator
-        
+
         if self.entry_type in ["advanced", None]:
             MissionCalculator.sync_totals(self)
-            
+
             if save_after_sync and self.pk:
                 self.save(update_fields=["total_gallons", "total_stops"])
 

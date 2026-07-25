@@ -288,9 +288,7 @@ class BasicAdvancedModeTests(TestCase):
     """
 
     def setUp(self):
-        self.user = User.objects.create_user(
-            username="modeuser", password="pass12345"
-        )
+        self.user = User.objects.create_user(username="modeuser", password="pass12345")
         self.client.force_login(self.user)
 
     # ------------------------------------------------------------------

@@ -98,6 +98,13 @@
 
     <div class="tactical-card" x-show="step >= 2" x-transition x-ref="tankStepCard">
         <h2 class="h5 mono text-tactical-warning mb-3">02 // SELECT_TARGET_TANK</h2>
+        <div x-show="showVaporManifoldTag" class="mb-2" x-cloak>
+            <span
+                class="mono fw-bold small vapor-manifold-tag"
+                :class="vaporManifoldTag.cssClass"
+                x-text="vaporManifoldTag.label"
+            ></span>
+        </div>
         <div class="mb-3" x-show="storeData" x-cloak>
             <a
                 class="btn btn-primary btn-tactical-olive mono fw-bold w-100"

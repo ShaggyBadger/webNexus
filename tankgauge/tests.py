@@ -12,6 +12,7 @@ from rest_framework.test import APITestCase
 
 from atg.models import VeederReading, VeederTicket
 from missionlog.models import FuelType
+from siteintel.models import Location, LocationType
 from tankgauge.admin.hardware_admin import TankTypeAdmin
 from tankgauge.admin.store_admin import StoreTankMappingAdmin
 from tankgauge.logic.curve_generator import generate_inch_gallon_curve
@@ -618,6 +619,16 @@ class StoreChartApiTests(TestCase):
         )
         self.fuel_type = FuelType.objects.create(name="Diesel")
 
+    def _attach_location(self, vapor_manifold_value):
+        location_type, _ = LocationType.objects.get_or_create(name="Store")
+        location = Location.objects.create(
+            name=f"Location {self.store.store_num}",
+            location_type=location_type,
+            metadata={"vapor_manifold": vapor_manifold_value},
+        )
+        self.store.location = location
+        self.store.save(update_fields=["location"])
+
     def test_store_tanks_api_returns_sorted_records(self):
         StoreTankMapping.objects.create(
             store=self.store,
@@ -672,6 +683,44 @@ class StoreChartApiTests(TestCase):
         self.assertEqual(payload["status"], "success")
         self.assertEqual(payload["data"]["store"]["store_num"], self.store.store_num)
         self.assertEqual(payload["data"]["store"]["riso_num"], self.store.riso_num)
+
+    def test_store_tanks_api_maps_yes_no_metadata_to_boolean(self):
+        self._attach_location("No")
+
+        response = self.client.get(
+            reverse(
+                "tankgauge:store_tanks_api", kwargs={"store_num": self.store.store_num}
+            )
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = response.json()
+        self.assertIs(payload["data"]["store"]["vapor_manifold"], False)
+
+        self.store.location.metadata["vapor_manifold"] = "Yes"
+        self.store.location.save(update_fields=["metadata"])
+
+        response = self.client.get(
+            reverse(
+                "tankgauge:store_tanks_api", kwargs={"store_num": self.store.store_num}
+            )
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = response.json()
+        self.assertIs(payload["data"]["store"]["vapor_manifold"], True)
+
+    def test_store_tanks_api_returns_unknown_when_metadata_is_blank(self):
+        self._attach_location("")
+
+        response = self.client.get(
+            reverse(
+                "tankgauge:store_tanks_api", kwargs={"store_num": self.store.store_num}
+            )
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = response.json()
+        self.assertIsNone(payload["data"]["store"]["vapor_manifold"])
 
     def test_store_tanks_api_falls_back_to_veeder_limits_when_official_missing(self):
         null_limits_tank_type = TankType.objects.create(name="15k120")

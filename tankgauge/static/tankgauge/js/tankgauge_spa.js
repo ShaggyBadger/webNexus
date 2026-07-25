@@ -144,6 +144,21 @@ function tankGaugeApp() {
       return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     },
 
+    get vaporManifoldTag() {
+      const vm = this.storeData?.vapor_manifold;
+      if (vm === null || vm === undefined) {
+        return { label: "VAPOR MANIFOLD: UNKNOWN", cssClass: "vapor-manifold-unknown" };
+      }
+      if (vm === true) {
+        return { label: "VAPOR MANIFOLD: YES", cssClass: "vapor-manifold-yes" };
+      }
+      return { label: "VAPOR MANIFOLD: NO", cssClass: "vapor-manifold-no" };
+    },
+
+    get showVaporManifoldTag() {
+      return this.storeData !== null;
+    },
+
     scrollToStep(stepRef) {
       this.$nextTick(() => {
         const target = this.$refs[stepRef];

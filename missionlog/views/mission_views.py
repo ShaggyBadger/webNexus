@@ -225,11 +225,14 @@ def mission_detail_or_update(request, pk):
                 mission.hours_on_duty = data["hours_on_duty"]
             if "hours_on_duty_not_driving" in data:
                 mission.hours_on_duty_not_driving = data["hours_on_duty_not_driving"]
-            
+
             if "entry_type" in data:
                 existing_entry_type = mission.entry_type
                 requested_entry_type = data["entry_type"]
-                if existing_entry_type == "basic" and requested_entry_type == "advanced":
+                if (
+                    existing_entry_type == "basic"
+                    and requested_entry_type == "advanced"
+                ):
                     mission.entry_type = "advanced"
                 elif existing_entry_type is None:
                     pass
