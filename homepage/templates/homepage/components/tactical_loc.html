@@ -5,4 +5,12 @@
 
     <div id="loc-intel-display" class="timestamp mono text-muted-custom location-intel-display">
     </div>
+
+    <div x-show="storeNum !== null" class="mt-1" x-cloak>
+        <span
+            class="mono fw-bold small vapor-manifold-tag"
+            :class="vaporManifoldCssClass"
+            x-text="vaporManifoldLabel"
+        ></span>
+    </div>
 </div>

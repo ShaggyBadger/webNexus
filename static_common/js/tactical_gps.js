@@ -156,6 +156,21 @@ const TacticalGPS = {
                   </span>`;
         }
 
+        // 3. Dispatch store identification event for Alpine components
+        if (data && data.store_num) {
+          console.log('[TacticalGPS] dispatching store_identified:', { store_num: data.store_num, vapor_manifold: data.vapor_manifold });
+          document.dispatchEvent(new CustomEvent('webnexus:store_identified', {
+            detail: {
+              store_num: data.store_num,
+              store_name: data.store_name,
+              city: data.city,
+              state: data.state,
+              distance_display: data.distance_display,
+              vapor_manifold: data.vapor_manifold
+            }
+          }));
+        }
+
         return data;
       }
     } catch (error) {

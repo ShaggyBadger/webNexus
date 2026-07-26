@@ -937,6 +937,24 @@ class StoreChartApiTests(TestCase):
 
 
 class ClosestStoreApiTests(TestCase):
+    def setUp(self):
+        self.store = Store.objects.create(
+            store_num=7777,
+            store_name="Closest Store",
+            lat=40.0,
+            lon=-89.0,
+        )
+
+    def _attach_location(self, vapor_manifold_value):
+        location_type, _ = LocationType.objects.get_or_create(name="Store")
+        location = Location.objects.create(
+            name=f"Location {self.store.store_num}",
+            location_type=location_type,
+            metadata={"vapor_manifold": vapor_manifold_value},
+        )
+        self.store.location = location
+        self.store.save(update_fields=["location"])
+
     def test_closest_store_api_missing_coordinates_uses_error_contract(self):
         response = self.client.get(reverse("tankgauge:closest_store_api"))
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -946,6 +964,43 @@ class ClosestStoreApiTests(TestCase):
         self.assertIn("message", payload["error"])
         self.assertIn("details", payload["error"])
         self.assertIn("trace_id", payload["error"])
+
+    def test_closest_store_api_includes_vapor_manifold_true(self):
+        self._attach_location("Yes")
+
+        response = self.client.get(
+            reverse("tankgauge:closest_store_api"),
+            {"lat": "40.001", "lon": "-89.001"},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = response.json()
+        store_result = payload["data"]["results"][0]
+        self.assertIs(store_result["vapor_manifold"], True)
+
+    def test_closest_store_api_includes_vapor_manifold_false(self):
+        self._attach_location("No")
+
+        response = self.client.get(
+            reverse("tankgauge:closest_store_api"),
+            {"lat": "40.001", "lon": "-89.001"},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = response.json()
+        store_result = payload["data"]["results"][0]
+        self.assertIs(store_result["vapor_manifold"], False)
+
+    def test_closest_store_api_includes_vapor_manifold_unknown(self):
+        response = self.client.get(
+            reverse("tankgauge:closest_store_api"),
+            {"lat": "40.001", "lon": "-89.001"},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = response.json()
+        store_result = payload["data"]["results"][0]
+        self.assertIsNone(store_result["vapor_manifold"])
 
 
 class StoreTankMappingAdminTests(TestCase):

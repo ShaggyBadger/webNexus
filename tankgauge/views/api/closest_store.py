@@ -3,6 +3,7 @@ import logging
 from ...logic.utils import haversine
 from ...models import Store
 from .error_contract import json_error_response, json_success_response
+from .tank_data import _resolve_vapor_manifold
 
 logger = logging.getLogger("tankgauge")
 
@@ -106,6 +107,7 @@ def closest_store_api(request):
                 "has_location": store.location is not None,
                 "location_id": store.location.id if store.location else None,
                 "user_location_proxy": f"{store.city}, {store.state}",
+                "vapor_manifold": _resolve_vapor_manifold(store),
             }
         )
 
