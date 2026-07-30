@@ -279,16 +279,16 @@ class DMSChartStorageService:
         if not existing:
             return
 
-        existing.status = "ARCHIVED"
-        existing.save(update_fields=["status", "updated_at"])
+        default_storage.delete(existing.file_path)
+        existing.delete()
 
     def delete_store(self, *, store_num: int) -> None:
         existing = self.find_existing_store(store_num=store_num)
         if not existing:
             return
 
-        existing.status = "ARCHIVED"
-        existing.save(update_fields=["status", "updated_at"])
+        default_storage.delete(existing.file_path)
+        existing.delete()
 
     def get_download_url(
         self,
