@@ -5,16 +5,23 @@ from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAdminUser
 from rest_framework.views import APIView
 
-from tankgauge.models import StoreTankMapping
-from tankgauge.views.api.error_contract import drf_error_response, drf_success_response
+from tankgauge.views.api.error_contract import (
+    drf_error_response,
+    drf_success_response,
+)
 from tankcharts.rendering import PDFRenderer
-from tankcharts.services import DMSChartStorageService, TankFieldChartService
+from tankcharts.services import (
+    DMSChartStorageService,
+    TankChartService,
+)
+from tankcharts.services.field_chart_service import TankFieldChartService
+from tankgauge.models import StoreTankMapping
 
-logger = logging.getLogger("tankcharts")
+logger = logging.getLogger(__name__)
 
 
 class TankChartPDFAPIView(APIView):
-    """Get chart PDF for store/tank, generating when missing or stale."""
+    """Get a single tank chart PDF for a store and tank index."""
 
     permission_classes = [AllowAny]
 
@@ -26,29 +33,25 @@ class TankChartPDFAPIView(APIView):
 
     def get(self, request, store_num: int, tank_index: int):
         mapping = (
-            StoreTankMapping.objects.filter(
-                store__store_num=store_num,
-                tank_index=tank_index,
-            )
-            .order_by("id")
+            StoreTankMapping.objects.select_related("store", "tank_type")
+            .filter(store__store_num=store_num, tank_index=tank_index)
             .first()
         )
+
         if not mapping:
             return drf_error_response(
                 request=request,
-                code="tank_not_found",
-                message="Tank mapping not found for this store and tank index.",
+                code="tank_mapping_not_found",
+                message="No tank mapping found for store and tank index.",
                 details={"store_num": store_num, "tank_index": tank_index},
                 status_code=status.HTTP_404_NOT_FOUND,
             )
 
-        fuel_type = mapping.fuel_type or "unknown"
         existing = self.storage_service.find_existing(
             store_num=store_num,
-            fuel_type=fuel_type,
+            fuel_type=mapping.fuel_type,
             tank_index=tank_index,
         )
-
         if existing and not self.storage_service.is_stale(
             document=existing,
             store_num=store_num,
@@ -56,27 +59,29 @@ class TankChartPDFAPIView(APIView):
         ):
             download_url = self.storage_service.get_download_url(
                 store_num=store_num,
-                fuel_type=fuel_type,
+                fuel_type=mapping.fuel_type,
                 tank_index=tank_index,
             )
             if download_url:
                 return HttpResponseRedirect(download_url)
 
         try:
-            chart = self.chart_service.build(store_num=store_num, tank_index=tank_index)
+            chart = self.chart_service.build(
+                store_num=store_num,
+                tank_index=tank_index,
+            )
             pdf_bytes = self.pdf_renderer.render(chart)
+
             metadata = {
                 "store_num": chart.store_num,
-                "tank_index": chart.tank_index,
                 "fuel_type": chart.fuel_type,
+                "tank_index": chart.tank_index,
                 "official_row_count": chart.official_row_count,
-                "veeder_count": chart.veeder_observation_count,
-                "estimation_id": chart.estimation_id,
                 "generated_at": chart.generated_at.isoformat(),
             }
             document = self.storage_service.store(
                 store_num=store_num,
-                fuel_type=chart.fuel_type,
+                fuel_type=mapping.fuel_type,
                 tank_index=tank_index,
                 pdf_bytes=pdf_bytes,
                 metadata=metadata,
@@ -85,6 +90,7 @@ class TankChartPDFAPIView(APIView):
                 "TANKCHART_PDF_GENERATED",
                 extra={
                     "store_num": store_num,
+                    "fuel_type": mapping.fuel_type,
                     "tank_index": tank_index,
                     "document_id": document.id,
                 },
@@ -92,14 +98,14 @@ class TankChartPDFAPIView(APIView):
             return HttpResponseRedirect(
                 self.storage_service.get_download_url(
                     store_num=store_num,
-                    fuel_type=chart.fuel_type,
+                    fuel_type=mapping.fuel_type,
                     tank_index=tank_index,
                 )
             )
         except ValueError as error:
             return drf_error_response(
                 request=request,
-                code="chart_generation_unavailable",
+                code="tank_chart_generation_unavailable",
                 message=str(error),
                 details={"store_num": store_num, "tank_index": tank_index},
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -107,19 +113,23 @@ class TankChartPDFAPIView(APIView):
         except Exception as error:
             logger.exception(
                 "TANKCHART_PDF_GENERATION_FAILED",
-                extra={"store_num": store_num, "tank_index": tank_index},
+                extra={
+                    "store_num": store_num,
+                    "fuel_type": mapping.fuel_type,
+                    "tank_index": tank_index,
+                },
             )
             return drf_error_response(
                 request=request,
-                code="chart_generation_failed",
-                message="Failed to generate tank field chart PDF.",
+                code="tank_chart_generation_failed",
+                message="Failed to generate tank chart PDF.",
                 details={"error": str(error)},
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
 
 class TankChartMetaAPIView(APIView):
-    """Return tank chart metadata and freshness status."""
+    """Metadata view for tank charts."""
 
     permission_classes = [AllowAny]
 
@@ -130,63 +140,59 @@ class TankChartMetaAPIView(APIView):
 
     def get(self, request, store_num: int, tank_index: int):
         mapping = (
-            StoreTankMapping.objects.select_related("store")
+            StoreTankMapping.objects.select_related("store", "tank_type")
             .filter(store__store_num=store_num, tank_index=tank_index)
             .first()
         )
+
         if not mapping:
             return drf_error_response(
                 request=request,
-                code="tank_not_found",
-                message="Tank mapping not found for this store and tank index.",
+                code="tank_mapping_not_found",
+                message="No tank mapping found for store and tank index.",
                 details={"store_num": store_num, "tank_index": tank_index},
                 status_code=status.HTTP_404_NOT_FOUND,
             )
 
-        fuel_type = mapping.fuel_type or "unknown"
-        existing = self.storage_service.find_existing(
+        chart = self.chart_service.build(
             store_num=store_num,
-            fuel_type=fuel_type,
             tank_index=tank_index,
         )
-        is_stale = False
-        if existing:
-            is_stale = self.storage_service.is_stale(
+
+        existing = self.storage_service.find_existing(
+            store_num=store_num,
+            fuel_type=mapping.fuel_type,
+            tank_index=tank_index,
+        )
+        is_stale = (
+            self.storage_service.is_stale(
                 document=existing,
                 store_num=store_num,
                 tank_index=tank_index,
             )
-
-        has_official = False
-        has_estimation = False
-        coverage_percent = 0.0
-        veeder_count = 0
-
-        try:
-            chart = self.chart_service.build(store_num=store_num, tank_index=tank_index)
-            has_official = chart.has_official_chart
-            has_estimation = chart.estimation_id is not None
-            coverage_percent = chart.coverage_percent
-            veeder_count = chart.veeder_observation_count
-        except Exception:
-            has_official = False
-            has_estimation = False
-
-        return drf_success_response(
-            data={
-                "store_num": store_num,
-                "tank_index": tank_index,
-                "fuel_type": fuel_type,
-                "has_official": has_official,
-                "has_estimation": has_estimation,
-                "coverage_percent": coverage_percent,
-                "veeder_count": veeder_count,
-                "available": existing is not None,
-                "is_stale": is_stale,
-                "dms_document_id": existing.id if existing else None,
-                "generated_at": existing.uploaded_at.isoformat() if existing else None,
-            }
+            if existing
+            else True
         )
+
+        download_url = None
+        if existing and not is_stale:
+            download_url = self.storage_service.get_download_url(
+                store_num=store_num,
+                fuel_type=mapping.fuel_type,
+                tank_index=tank_index,
+            )
+
+        payload = {
+            "store_num": store_num,
+            "fuel_type": mapping.fuel_type,
+            "tank_index": tank_index,
+            "official_row_count": chart.official_row_count,
+            "generated_at": chart.generated_at.isoformat(),
+            "has_cached_document": existing is not None,
+            "is_stale": is_stale,
+            "download_url": download_url,
+        }
+        return drf_success_response(data=payload)
 
 
 class StoreChartPDFAPIView(APIView):
@@ -196,88 +202,55 @@ class StoreChartPDFAPIView(APIView):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.chart_service = TankFieldChartService()
-        self.pdf_renderer = PDFRenderer()
-        self.storage_service = DMSChartStorageService()
+        self.orchestrator = TankChartService()
 
     def get(self, request, store_num: int):
-        has_mappings = StoreTankMapping.objects.filter(
-            store__store_num=store_num
-        ).exists()
-        if not has_mappings:
+        result = self.orchestrator.get_store_chart(store_num=store_num)
+
+        if not result["success"]:
             return drf_error_response(
                 request=request,
-                code="store_not_found",
-                message="Store has no mapped tanks.",
+                code=result.get("code", "store_chart_generation_failed"),
+                message=result.get("message", "Error getting store chart."),
+                details=result.get("details") or {"store_num": store_num},
+                status_code=result.get("status_code", 500),
+            )
+
+        download_url = result.get("download_url")
+        if download_url:
+            return HttpResponseRedirect(download_url)
+
+        return drf_error_response(
+            request=request,
+            code="store_chart_url_missing",
+            message="Chart generated but download URL unavailable.",
+            details={"store_num": store_num},
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+
+class StoreChartStatusAPIView(APIView):
+    """Read-only API view for checking store tank chart status."""
+
+    permission_classes = [AllowAny]
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.orchestrator = TankChartService()
+
+    def get(self, request, store_num: int):
+        result = self.orchestrator.get_chart_status(store_num=store_num)
+
+        if not result["success"]:
+            return drf_error_response(
+                request=request,
+                code=result.get("code", "store_status_failed"),
+                message=result.get("message", "Failed to retrieve store chart status."),
                 details={"store_num": store_num},
-                status_code=status.HTTP_404_NOT_FOUND,
+                status_code=result.get("status_code", 404),
             )
 
-        existing = self.storage_service.find_existing_store(store_num=store_num)
-        if existing and not self.storage_service.is_store_stale(
-            document=existing,
-            store_num=store_num,
-        ):
-            download_url = self.storage_service.get_store_download_url(
-                store_num=store_num
-            )
-            if download_url:
-                return HttpResponseRedirect(download_url)
-
-        try:
-            chart = self.chart_service.build_store(store_num=store_num)
-            tank_chunks = self.chart_service.chunk_store_tanks(chart, page_size=4)
-            pdf_bytes = self.pdf_renderer.render_store(
-                chart,
-                tank_chunks=tank_chunks,
-            )
-
-            metadata = {
-                "store_num": chart.store_num,
-                "tank_count": len(chart.tanks),
-                "tank_indices": [tank.tank_index for tank in chart.tanks],
-                "official_row_counts": {
-                    str(tank.tank_index): tank.official_row_count
-                    for tank in chart.tanks
-                },
-                "generated_at": chart.generated_at.isoformat(),
-            }
-            document = self.storage_service.store_store_chart(
-                store_num=store_num,
-                pdf_bytes=pdf_bytes,
-                metadata=metadata,
-            )
-            logger.info(
-                "STORE_TANKCHART_PDF_GENERATED",
-                extra={
-                    "store_num": store_num,
-                    "document_id": document.id,
-                    "tank_count": len(chart.tanks),
-                },
-            )
-            return HttpResponseRedirect(
-                self.storage_service.get_store_download_url(store_num=store_num)
-            )
-        except ValueError as error:
-            return drf_error_response(
-                request=request,
-                code="store_chart_generation_unavailable",
-                message=str(error),
-                details={"store_num": store_num},
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            )
-        except Exception as error:
-            logger.exception(
-                "STORE_TANKCHART_PDF_GENERATION_FAILED",
-                extra={"store_num": store_num},
-            )
-            return drf_error_response(
-                request=request,
-                code="store_chart_generation_failed",
-                message="Failed to generate store-wide tank chart PDF.",
-                details={"error": str(error)},
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+        return drf_success_response(data=result["data"])
 
 
 class TankChartBatchGenerateAPIView(APIView):

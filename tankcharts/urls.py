@@ -2,6 +2,7 @@ from django.urls import path
 
 from tankcharts.views import (
     StoreChartPDFAPIView,
+    StoreChartStatusAPIView,
     TankChartBatchGenerateAPIView,
     TankChartMetaAPIView,
     TankChartPDFAPIView,
@@ -24,6 +25,11 @@ urlpatterns = [
         "store/<int:store_num>/",
         StoreChartPDFAPIView.as_view(),
         name="store_chart_pdf",
+    ),
+    path(
+        "api/store/<int:store_num>/status/",
+        StoreChartStatusAPIView.as_view(),
+        name="store_chart_status",
     ),
     path(
         "meta/<int:store_num>/<int:tank_index>/",
