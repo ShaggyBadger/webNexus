@@ -47,6 +47,9 @@ class Tag(models.Model):
         verbose_name = "Tag"
         verbose_name_plural = "Tags"
         ordering = ["name"]
+        indexes = [
+            models.Index(fields=["name"], name="dms_tag_name_idx"),
+        ]
 
     def __str__(self) -> str:
         return self.name
@@ -160,6 +163,11 @@ class Document(models.Model):
         verbose_name = "Document"
         verbose_name_plural = "Documents"
         ordering = ["-uploaded_at"]
+        indexes = [
+            models.Index(fields=["content_type", "object_id"], name="dms_doc_gfk_idx"),
+            models.Index(fields=["status"], name="dms_doc_status_idx"),
+            models.Index(fields=["title"], name="dms_doc_title_idx"),
+        ]
 
     def __str__(self) -> str:
         return f"{self.title} (v{self.version})"

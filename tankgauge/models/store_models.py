@@ -36,6 +36,12 @@ class Store(models.Model):
         help_text="Canonical link to Site Intelligence",
     )
 
+    class Meta:
+        indexes = [
+            models.Index(fields=["state"], name="tankgauge_s_state_98018f_idx"),
+            models.Index(fields=["city"], name="tankgauge_s_city_1947a1_idx"),
+        ]
+
     def __str__(self):
         return f"{self.store_num} - {self.store_name}"
 

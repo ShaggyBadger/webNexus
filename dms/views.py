@@ -1,5 +1,6 @@
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.core.paginator import Paginator
+from django.db.models import Count
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.utils.text import slugify
@@ -63,6 +64,13 @@ class DashboardView(TemplateView):
         context["documents"] = page_obj.object_list
         context["documents_page"] = page_obj
         context["documents_count"] = paginator.count
+
+        context["suggested_keywords"] = list(
+            Tag.objects.annotate(doc_count=Count("documents"))
+            .filter(doc_count__gt=0)
+            .order_by("-doc_count")[:8]
+            .values_list("name", flat=True)
+        )
         return context
 
 

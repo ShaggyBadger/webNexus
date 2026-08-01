@@ -47,6 +47,27 @@ TANKGAUGE_DEFAULT_TANK_LIMITS_SOURCE_PRIORITY = os.environ.get(
     "TANKGAUGE_DEFAULT_TANK_LIMITS_SOURCE_PRIORITY", "OFFICIAL_FIRST"
 ).upper()
 
+# Location Document Hub Settings
+HUB_FUZZY_STORE_THRESHOLD = int(os.environ.get("HUB_FUZZY_STORE_THRESHOLD", "50"))
+HUB_FUZZY_DOCUMENT_THRESHOLD = int(os.environ.get("HUB_FUZZY_DOCUMENT_THRESHOLD", "55"))
+HUB_ICONTAINS_BOOST = int(os.environ.get("HUB_ICONTAINS_BOOST", "25"))
+HUB_MIN_QUERY_LENGTH = int(os.environ.get("HUB_MIN_QUERY_LENGTH", "2"))
+HUB_SEARCH_LIMIT = int(os.environ.get("HUB_SEARCH_LIMIT", "20"))
+HUB_FUZZY_DOCUMENTS = os.environ.get("HUB_FUZZY_DOCUMENTS", "True").lower() in (
+    "true",
+    "1",
+    "t",
+    "y",
+    "yes",
+)
+HUB_FUZZY_FULL_CORPUS = os.environ.get("HUB_FUZZY_FULL_CORPUS", "False").lower() in (
+    "true",
+    "1",
+    "t",
+    "y",
+    "yes",
+)
+
 # FEEDBACK_MAX_METADATA_BYTES:
 # Maximum serialized JSON size accepted for feedback page metadata payloads.
 FEEDBACK_MAX_METADATA_BYTES = int(
@@ -344,5 +365,6 @@ REST_FRAMEWORK = {
             "FEEDBACK_THROTTLE_INITIATE_RATE", "30/min"
         ),
         "feedback_submit": os.environ.get("FEEDBACK_THROTTLE_SUBMIT_RATE", "20/min"),
+        "hub_search": os.environ.get("HUB_SEARCH_THROTTLE_RATE", "30/min"),
     },
 }

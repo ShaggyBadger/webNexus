@@ -9,6 +9,10 @@ from dms.api.views import (
     FinalizeUploadView,
     DocumentDownloadView,
 )
+from dms.api.views.hub import (
+    LocationHubSearchAPIView,
+    LocationDocumentSummaryAPIView,
+)
 from dms.views import DashboardView, DocumentMetadataEditView, DocumentUploadView
 
 app_name = "dms"
@@ -43,6 +47,16 @@ urlpatterns = [
         "api/v1/upload/finalize/",
         FinalizeUploadView.as_view(),
         name="api_finalize_upload",
+    ),
+    path(
+        "api/v1/hub/search/",
+        LocationHubSearchAPIView.as_view(),
+        name="api_hub_search",
+    ),
+    path(
+        "api/v1/hub/location/<int:store_num>/summary/",
+        LocationDocumentSummaryAPIView.as_view(),
+        name="api_location_summary",
     ),
     # Legacy compatibility aliases
     path(
