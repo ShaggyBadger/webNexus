@@ -2,7 +2,10 @@
 
 {% block object-tools-items %}
   <li>
-    <a href="{% url 'admin:tankcharts_storechartgeneration_generate_all' %}">Generate All Tank Charts</a>
+    <form action="{% url 'admin:tankcharts_storechartgeneration_generate_all' %}" method="post" style="margin: 0;">
+      {% csrf_token %}
+      <button type="submit" class="addlink" style="padding: 6px 12px;">Generate All Tank Charts</button>
+    </form>
   </li>
   {{ block.super }}
 {% endblock %}
