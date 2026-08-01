@@ -44,7 +44,7 @@ class TankFieldChart:
 class StoreTankSummary:
     """Summary metadata for one tank on a store-wide chart."""
 
-    tank_index: int
+    tank_index: int | None
     fuel_type: str
     tank_type_name: str
     capacity_gallons: int

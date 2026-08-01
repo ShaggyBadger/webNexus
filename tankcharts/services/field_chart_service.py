@@ -216,7 +216,13 @@ class TankFieldChartService:
             zip_code=store.zip_code or "",
             latitude=store.lat,
             longitude=store.lon,
-            tanks=sorted(summaries, key=lambda summary: summary.tank_index),
+            tanks=sorted(
+                summaries,
+                key=lambda summary: (
+                    summary.tank_index is None,
+                    summary.tank_index or 0,
+                ),
+            ),
             combined_table_rows=combined_table_rows,
             curves=curves,
             max_depth_inches_global=max_depth_inches_global,
@@ -398,7 +404,7 @@ class TankFieldChartService:
 
     def chunk_store_tanks(
         self, chart: StoreFieldChart, page_size: int = 4
-    ) -> list[list[int]]:
+    ) -> list[list[int | None]]:
         """Return tank index groups for deterministic multi-page store table rendering."""
         ordered_indices = [tank.tank_index for tank in chart.tanks]
         return [

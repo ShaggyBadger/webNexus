@@ -126,3 +126,28 @@ class TankFieldChartServiceTests(TestCase):
 
         chunks = service.chunk_store_tanks(store_chart, page_size=4)
         self.assertEqual(chunks, [[1, 2]])
+
+    def test_build_store_handles_null_tank_index(self):
+        tank_none = StoreTankMapping.objects.create(
+            store=self.store,
+            tank_type=self.tank_type,
+            fuel_type="diesel",
+            tank_index=None,
+        )
+        TankEstimation.objects.create(
+            tank_mapping=tank_none,
+            radius=48.0,
+            length=360.0,
+            confidence=0.8,
+            mean_error=4.2,
+            max_error=8.0,
+            sample_count=7,
+            algorithm_version="1.0.0",
+            is_active=True,
+        )
+
+        service = TankFieldChartService()
+        store_chart = service.build_store(store_num=self.store.store_num)
+
+        self.assertEqual([tank.tank_index for tank in store_chart.tanks], [1, None])
+        self.assertEqual(service.chunk_store_tanks(store_chart), [[1, None]])
