@@ -18,7 +18,7 @@
             <template x-if="loadingDetail">
                 <div class="text-center py-4">
                     <i class="fa-solid fa-spinner fa-spin fa-2x text-tactical-warning mb-2"></i>
-                    <p class="font-family-monospace text-white small mb-0">FETCHING LOCATION DOCUMENTS & TANK CHART STATUS...</p>
+                    <p class="font-family-monospace text-white small mb-0">FETCHING LOCATION DOCUMENTS &amp; TANK CHART STATUS...</p>
                 </div>
             </template>
 
@@ -47,7 +47,53 @@
 
                                     <!-- Tank Chart Section Handling -->
                                     <template x-if="catName === 'Tank Chart'">
-                                        <div>
+                                        <div x-data="{
+                                            emailInput: '',
+                                            emailSending: false,
+                                            emailSent: false,
+                                            emailError: '',
+                                            idempotencyKey: crypto.randomUUID(),
+                                            resetEmail() {
+                                                this.emailSending = false;
+                                                this.emailSent = false;
+                                                this.emailError = '';
+                                                this.emailInput = '';
+                                                this.idempotencyKey = crypto.randomUUID();
+                                            },
+                                            async sendChartEmail(storeNumber) {
+                                                if (!this.emailInput.trim()) return;
+                                                if (this.emailSending || this.emailSent) return;
+                                                this.emailSending = true;
+                                                this.emailError = '';
+                                                try {
+                                                    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value
+                                                        || document.cookie.split('; ').find(r => r.startsWith('csrftoken='))?.split('=')[1]
+                                                        || '';
+                                                    const response = await fetch(
+                                                        '/tankcharts/api/store/' + storeNumber + '/email/',
+                                                        {
+                                                            method: 'POST',
+                                                            headers: {
+                                                                'Content-Type': 'application/json',
+                                                                'X-CSRFToken': csrfToken,
+                                                                'Idempotency-Key': this.idempotencyKey,
+                                                            },
+                                                            body: JSON.stringify({ email: this.emailInput.trim() }),
+                                                        }
+                                                    );
+                                                    const data = await response.json();
+                                                    if (response.ok && data.status === 'success') {
+                                                        this.emailSent = true;
+                                                    } else {
+                                                        this.emailError = data.message || 'Delivery failed. Download directly.';
+                                                    }
+                                                } catch (err) {
+                                                    this.emailError = 'Network error. Download directly instead.';
+                                                } finally {
+                                                    this.emailSending = false;
+                                                }
+                                            }
+                                        }">
                                             <div class="d-flex flex-wrap align-items-center justify-content-between mb-3 gap-2">
                                                 <div>
                                                     <span class="font-family-monospace small text-muted-custom me-2">CACHE STATE:</span>
@@ -81,6 +127,73 @@
                                                     </template>
                                                 </div>
                                             </div>
+
+                                            <!-- Email Modal Trigger + Inline Panel -->
+                                            <template x-if="catData.download_url">
+                                                <div class="mt-3 pt-3 border-top border-secondary">
+                                                    <div class="font-family-monospace text-muted-custom small text-uppercase mb-2">
+                                                        <i class="fa-solid fa-envelope me-1 text-tactical-warning"></i>EMAIL CHART TO FIELD OPERATOR
+                                                    </div>
+
+                                                    <!-- Success State -->
+                                                    <template x-if="emailSent">
+                                                        <div class="d-flex align-items-center gap-3 p-2 rounded" style="background-color: rgba(25,135,84,0.12); border: 1px solid #198754;">
+                                                            <i class="fa-solid fa-circle-check text-success fa-lg"></i>
+                                                            <span class="font-family-monospace text-success small">TRANSMISSION CONFIRMED — CHART DISPATCHED</span>
+                                                            <button
+                                                                type="button"
+                                                                class="btn btn-sm btn-tactical-secondary font-family-monospace py-0 px-2 ms-auto"
+                                                                @click="resetEmail()"
+                                                                style="min-height:36px;"
+                                                            >
+                                                                <i class="fa-solid fa-arrows-rotate me-1"></i>SEND AGAIN
+                                                            </button>
+                                                        </div>
+                                                    </template>
+
+                                                    <!-- Input State -->
+                                                    <template x-if="!emailSent">
+                                                        <div>
+                                                            <div class="d-flex gap-2 align-items-start flex-wrap">
+                                                                <input
+                                                                    id="chart-email-input"
+                                                                    type="email"
+                                                                    x-model="emailInput"
+                                                                    placeholder="operator@example.com"
+                                                                    class="form-control form-control-sm font-family-monospace"
+                                                                    style="background-color:#0d0f11; border:1px solid #495057; color:#fff; max-width:280px; min-height:44px;"
+                                                                    :disabled="emailSending"
+                                                                     @keydown.enter.prevent="sendChartEmail(selectedStore)"
+                                                                    autocomplete="email"
+                                                                />
+                                                                <button
+                                                                    type="button"
+                                                                    id="chart-email-send-btn"
+                                                                    class="btn btn-sm btn-tactical-amber font-family-monospace px-3"
+                                                                    style="min-height:44px;"
+                                                                    @click="sendChartEmail(selectedStore)"
+                                                                    :disabled="emailSending || !emailInput.trim()"
+                                                                >
+                                                                    <template x-if="emailSending">
+                                                                        <span><i class="fa-solid fa-spinner fa-spin me-1"></i>TRANSMITTING...</span>
+                                                                    </template>
+                                                                    <template x-if="!emailSending">
+                                                                        <span><i class="fa-solid fa-paper-plane me-1"></i>TRANSMIT</span>
+                                                                    </template>
+                                                                </button>
+                                                            </div>
+
+                                                            <!-- Error Banner -->
+                                                            <template x-if="emailError">
+                                                                <div class="mt-2 p-2 rounded d-flex align-items-center gap-2" style="background-color: rgba(220,53,69,0.12); border: 1px solid #dc3545;">
+                                                                    <i class="fa-solid fa-triangle-exclamation text-danger"></i>
+                                                                    <span class="font-family-monospace text-danger small" x-text="emailError"></span>
+                                                                </div>
+                                                            </template>
+                                                        </div>
+                                                    </template>
+                                                </div>
+                                            </template>
 
                                             <!-- Tank Profiles Readout -->
                                             <template x-if="catData.tanks && catData.tanks.length > 0">

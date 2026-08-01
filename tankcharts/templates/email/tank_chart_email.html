@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Tank Charts - Store #{{ store.store_num }}</title>
+</head>
+<body style="margin:0; padding:0; background-color:#121417; color:#f8f9fa; font-family:'JetBrains Mono', monospace, Arial, sans-serif;">
+    <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color:#121417; padding:20px;">
+        <tr>
+            <td align="center">
+                <table width="600" border="0" cellspacing="0" cellpadding="0" style="background-color:#1c1f23; border:1px solid #2a2e33; border-radius:4px; overflow:hidden;">
+                    <!-- Header -->
+                    <tr>
+                        <td style="background-color:#121417; padding:15px 20px; border-bottom:2px solid #ffb86c;">
+                            <h2 style="margin:0; font-size:18px; color:#ffb86c; text-transform:uppercase; letter-spacing:1px;">
+                                webNexus // TANK CHARTS DELIVERY
+                            </h2>
+                        </td>
+                    </tr>
+                    <!-- Content -->
+                    <tr>
+                        <td style="padding:20px; color:#f8f9fa; font-size:14px; line-height:1.5;">
+                            <p style="margin-top:0; font-weight:bold; color:#ffffff; font-size:16px;">
+                                TANK CHARTS &mdash; STORE #{{ store.store_num }} &mdash; {{ store.city|default:""|upper }} {{ store.state|default:""|upper }}
+                            </p>
+                            <p style="color:#a0aec0;">
+                                Tank chart PDF for {{ store.store_name|default:"STORE" }} (#{{ store.store_num }}, {{ store.city|default:"" }}, {{ store.state|default:"" }}) is attached to this email.
+                            </p>
+                            <p style="color:#a0aec0;">
+                                This chart was generated from the latest tank calibration data and includes all mapped store tanks. If you need a different format or have questions regarding site geometry, contact your field supervisor.
+                            </p>
+
+                            <!-- Attachment Indicator line -->
+                            <div style="margin-top:20px; padding:10px; background-color:#121417; border-left:3px solid #8da35d; color:#8da35d; font-size:12px;">
+                                ATTACHMENT: tank_chart_store_{{ store.store_num }}.pdf ({{ document.file_size }} bytes)
+                            </div>
+                        </td>
+                    </tr>
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color:#121417; padding:15px 20px; border-top:1px solid #2a2e33; font-size:11px; color:#a0aec0;">
+                            <div>SYSTEM GENERATED AT: {{ generated_at }}</div>
+                            <div style="margin-top:4px;">webNexus Operational Tank Gauge System &bull; <a href="{{ site_url }}" style="color:#ffb86c; text-decoration:none;">{{ site_url }}</a></div>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

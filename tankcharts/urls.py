@@ -1,6 +1,7 @@
 from django.urls import path
 
 from tankcharts.views import (
+    StoreChartEmailAPIView,
     StoreChartPDFAPIView,
     StoreChartStatusAPIView,
     TankChartBatchGenerateAPIView,
@@ -35,5 +36,10 @@ urlpatterns = [
         "meta/<int:store_num>/<int:tank_index>/",
         TankChartMetaAPIView.as_view(),
         name="chart_meta",
+    ),
+    path(
+        "api/store/<int:store_num>/email/",
+        StoreChartEmailAPIView.as_view(),
+        name="store_chart_email",
     ),
 ]

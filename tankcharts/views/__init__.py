@@ -1,4 +1,5 @@
 from tankcharts.views.api import (
+    StoreChartEmailAPIView,
     StoreChartPDFAPIView,
     StoreChartStatusAPIView,
     TankChartBatchGenerateAPIView,
@@ -7,6 +8,7 @@ from tankcharts.views.api import (
 )
 
 __all__ = [
+    "StoreChartEmailAPIView",
     "TankChartPDFAPIView",
     "TankChartMetaAPIView",
     "StoreChartPDFAPIView",

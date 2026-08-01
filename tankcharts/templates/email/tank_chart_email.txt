@@ -1,0 +1,12 @@
+TANK CHARTS — STORE #{{ store.store_num }} — {{ store.city|default:""|upper }} {{ store.state|default:""|upper }}
+
+Tank chart PDF for {{ store.store_name|default:"STORE" }} (#{{ store.store_num }}, {{ store.city|default:"" }}, {{ store.state|default:"" }}) is attached to this email.
+
+This chart was generated from the latest tank calibration data and includes all mapped store tanks. If you need a different format or have questions regarding site geometry, contact your field supervisor.
+
+ATTACHMENT: tank_chart_store_{{ store.store_num }}.pdf ({{ document.file_size }} bytes)
+
+--
+webNexus Operational Tank Gauge System
+System Generated at: {{ generated_at }}
+{{ site_url }}

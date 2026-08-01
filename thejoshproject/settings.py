@@ -366,5 +366,7 @@ REST_FRAMEWORK = {
         ),
         "feedback_submit": os.environ.get("FEEDBACK_THROTTLE_SUBMIT_RATE", "20/min"),
         "hub_search": os.environ.get("HUB_SEARCH_THROTTLE_RATE", "30/min"),
+        "chart_email_anon": os.environ.get("CHART_EMAIL_ANON_THROTTLE", "5/min"),
+        "chart_email_user": os.environ.get("CHART_EMAIL_USER_THROTTLE", "10/min"),
     },
 }
