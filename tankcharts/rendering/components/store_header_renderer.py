@@ -17,7 +17,7 @@ class StoreHeaderRenderer:
         tank_summaries = " | ".join(
             [
                 (
-                    f'{tank.fuel_type.upper()[:3]} '
+                    f"{tank.fuel_type.upper()[:3]} "
                     f"T{tank.tank_index if tank.tank_index is not None else '?'} "
                     f'{tank.max_depth_inches}" '
                     f"N={tank.veeder_observation_count or tank.sample_count}"

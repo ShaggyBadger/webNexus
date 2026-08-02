@@ -153,7 +153,9 @@ class DocumentSearchService:
 
     @staticmethod
     def _tokenize(search_query: str) -> list[str]:
-        return [token.strip().lower() for token in search_query.split() if token.strip()]
+        return [
+            token.strip().lower() for token in search_query.split() if token.strip()
+        ]
 
     @classmethod
     def _find_matching_store_ids(cls, *, tokens: list[str]) -> set[int]:
@@ -187,7 +189,9 @@ class DocumentSearchService:
         candidates = cls.optimize_queryset(queryset)
         for document in candidates:
             document_blob = cls._document_blob(document=document)
-            if cls._tokens_match(text=document_blob, tokens=tokens, threshold=threshold):
+            if cls._tokens_match(
+                text=document_blob, tokens=tokens, threshold=threshold
+            ):
                 matched_ids.add(document.id)
                 continue
 

@@ -80,10 +80,13 @@ class TankFieldChartServiceTests(TestCase):
         self.assertEqual(chart.store_num, 7974)
         self.assertEqual(chart.tank_index, 1)
         self.assertEqual(chart.max_depth_inches, 96)
-        self.assertTrue(chart.has_official_chart)
+        self.assertFalse(chart.has_official_chart)
+        self.assertIsNone(chart.official_chart_source)
         self.assertEqual(len(chart.table_rows), 96)
         self.assertIn("gallons", chart.table_rows[0])
         self.assertNotIn("official_gallons", chart.table_rows[0])
+        self.assertEqual(len(chart.curves), 1)
+        self.assertIn("Veeder", chart.curves[0]["label"])
         self.assertGreaterEqual(chart.coverage_percent, 0.0)
         self.assertGreaterEqual(chart.veeder_observation_count, 2)
 
@@ -127,7 +130,7 @@ class TankFieldChartServiceTests(TestCase):
         chunks = service.chunk_store_tanks(store_chart, page_size=4)
         self.assertEqual(chunks, [[1, 2]])
 
-    def test_build_store_handles_null_tank_index(self):
+    def test_build_store_omits_null_tank_index(self):
         tank_none = StoreTankMapping.objects.create(
             store=self.store,
             tank_type=self.tank_type,
@@ -149,5 +152,10 @@ class TankFieldChartServiceTests(TestCase):
         service = TankFieldChartService()
         store_chart = service.build_store(store_num=self.store.store_num)
 
-        self.assertEqual([tank.tank_index for tank in store_chart.tanks], [1, None])
-        self.assertEqual(service.chunk_store_tanks(store_chart), [[1, None]])
+        self.assertEqual([tank.tank_index for tank in store_chart.tanks], [1])
+        self.assertEqual(service.chunk_store_tanks(store_chart), [[1]])
+
+        omitted = store_chart.omitted_tanks
+        self.assertEqual(len(omitted), 1)
+        self.assertIsNone(omitted[0].tank_index)
+        self.assertEqual(omitted[0].reason_code, "null_tank_index")

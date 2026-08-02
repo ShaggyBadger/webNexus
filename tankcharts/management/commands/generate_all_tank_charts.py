@@ -48,9 +48,11 @@ class Command(BaseCommand):
         if store_num:
             stores = Store.objects.filter(store_num=store_num)
         else:
-            estimation_store_ids = TankEstimation.objects.filter(is_active=True).values_list(
-                "tank_mapping__store_id", flat=True
-            ).distinct()
+            estimation_store_ids = (
+                TankEstimation.objects.filter(is_active=True)
+                .values_list("tank_mapping__store_id", flat=True)
+                .distinct()
+            )
             virtual_store_ids = VirtualTankEstimation.objects.filter(
                 is_active=True
             ).values_list("store_id", flat=True)

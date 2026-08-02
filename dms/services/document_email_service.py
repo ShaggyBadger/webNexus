@@ -146,7 +146,9 @@ class DocumentEmailService:
         """Increment document email_count under a row lock for concurrency safety."""
         try:
             with transaction.atomic():
-                locked_document = Document.objects.select_for_update().get(id=document.id)
+                locked_document = Document.objects.select_for_update().get(
+                    id=document.id
+                )
                 locked_document.email_count += 1
                 locked_document.save(update_fields=["email_count"])
         except Exception:

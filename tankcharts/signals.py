@@ -22,6 +22,7 @@ def regenerate_store_chart_for_store_id(*, store_id: int, reason_code: str) -> N
         store_id: Primary key for the store whose chart should be regenerated.
         reason_code: Stable reason code indicating the trigger path.
     """
+
     def regenerate() -> None:
         try:
             store = Store.objects.filter(pk=store_id).first()
@@ -37,7 +38,9 @@ def regenerate_store_chart_for_store_id(*, store_id: int, reason_code: str) -> N
                 return
 
             chart_service = TankChartService()
-            result = chart_service.get_store_chart(store_num=store.store_num, force=True)
+            result = chart_service.get_store_chart(
+                store_num=store.store_num, force=True
+            )
 
             if not result.get("success"):
                 logger.error(

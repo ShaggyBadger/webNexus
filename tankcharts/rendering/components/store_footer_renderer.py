@@ -26,7 +26,9 @@ class StoreFooterRenderer:
         if chart.omitted_tanks:
             omitted_labels = []
             for omitted in chart.omitted_tanks:
-                tank_label = omitted.tank_index if omitted.tank_index is not None else "?"
+                tank_label = (
+                    omitted.tank_index if omitted.tank_index is not None else "?"
+                )
                 omitted_labels.append(
                     f"T{tank_label} ({omitted.reason_code}, N={omitted.veeder_observation_count})"
                 )
@@ -38,10 +40,9 @@ class StoreFooterRenderer:
             f" | Trust threshold N>={minimum_readings}"
         )
         if confidence_flags:
-            note_line += (
-                " | LOW CONFIDENCE "
-                + ", ".join(confidence_flags)
-            )
+            note_line += " | LOW CONFIDENCE " + ", ".join(confidence_flags)
         return [
-            Paragraph(f"{generated_label} | {note_line}{omitted_line}", self.styles["footer"])
+            Paragraph(
+                f"{generated_label} | {note_line}{omitted_line}", self.styles["footer"]
+            )
         ]

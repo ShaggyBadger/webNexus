@@ -49,9 +49,7 @@ TANKGAUGE_DEFAULT_TANK_LIMITS_SOURCE_PRIORITY = os.environ.get(
 
 # DMS dashboard token-aware search tuning
 DMS_STORE_TOKEN_THRESHOLD = int(os.environ.get("DMS_STORE_TOKEN_THRESHOLD", "50"))
-DMS_DOCUMENT_TOKEN_THRESHOLD = int(
-    os.environ.get("DMS_DOCUMENT_TOKEN_THRESHOLD", "55")
-)
+DMS_DOCUMENT_TOKEN_THRESHOLD = int(os.environ.get("DMS_DOCUMENT_TOKEN_THRESHOLD", "55"))
 
 CHART_MIN_READINGS = int(os.environ.get("CHART_MIN_READINGS", "10"))
 
