@@ -1,5 +1,8 @@
-from django.db.models import Q, QuerySet
+from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
+from django.db.models import Q, QuerySet
+from rapidfuzz import fuzz
+
 from dms.models import Document
 from siteintel.models import Location
 from tankgauge.models import Store
@@ -28,7 +31,12 @@ class DocumentSearchService:
         is_public_only: bool = False,
     ) -> QuerySet:
         """
-        Filter documents query based on query parameters, category, collection, tags, state, and public visibility.
+        Filter documents by search query and dashboard filters.
+
+        Commander's Intent:
+        Field users must reliably find the right document with multi-token
+        queries like "exxon charlotte nc". Weak search causes bad document
+        retrieval in operational moments.
         """
         if queryset is None:
             queryset = Document.objects.all()
@@ -41,10 +49,9 @@ class DocumentSearchService:
 
         # 1. Search Query (Title, Description, or Tag Name)
         if search_query:
-            queryset = queryset.filter(
-                Q(title__icontains=search_query)
-                | Q(description__icontains=search_query)
-                | Q(tags__name__icontains=search_query)
+            queryset = cls._apply_token_aware_search(
+                queryset=queryset,
+                search_query=search_query,
             )
 
         # 2. Category Filter
@@ -122,3 +129,128 @@ class DocumentSearchService:
             "uploaded_by",
             "content_type",
         ).prefetch_related("tags", "collections")
+
+    @classmethod
+    def _apply_token_aware_search(
+        cls,
+        *,
+        queryset: QuerySet,
+        search_query: str,
+    ) -> QuerySet:
+        tokens = cls._tokenize(search_query)
+        if not tokens:
+            return queryset
+
+        matched_store_ids = cls._find_matching_store_ids(tokens=tokens)
+        matched_document_ids = cls._find_matching_document_ids(
+            queryset=queryset,
+            tokens=tokens,
+            matched_store_ids=matched_store_ids,
+        )
+        if not matched_document_ids:
+            return queryset.none()
+        return queryset.filter(id__in=matched_document_ids)
+
+    @staticmethod
+    def _tokenize(search_query: str) -> list[str]:
+        return [token.strip().lower() for token in search_query.split() if token.strip()]
+
+    @classmethod
+    def _find_matching_store_ids(cls, *, tokens: list[str]) -> set[int]:
+        threshold = int(getattr(settings, "DMS_STORE_TOKEN_THRESHOLD", 50))
+        matched_ids: set[int] = set()
+
+        for store in Store.objects.filter(store_num__isnull=False).only(
+            "id",
+            "store_num",
+            "store_name",
+            "city",
+            "state",
+        ):
+            store_blob = cls._store_blob(store=store)
+            if cls._tokens_match(text=store_blob, tokens=tokens, threshold=threshold):
+                matched_ids.add(store.id)
+        return matched_ids
+
+    @classmethod
+    def _find_matching_document_ids(
+        cls,
+        *,
+        queryset: QuerySet,
+        tokens: list[str],
+        matched_store_ids: set[int],
+    ) -> set[str]:
+        threshold = int(getattr(settings, "DMS_DOCUMENT_TOKEN_THRESHOLD", 55))
+        matched_ids: set[str] = set()
+        store_content_type = ContentType.objects.get_for_model(Store)
+
+        candidates = cls.optimize_queryset(queryset)
+        for document in candidates:
+            document_blob = cls._document_blob(document=document)
+            if cls._tokens_match(text=document_blob, tokens=tokens, threshold=threshold):
+                matched_ids.add(document.id)
+                continue
+
+            if (
+                document.content_type_id == store_content_type.id
+                and document.object_id
+                and document.object_id.isdigit()
+                and int(document.object_id) in matched_store_ids
+            ):
+                matched_ids.add(document.id)
+        return matched_ids
+
+    @staticmethod
+    def _tokens_match(*, text: str, tokens: list[str], threshold: int) -> bool:
+        text_lower = text.lower()
+        for token in tokens:
+            score = fuzz.WRatio(token, text_lower)
+            if score < threshold:
+                return False
+        return True
+
+    @classmethod
+    def _store_blob(cls, *, store: Store) -> str:
+        state_value = (store.state or "").strip().lower()
+        return " ".join(
+            [
+                str(store.store_num or ""),
+                (store.store_name or "").lower(),
+                (store.city or "").lower(),
+                state_value,
+                cls._state_aliases(state_value),
+            ]
+        ).strip()
+
+    @staticmethod
+    def _document_blob(*, document: Document) -> str:
+        tag_names = " ".join(tag.name for tag in document.tags.all())
+        collection_names = " ".join(
+            collection.name for collection in document.collections.all()
+        )
+        category_name = document.category.name if document.category else ""
+        return " ".join(
+            [
+                document.title or "",
+                document.description or "",
+                tag_names,
+                category_name,
+                collection_names,
+            ]
+        ).lower()
+
+    @staticmethod
+    def _state_aliases(state_value: str) -> str:
+        state_alias_map = {
+            "nc": "north carolina",
+            "north carolina": "nc",
+            "sc": "south carolina",
+            "south carolina": "sc",
+            "va": "virginia",
+            "virginia": "va",
+            "ga": "georgia",
+            "georgia": "ga",
+            "tn": "tennessee",
+            "tennessee": "tn",
+        }
+        return state_alias_map.get(state_value, "")

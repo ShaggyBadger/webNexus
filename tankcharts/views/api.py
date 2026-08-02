@@ -84,7 +84,8 @@ class TankChartPDFAPIView(APIView):
                 "store_num": chart.store_num,
                 "fuel_type": chart.fuel_type,
                 "tank_index": chart.tank_index,
-                "official_row_count": chart.official_row_count,
+                "veeder_observation_count": chart.veeder_observation_count,
+                "estimation_sample_count": chart.estimation_sample_count,
                 "generated_at": chart.generated_at.isoformat(),
             }
             document = self.storage_service.store(
@@ -194,7 +195,8 @@ class TankChartMetaAPIView(APIView):
             "store_num": store_num,
             "fuel_type": mapping.fuel_type,
             "tank_index": tank_index,
-            "official_row_count": chart.official_row_count,
+            "veeder_observation_count": chart.veeder_observation_count,
+            "estimation_sample_count": chart.estimation_sample_count,
             "generated_at": chart.generated_at.isoformat(),
             "has_cached_document": existing is not None,
             "is_stale": is_stale,

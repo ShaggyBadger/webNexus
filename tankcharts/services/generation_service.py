@@ -148,10 +148,19 @@ class ChartGenerationService:
                 "store_num": chart.store_num,
                 "tank_count": len(chart.tanks),
                 "tank_indices": [tank.tank_index for tank in chart.tanks],
-                "official_row_counts": {
-                    str(tank.tank_index): tank.official_row_count
+                "veeder_observation_counts": {
+                    str(tank.tank_index): tank.veeder_observation_count
                     for tank in chart.tanks
                 },
+                "omitted_tanks": [
+                    {
+                        "tank_index": tank.tank_index,
+                        "fuel_type": tank.fuel_type,
+                        "reason_code": tank.reason_code,
+                        "veeder_observation_count": tank.veeder_observation_count,
+                    }
+                    for tank in chart.omitted_tanks
+                ],
                 "generated_at": chart.generated_at.isoformat(),
             }
 

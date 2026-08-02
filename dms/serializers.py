@@ -72,6 +72,7 @@ class DocumentSerializer(serializers.ModelSerializer):
             "status",
             "version",
             "download_count",
+            "email_count",
             "category",
             "collections",
             "is_public",
@@ -92,6 +93,7 @@ class DocumentSerializer(serializers.ModelSerializer):
             "uploaded_by",
             "uploaded_at",
             "download_count",
+            "email_count",
             "download_url",
             "linked_object",
         ]

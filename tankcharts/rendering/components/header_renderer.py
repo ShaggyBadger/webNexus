@@ -20,6 +20,7 @@ class HeaderRenderer:
             f" | TANK {chart.tank_index} {chart.fuel_type.upper()}"
             f" | {chart.capacity_gallons:,} gal"
             f" | {chart.max_depth_inches} in"
+            f" | N={chart.veeder_observation_count or chart.estimation_sample_count}"
         )
         location_line = (
             f"{chart.address or 'Unknown address'}"

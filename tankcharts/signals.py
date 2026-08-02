@@ -4,47 +4,116 @@ from django.db import transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
-from atg.models import VeederTicket
 from tankcharts.services.chart_service import TankChartService
-from tankgauge.models import Store
+from tankgauge.models import Store, TankEstimation, VirtualTankEstimation
 
 logger = logging.getLogger(__name__)
 
 
-@receiver(post_save, sender=VeederTicket)
-def auto_regenerate_on_veeder_ticket(
-    sender, instance: VeederTicket, created: bool, **kwargs
-) -> None:
+def regenerate_store_chart_for_store_id(*, store_id: int, reason_code: str) -> None:
     """
-    Auto-regenerates store tank chart after a Veeder-Root ticket is OCR processed.
+    Ensures freshly estimated tank geometry is reflected in pre-warmed store PDFs.
 
     Commander's Intent:
-    Ensures tank charts are kept pre-warmed whenever a new fuel delivery is ingested.
-    Non-blocking: failures are logged without disrupting ticket saving.
+    If automatic re-warm fails, operators work from stale charts and risk bad
+    delivery decisions. This function logs failures and never raises.
+
+    Args:
+        store_id: Primary key for the store whose chart should be regenerated.
+        reason_code: Stable reason code indicating the trigger path.
     """
-    if not instance.parsed_json:
-        return  # Only fire on fully processed tickets
-
-    if not instance.store_id:
-        return  # No store linked — nothing to regenerate
-
-    store_id = instance.store_id
-
     def regenerate() -> None:
         try:
             store = Store.objects.filter(pk=store_id).first()
             if not store:
+                logger.info(
+                    "VEEDER_TICKET_AUTO_REGENERATE_SKIPPED",
+                    extra={
+                        "store_id": store_id,
+                        "reason_code": "store_not_found",
+                        "trigger_reason_code": reason_code,
+                    },
+                )
                 return
+
             chart_service = TankChartService()
-            chart_service.get_store_chart(store_num=store.store_num, force=True)
+            result = chart_service.get_store_chart(store_num=store.store_num, force=True)
+
+            if not result.get("success"):
+                logger.error(
+                    "VEEDER_TICKET_AUTO_REGENERATE_FAILED",
+                    extra={
+                        "store_id": store_id,
+                        "store_num": store.store_num,
+                        "reason_code": "chart_service_failure",
+                        "trigger_reason_code": reason_code,
+                        "error_code": result.get("code"),
+                    },
+                )
+                return
+
             logger.info(
                 "VEEDER_TICKET_AUTO_REGENERATE_SUCCESS",
-                extra={"store_id": store_id, "store_num": store.store_num},
+                extra={
+                    "store_id": store_id,
+                    "store_num": store.store_num,
+                    "reason_code": reason_code,
+                },
             )
         except Exception:
             logger.exception(
                 "VEEDER_TICKET_AUTO_REGENERATE_FAILED",
-                extra={"store_id": store_id},
+                extra={
+                    "store_id": store_id,
+                    "reason_code": "unhandled_exception",
+                    "trigger_reason_code": reason_code,
+                },
             )
 
     transaction.on_commit(regenerate)
+
+
+@receiver(post_save, sender=TankEstimation)
+def auto_regenerate_on_tank_estimation(
+    sender, instance: TankEstimation, created: bool, **kwargs
+) -> None:
+    """Trigger chart re-warm when a new active mapped-tank estimation is created."""
+    if not created:
+        return
+    if not instance.is_active:
+        logger.info(
+            "VEEDER_TICKET_AUTO_REGENERATE_SKIPPED",
+            extra={
+                "store_id": instance.tank_mapping.store_id,
+                "reason_code": "inactive_tank_estimation",
+                "estimation_id": instance.id,
+            },
+        )
+        return
+    regenerate_store_chart_for_store_id(
+        store_id=instance.tank_mapping.store_id,
+        reason_code="tank_estimation_created",
+    )
+
+
+@receiver(post_save, sender=VirtualTankEstimation)
+def auto_regenerate_on_virtual_estimation(
+    sender, instance: VirtualTankEstimation, created: bool, **kwargs
+) -> None:
+    """Trigger chart re-warm when a new active virtual estimation is created."""
+    if not created:
+        return
+    if not instance.is_active:
+        logger.info(
+            "VEEDER_TICKET_AUTO_REGENERATE_SKIPPED",
+            extra={
+                "store_id": instance.store_id,
+                "reason_code": "inactive_virtual_tank_estimation",
+                "estimation_id": instance.id,
+            },
+        )
+        return
+    regenerate_store_chart_for_store_id(
+        store_id=instance.store_id,
+        reason_code="virtual_tank_estimation_created",
+    )

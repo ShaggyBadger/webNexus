@@ -13,7 +13,7 @@ from django.utils.text import slugify
 from atg.models import VeederTicket
 from dms.models import Category, Document, Tag, generate_ulid
 from missionlog.models import FuelType
-from tankgauge.models import Store, StoreTankMapping, TankChart, TankEstimation
+from tankgauge.models import Store, StoreTankMapping, TankEstimation
 
 
 class DMSChartStorageService:
@@ -106,13 +106,7 @@ class DMSChartStorageService:
         if latest_estimation and latest_estimation > document.uploaded_at:
             return True
 
-        metadata = self._parse_metadata(document=document)
-        prior_official_row_count = metadata.get("official_row_count")
-        if prior_official_row_count is None:
-            return True
-
-        current_official_row_count = self._official_row_count(mapping=mapping)
-        return int(prior_official_row_count) != int(current_official_row_count)
+        return False
 
     def is_store_stale(self, *, document: Document, store_num: int) -> bool:
         store = Store.objects.filter(store_num=store_num).first()
@@ -127,24 +121,11 @@ class DMSChartStorageService:
         if not mappings:
             return True
 
-        metadata = self._parse_metadata(document=document)
-        prior_official_counts = metadata.get("official_row_counts")
-        if not isinstance(prior_official_counts, dict):
-            return True
-
         for mapping in mappings:
             if self._tank_updated_after(
                 mapping=mapping,
                 uploaded_at=document.uploaded_at,
             ):
-                return True
-
-            key = str(mapping.tank_index)
-            if key not in prior_official_counts:
-                return True
-
-            current_count = self._official_row_count(mapping=mapping)
-            if int(prior_official_counts[key]) != int(current_count):
                 return True
 
         return False
@@ -365,7 +346,6 @@ class DMSChartStorageService:
                     "store_num": chart.store_num,
                     "tank_index": chart.tank_index,
                     "fuel_type": chart.fuel_type,
-                    "official_row_count": chart.official_row_count,
                     "veeder_count": chart.veeder_observation_count,
                     "estimation_id": chart.estimation_id,
                     "generated_at": chart.generated_at.isoformat(),
@@ -438,23 +418,6 @@ class DMSChartStorageService:
         except json.JSONDecodeError:
             return {}
         return {}
-
-    def _official_row_count(self, *, mapping: StoreTankMapping) -> int:
-        store_specific_count = TankChart.objects.filter(
-            store=mapping.store,
-            tank_index=mapping.tank_index,
-            is_official=True,
-        ).count()
-        if store_specific_count > 0:
-            return store_specific_count
-
-        if not mapping.tank_type:
-            return 0
-
-        return TankChart.objects.filter(
-            tank_type=mapping.tank_type,
-            is_official=True,
-        ).count()
 
     def _tank_updated_after(
         self,

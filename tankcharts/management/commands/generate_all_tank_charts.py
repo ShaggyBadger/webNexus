@@ -1,11 +1,13 @@
 import time
+
 from django.core.management.base import BaseCommand
+
 from tankcharts.services.chart_service import TankChartService
-from tankgauge.models import Store, StoreTankMapping
+from tankgauge.models import Store, TankEstimation, VirtualTankEstimation
 
 
 class Command(BaseCommand):
-    help = "Batch generate tank chart PDFs for stores."
+    help = "Batch generate tank chart PDFs for stores with Veeder-derived data."
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -46,10 +48,15 @@ class Command(BaseCommand):
         if store_num:
             stores = Store.objects.filter(store_num=store_num)
         else:
-            mapped_store_ids = StoreTankMapping.objects.values_list(
-                "store_id", flat=True
+            estimation_store_ids = TankEstimation.objects.filter(is_active=True).values_list(
+                "tank_mapping__store_id", flat=True
             ).distinct()
-            stores = Store.objects.filter(id__in=mapped_store_ids).order_by("store_num")
+            virtual_store_ids = VirtualTankEstimation.objects.filter(
+                is_active=True
+            ).values_list("store_id", flat=True)
+            stores = Store.objects.filter(
+                id__in=estimation_store_ids.union(virtual_store_ids)
+            ).order_by("store_num")
 
         total_stores = stores.count()
         self.stdout.write(

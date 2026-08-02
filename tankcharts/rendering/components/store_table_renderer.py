@@ -11,7 +11,9 @@ class StoreLookupTableRenderer:
     def __init__(self, styles: dict):
         self.styles = styles
 
-    def render(self, chart: StoreFieldChart, *, tank_indices: list[int]) -> list:
+    def render(
+        self, chart: StoreFieldChart, *, tank_indices: list[int | None]
+    ) -> list:
         left_headers = ["INCHES"]
         for tank in chart.tanks:
             if tank.tank_index in tank_indices:
@@ -20,6 +22,8 @@ class StoreLookupTableRenderer:
                         fuel_type=tank.fuel_type,
                         tank_index=tank.tank_index,
                         max_depth_inches=tank.max_depth_inches,
+                        reading_count=tank.veeder_observation_count
+                        or tank.sample_count,
                     )
                 )
         right_headers = list(left_headers)
@@ -121,11 +125,13 @@ class StoreLookupTableRenderer:
         self,
         *,
         fuel_type: str,
-        tank_index: int,
+        tank_index: int | None,
         max_depth_inches: int,
+        reading_count: int,
     ) -> str:
         fuel_abbreviation = (fuel_type or "UNK").upper()[:3]
-        return f'{fuel_abbreviation} T{tank_index} ({max_depth_inches}")'
+        tank_label = str(tank_index) if tank_index is not None else "?"
+        return f'{fuel_abbreviation} T{tank_label} ({max_depth_inches}") N={reading_count}'
 
     def _format_number(self, value: float | None) -> str:
         if value is None:

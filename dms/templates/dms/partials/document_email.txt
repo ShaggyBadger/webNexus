@@ -1,0 +1,10 @@
+Document Delivery
+
+A DMS document has been sent to support field operations.
+
+Title: {{ document.title }}
+Category: {% if document.category %}{{ document.category.name }}{% else %}Uncategorized{% endif %}
+Version: {{ document.version }}
+Direct Download: {{ site_url }}/dms/documents/{{ document.id }}/download/
+
+This message was addressed to {{ recipient_email }}.

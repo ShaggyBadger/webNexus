@@ -10,7 +10,13 @@
                 </h5>
                 <span class="badge bg-dark border border-secondary text-muted-custom small mono">v{{ doc.version }}</span>
             </div>
-            <p class="text-muted-custom small mb-2">{{ doc.description|default:"No description provided" }}</p>
+            <p class="text-muted-custom small mb-2">
+                {% if doc.structured_metadata_tags %}
+                    Store chart metadata available below.
+                {% else %}
+                    {{ doc.description|default:"No description provided" }}
+                {% endif %}
+            </p>
 
             <div class="d-flex flex-wrap gap-1 mb-3">
                 {% if doc.category %}
@@ -25,6 +31,9 @@
                         <i class="fa-solid fa-link me-1"></i>{{ doc.content_type.model|upper }} #{{ doc.object_id }}
                     </span>
                 {% endif %}
+                {% for metadata_tag in doc.structured_metadata_tags %}
+                    <span class="meta-tag"><i class="fa-solid fa-database me-1"></i>{{ metadata_tag }}</span>
+                {% endfor %}
             </div>
 
             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -35,6 +44,14 @@
                     <a href="{% url 'dms:document_download' doc.id %}" class="btn btn-sm btn-tactical btn-tactical-primary px-3 touch-target">
                         <i class="fa-solid fa-download me-1"></i> Get
                     </a>
+                    <button
+                        type="button"
+                        class="btn btn-sm btn-tactical btn-tactical-amber px-3 touch-target"
+                        @click="sendDocumentEmail('{{ doc.id }}')"
+                        :disabled="getEmailState('{{ doc.id }}').sending"
+                    >
+                        <i class="fa-solid fa-envelope me-1"></i> Email
+                    </button>
                     {% if user.is_staff or user.is_superuser %}
                         <a href="{% url 'dms:document_edit' doc.id %}" class="btn btn-sm btn-tactical btn-tactical-secondary px-2 touch-target">
                             <i class="fa-solid fa-pen"></i>
@@ -44,6 +61,22 @@
                         </button>
                     {% endif %}
                 </div>
+            </div>
+
+            <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
+                <input
+                    type="email"
+                    class="form-control form-control-tactical"
+                    style="max-width: 320px;"
+                    placeholder="operator@example.com"
+                    :value="getEmailState('{{ doc.id }}').email"
+                    @input="setEmailInput('{{ doc.id }}', $event.target.value)"
+                    @keydown.enter.prevent="sendDocumentEmail('{{ doc.id }}')"
+                >
+                <span class="text-success small font-family-monospace" x-show="getEmailState('{{ doc.id }}').success" x-cloak>
+                    SENT
+                </span>
+                <span class="text-danger small font-family-monospace" x-show="getEmailState('{{ doc.id }}').error" x-text="getEmailState('{{ doc.id }}').error" x-cloak></span>
             </div>
 
             <div class="delete-confirm-block mt-3 p-3 border border-danger bg-dark rounded" x-show="isDeleteOpen('{{ doc.id }}')" x-cloak>

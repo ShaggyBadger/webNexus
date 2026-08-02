@@ -1,0 +1,12 @@
+<!doctype html>
+<html>
+  <body style="font-family: Arial, sans-serif; color: #121417;">
+    <h2 style="margin-bottom: 8px;">Document Delivery</h2>
+    <p style="margin-top: 0;">A DMS document has been sent to support field operations.</p>
+    <p><strong>Title:</strong> {{ document.title }}</p>
+    <p><strong>Category:</strong> {% if document.category %}{{ document.category.name }}{% else %}Uncategorized{% endif %}</p>
+    <p><strong>Version:</strong> {{ document.version }}</p>
+    <p><strong>Direct Download:</strong> {{ site_url }}/dms/documents/{{ document.id }}/download/</p>
+    <p style="margin-top: 20px;">This message was addressed to {{ recipient_email }}.</p>
+  </body>
+</html>

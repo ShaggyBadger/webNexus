@@ -30,6 +30,7 @@ class DocumentAdmin(admin.ModelAdmin):
         "status",
         "version",
         "download_count",
+        "email_count",
         "is_public",
         "uploaded_by",
         "uploaded_at",
@@ -47,6 +48,7 @@ class DocumentAdmin(admin.ModelAdmin):
         "uploaded_at",
         "updated_at",
         "download_count",
+        "email_count",
     )
     filter_horizontal = ("tags",)
     fieldsets = (
@@ -71,7 +73,15 @@ class DocumentAdmin(admin.ModelAdmin):
         ),
         (
             "Ownership & Stats",
-            {"fields": ("uploaded_by", "uploaded_at", "updated_at", "download_count")},
+            {
+                "fields": (
+                    "uploaded_by",
+                    "uploaded_at",
+                    "updated_at",
+                    "download_count",
+                    "email_count",
+                )
+            },
         ),
         (
             "Generic Linkage",

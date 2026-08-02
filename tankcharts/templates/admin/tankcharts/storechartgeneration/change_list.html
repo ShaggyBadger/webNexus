@@ -4,7 +4,7 @@
   <li>
     <form action="{% url 'admin:tankcharts_storechartgeneration_generate_all' %}" method="post" style="margin: 0;">
       {% csrf_token %}
-      <button type="submit" class="addlink" style="padding: 6px 12px;">Generate All Tank Charts</button>
+      <button type="submit" class="addlink" style="padding: 6px 12px;">Generate Veeder-Data Tank Charts</button>
     </form>
   </li>
   {{ block.super }}

@@ -117,6 +117,9 @@ class Document(models.Model):
     download_count = models.PositiveIntegerField(
         default=0, help_text="Cumulative download count"
     )
+    email_count = models.PositiveIntegerField(
+        default=0, help_text="Cumulative email send count"
+    )
     category = models.ForeignKey(
         Category,
         on_delete=models.PROTECT,

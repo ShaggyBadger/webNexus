@@ -59,7 +59,7 @@ class PDFRenderer:
         self,
         chart: StoreFieldChart,
         *,
-        tank_chunks: list[list[int]],
+        tank_chunks: list[list[int | None]],
     ) -> bytes:
         buffer = io.BytesIO()
         doc = SimpleDocTemplate(

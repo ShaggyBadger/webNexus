@@ -1,11 +1,21 @@
+import logging
 from datetime import datetime
+
+from django.conf import settings
 
 from atg.models import VeederReading
 from tankgauge.logic.curve_generator import generate_inch_gallon_curve
-from tankgauge.models import StoreTankMapping, TankChart, TankEstimation
+from tankgauge.models import StoreTankMapping, TankEstimation
 
-from tankcharts.domain import StoreFieldChart, StoreTankSummary, TankFieldChart
+from tankcharts.domain import (
+    StoreFieldChart,
+    StoreTankOmission,
+    StoreTankSummary,
+    TankFieldChart,
+)
 from tankcharts.rendering.theme.colors import Colors
+
+logger = logging.getLogger(__name__)
 
 
 class TankFieldChartService:
@@ -15,7 +25,6 @@ class TankFieldChartService:
         """Build a complete field chart payload for rendering."""
         collected = self._collect_data(store_num=store_num, tank_index=tank_index)
         mapping = collected["mapping"]
-        official_curve = collected["official_curve"]
         veeder_points = collected["veeder_points"]
         estimation = collected["estimation"]
         max_depth_inches = collected["max_depth_inches"]
@@ -25,37 +34,28 @@ class TankFieldChartService:
             max_depth_inches=max_depth_inches,
         )
 
-        if not official_curve and not generated_curve:
+        if not generated_curve:
             raise ValueError(
-                "Cannot generate chart: no official chart rows and no active estimation."
+                "Cannot generate chart: no active Veeder-derived estimation for tank."
             )
 
-        table_rows = self._build_lookup_table(
-            official_curve=official_curve,
-            generated_curve=generated_curve,
-        )
+        table_rows = self._build_lookup_table(generated_curve=generated_curve)
 
         coverage_percent = self._compute_coverage(
             veeder_points=veeder_points,
             max_depth_inches=max_depth_inches,
         )
-        curves = []
-        if official_curve:
-            curves.append(
-                {
-                    "label": "Official Tank Chart",
-                    "color": "#a0aec0",
-                    "points": official_curve,
-                }
-            )
-        if generated_curve:
-            curves.append(
-                {
-                    "label": "Generated Curve (Math)",
-                    "color": "#d4943a",
-                    "points": generated_curve,
-                }
-            )
+        veeder_observation_count = len(veeder_points)
+        estimation_sample_count = int(estimation.sample_count or 0)
+        observed_count_for_trust = veeder_observation_count or estimation_sample_count
+        minimum_reading_count = self._minimum_reading_count()
+        curves = [
+            {
+                "label": "Veeder-Root Derived Curve",
+                "color": "#d4943a",
+                "points": generated_curve,
+            }
+        ]
 
         fallback_capacity = int(round(table_rows[-1]["gallons"])) if table_rows else 0
 
@@ -80,13 +80,15 @@ class TankFieldChartService:
             ),
             max_depth_inches=max_depth_inches,
             table_rows=table_rows,
-            has_official_chart=bool(official_curve),
-            official_chart_source=collected["official_chart_source"],
+            has_official_chart=False,
+            official_chart_source=None,
             coverage_percent=coverage_percent,
-            veeder_observation_count=len(veeder_points),
+            veeder_observation_count=veeder_observation_count,
+            estimation_sample_count=estimation_sample_count,
+            is_low_confidence=observed_count_for_trust < minimum_reading_count,
             curves=curves,
             veeder_points=veeder_points,
-            official_row_count=len(official_curve),
+            official_row_count=0,
             estimation_id=estimation.id if estimation else None,
             estimation_radius_inches=(
                 float(estimation.radius)
@@ -117,10 +119,30 @@ class TankFieldChartService:
         tank_payloads: list[dict] = []
         curves: list[dict] = []
         summaries: list[StoreTankSummary] = []
+        omitted_tanks: list[StoreTankOmission] = []
         total_veeder_observation_count = 0
+        minimum_reading_count = self._minimum_reading_count()
 
         for mapping in mappings:
-            official_curve = self._get_official_curve(mapping=mapping)
+            if mapping.tank_index is None:
+                omitted_tanks.append(
+                    StoreTankOmission(
+                        tank_index=None,
+                        fuel_type=(mapping.fuel_type or "unknown").lower(),
+                        reason_code="null_tank_index",
+                        veeder_observation_count=0,
+                    )
+                )
+                logger.info(
+                    "STORE_CHART_TANK_OMITTED",
+                    extra={
+                        "store_num": store_num,
+                        "tank_index": None,
+                        "reason_code": "null_tank_index",
+                    },
+                )
+                continue
+
             veeder_points = self._get_veeder_points(mapping=mapping)
             estimation = (
                 TankEstimation.objects.filter(tank_mapping=mapping, is_active=True)
@@ -129,40 +151,70 @@ class TankFieldChartService:
             )
             max_depth_inches = self._resolve_max_depth(
                 mapping=mapping,
-                official_curve=official_curve,
                 estimation=estimation,
             )
             generated_curve = self._generate_estimated_curve(
                 estimation=estimation,
                 max_depth_inches=max_depth_inches,
             )
-            table_rows = self._build_lookup_table(
-                official_curve=official_curve,
-                generated_curve=generated_curve,
-            )
+
+            veeder_count = len(veeder_points)
+            sample_count = int(estimation.sample_count or 0) if estimation else 0
+            observed_count_for_trust = veeder_count or sample_count
+
+            if not generated_curve:
+                omitted_tanks.append(
+                    StoreTankOmission(
+                        tank_index=mapping.tank_index,
+                        fuel_type=(mapping.fuel_type or "unknown").lower(),
+                        reason_code="no_active_estimation",
+                        veeder_observation_count=veeder_count,
+                    )
+                )
+                logger.info(
+                    "STORE_CHART_TANK_OMITTED",
+                    extra={
+                        "store_num": store_num,
+                        "tank_index": mapping.tank_index,
+                        "reason_code": "no_active_estimation",
+                    },
+                )
+                continue
+
+            table_rows = self._build_lookup_table(generated_curve=generated_curve)
             if not table_rows:
+                omitted_tanks.append(
+                    StoreTankOmission(
+                        tank_index=mapping.tank_index,
+                        fuel_type=(mapping.fuel_type or "unknown").lower(),
+                        reason_code="empty_estimated_curve",
+                        veeder_observation_count=veeder_count,
+                    )
+                )
+                logger.info(
+                    "STORE_CHART_TANK_OMITTED",
+                    extra={
+                        "store_num": store_num,
+                        "tank_index": mapping.tank_index,
+                        "reason_code": "empty_estimated_curve",
+                    },
+                )
                 continue
 
             fuel_label = (mapping.fuel_type or "UNK").upper()[:3]
-            tank_label = f'{fuel_label} T{mapping.tank_index} ({max_depth_inches}")'
+            tank_label = (
+                f'{fuel_label} T{mapping.tank_index} ({max_depth_inches}") '
+                f"N={observed_count_for_trust}"
+            )
             tank_color = self._color_for_tank_index(mapping.tank_index)
 
-            if official_curve:
-                curves.append(
-                    {
-                        "label": f"{tank_label} - Official Tank Chart",
-                        "color": "#a0aec0",
-                        "points": official_curve,
-                    }
-                )
-            if generated_curve:
-                curves.append(
-                    {
-                        "label": f"{tank_label} - Generated Curve (Math)",
-                        "color": tank_color,
-                        "points": generated_curve,
-                    }
-                )
+            curves.append(
+                {
+                    "label": f"{tank_label} - Veeder-Root Derived",
+                    "color": tank_color,
+                    "points": generated_curve,
+                }
+            )
 
             tank_payloads.append(
                 {
@@ -178,7 +230,6 @@ class TankFieldChartService:
                 if mapping.tank_type and mapping.tank_type.capacity
                 else int(round(table_rows[-1]["gallons"]))
             )
-            veeder_count = len(veeder_points)
             total_veeder_observation_count += veeder_count
             summaries.append(
                 StoreTankSummary(
@@ -189,15 +240,18 @@ class TankFieldChartService:
                     ),
                     capacity_gallons=capacity_gallons,
                     max_depth_inches=max_depth_inches,
-                    has_official_chart=bool(official_curve),
                     veeder_observation_count=veeder_count,
-                    official_row_count=len(official_curve),
+                    sample_count=sample_count,
+                    is_low_confidence=(
+                        observed_count_for_trust < minimum_reading_count
+                    ),
                 )
             )
 
         if not tank_payloads:
             raise ValueError(
-                "Cannot generate store chart: no tanks have official rows or active estimations."
+                "Cannot generate store chart: no mapped tanks have active "
+                "Veeder-derived estimations."
             )
 
         combined_table_rows = self._build_combined_table(tank_payloads=tank_payloads)
@@ -223,6 +277,10 @@ class TankFieldChartService:
                     summary.tank_index or 0,
                 ),
             ),
+            omitted_tanks=sorted(
+                omitted_tanks,
+                key=lambda tank: (tank.tank_index is None, tank.tank_index or 0),
+            ),
             combined_table_rows=combined_table_rows,
             curves=curves,
             max_depth_inches_global=max_depth_inches_global,
@@ -241,7 +299,6 @@ class TankFieldChartService:
                 f"Store {store_num} has no tank index {tank_index}."
             )
 
-        official_curve = self._get_official_curve(mapping=mapping)
         veeder_points = self._get_veeder_points(mapping=mapping)
         estimation = (
             TankEstimation.objects.filter(tank_mapping=mapping, is_active=True)
@@ -251,74 +308,29 @@ class TankFieldChartService:
 
         max_depth_inches = self._resolve_max_depth(
             mapping=mapping,
-            official_curve=official_curve,
             estimation=estimation,
         )
 
-        official_chart_source = None
-        if official_curve and mapping.tank_type:
-            has_store_specific = TankChart.objects.filter(
-                store=mapping.store,
-                tank_index=mapping.tank_index,
-                is_official=True,
-            ).exists()
-            official_chart_source = (
-                "store_specific_official"
-                if has_store_specific
-                else f"tank_type:{mapping.tank_type.name}"
-            )
-
         return {
             "mapping": mapping,
-            "official_curve": official_curve,
             "veeder_points": veeder_points,
             "estimation": estimation,
             "max_depth_inches": max_depth_inches,
-            "official_chart_source": official_chart_source,
         }
 
     def _resolve_max_depth(
         self,
         *,
         mapping: StoreTankMapping,
-        official_curve: list[dict],
         estimation: TankEstimation | None,
     ) -> int:
         if mapping.tank_type and mapping.tank_type.max_depth:
             return int(mapping.tank_type.max_depth)
 
-        if official_curve:
-            return int(max(point["inches"] for point in official_curve))
-
         if estimation:
             return max(1, int(round(2 * estimation.radius)))
 
         return 120
-
-    def _get_official_curve(self, *, mapping: StoreTankMapping) -> list[dict]:
-        store_curve = list(
-            TankChart.objects.filter(
-                store=mapping.store,
-                tank_index=mapping.tank_index,
-                is_official=True,
-            )
-            .order_by("inches")
-            .values("inches", "gallons")
-        )
-        if store_curve:
-            return store_curve
-
-        if not mapping.tank_type:
-            return []
-
-        return list(
-            TankChart.objects.filter(
-                tank_type=mapping.tank_type,
-                is_official=True,
-            )
-            .order_by("inches")
-            .values("inches", "gallons")
-        )
 
     def _get_veeder_points(self, *, mapping: StoreTankMapping) -> list[dict]:
         readings = VeederReading.objects.filter(
@@ -363,12 +375,9 @@ class TankFieldChartService:
     def _build_lookup_table(
         self,
         *,
-        official_curve: list[dict],
         generated_curve: list[dict],
     ) -> list[dict]:
-        if generated_curve:
-            return generated_curve
-        return official_curve
+        return generated_curve
 
     def _build_combined_table(self, *, tank_payloads: list[dict]) -> list[dict]:
         """Merge per-tank inch curves into one row set keyed by tank index."""
@@ -430,3 +439,7 @@ class TankFieldChartService:
             covered_inches.update(range(start_inch, end_inch + 1))
 
         return round((len(covered_inches) / max_depth_inches) * 100.0, 1)
+
+    @staticmethod
+    def _minimum_reading_count() -> int:
+        return int(getattr(settings, "CHART_MIN_READINGS", 10))

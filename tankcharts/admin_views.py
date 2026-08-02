@@ -1,4 +1,5 @@
 import logging
+import os
 import subprocess
 import sys
 from io import StringIO
@@ -60,10 +61,16 @@ def _spawn_generation(request, *, force: bool):
     try:
         BATCH_LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
         with open(BATCH_LOG_FILE, "ab") as log_file:
+            spawn_env = os.environ.copy()
+            spawn_env.setdefault("PYTHONUNBUFFERED", "1")
             subprocess.Popen(
                 _generation_command(force=force),
                 stdout=log_file,
                 stderr=subprocess.STDOUT,
+                cwd=str(PROJECT_ROOT),
+                env=spawn_env,
+                close_fds=True,
+                start_new_session=True,
             )
     except OSError as exc:
         logger.exception("BATCH_CHART_GENERATION_SPAWN_FAILED")

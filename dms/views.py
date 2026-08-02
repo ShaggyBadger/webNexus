@@ -1,3 +1,5 @@
+import json
+
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.core.paginator import Paginator
 from django.db.models import Count
@@ -61,7 +63,11 @@ class DashboardView(TemplateView):
         page_number = self.request.GET.get("page")
         page_obj = paginator.get_page(page_number)
 
-        context["documents"] = page_obj.object_list
+        documents = list(page_obj.object_list)
+        for document in documents:
+            document.structured_metadata_tags = self._structured_metadata_tags(document)
+
+        context["documents"] = documents
         context["documents_page"] = page_obj
         context["documents_count"] = paginator.count
 
@@ -72,6 +78,34 @@ class DashboardView(TemplateView):
             .values_list("name", flat=True)
         )
         return context
+
+    def _structured_metadata_tags(self, document: Document) -> list[str]:
+        """Return human-readable metadata tags for store-chart JSON descriptions."""
+        if not document.description:
+            return []
+
+        try:
+            metadata = json.loads(document.description)
+        except json.JSONDecodeError:
+            return []
+
+        if not isinstance(metadata, dict):
+            return []
+
+        tags: list[str] = []
+        if metadata.get("store_num") is not None:
+            tags.append(f"STORE #{metadata['store_num']}")
+        if metadata.get("tank_count") is not None:
+            tags.append(f"TANKS {metadata['tank_count']}")
+        tank_indices = metadata.get("tank_indices")
+        if isinstance(tank_indices, list) and tank_indices:
+            tags.append(f"INDICES {', '.join(str(idx) for idx in tank_indices)}")
+        veeder_counts = metadata.get("veeder_observation_counts")
+        if isinstance(veeder_counts, dict) and veeder_counts:
+            tags.append(f"READINGS {len(veeder_counts)} TANKS")
+        if metadata.get("generated_at"):
+            tags.append(f"GENERATED {str(metadata['generated_at'])[:19]}")
+        return tags
 
 
 class DocumentMetadataEditView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):

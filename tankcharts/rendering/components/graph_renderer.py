@@ -12,7 +12,7 @@ from tankcharts.rendering.theme import GraphConfig, PageLayout
 
 
 class GraphRenderer:
-    """Render official/estimated curves and veeder points as a static chart image."""
+    """Render Veeder-derived curves and observed points as a static chart image."""
 
     def render(self, chart: TankFieldChart | StoreFieldChart) -> list:
         figure, axis = plt.subplots(figsize=GraphConfig.FIGSIZE)
@@ -22,23 +22,13 @@ class GraphRenderer:
         for curve in chart.curves:
             inches = [point["inches"] for point in curve["points"]]
             gallons = [point["gallons"] for point in curve["points"]]
-            label = str(curve["label"])
-            is_generated_curve = "Generated Curve (Math)" in label
             axis.plot(
                 inches,
                 gallons,
-                label=label,
+                label=str(curve["label"]),
                 color=curve["color"],
-                linewidth=(
-                    GraphConfig.GENERATED_LINE_WIDTH
-                    if is_generated_curve
-                    else GraphConfig.OFFICIAL_LINE_WIDTH
-                ),
-                linestyle=(
-                    (0, GraphConfig.GENERATED_LINE_DASH)
-                    if is_generated_curve
-                    else "solid"
-                ),
+                linewidth=GraphConfig.GENERATED_LINE_WIDTH,
+                linestyle=(0, GraphConfig.GENERATED_LINE_DASH),
             )
 
         veeder_points = getattr(chart, "veeder_points", [])

@@ -1,18 +1,16 @@
 from django.urls import path
+
 from dms.api.views import (
-    CategoryListView,
-    TagListView,
     CollectionListView,
-    DocumentListCreateView,
+    CategoryListView,
     DocumentDetailView,
+    DocumentDownloadView,
+    DocumentListCreateView,
     RawUploadView,
     FinalizeUploadView,
-    DocumentDownloadView,
+    TagListView,
 )
-from dms.api.views.hub import (
-    LocationHubSearchAPIView,
-    LocationDocumentSummaryAPIView,
-)
+from dms.api.views.emails import DocumentEmailAPIView
 from dms.views import DashboardView, DocumentMetadataEditView, DocumentUploadView
 
 app_name = "dms"
@@ -42,21 +40,16 @@ urlpatterns = [
         DocumentDetailView.as_view(),
         name="api_document_detail",
     ),
+    path(
+        "api/v1/documents/<str:ulid>/email/",
+        DocumentEmailAPIView.as_view(),
+        name="api_document_email",
+    ),
     path("api/v1/upload/raw/", RawUploadView.as_view(), name="api_raw_upload"),
     path(
         "api/v1/upload/finalize/",
         FinalizeUploadView.as_view(),
         name="api_finalize_upload",
-    ),
-    path(
-        "api/v1/hub/search/",
-        LocationHubSearchAPIView.as_view(),
-        name="api_hub_search",
-    ),
-    path(
-        "api/v1/hub/location/<int:store_num>/summary/",
-        LocationDocumentSummaryAPIView.as_view(),
-        name="api_location_summary",
     ),
     # Legacy compatibility aliases
     path(
@@ -79,6 +72,11 @@ urlpatterns = [
         "api/dms/v1/documents/<str:ulid>/",
         DocumentDetailView.as_view(),
         name="api_document_detail_legacy",
+    ),
+    path(
+        "api/dms/v1/documents/<str:ulid>/email/",
+        DocumentEmailAPIView.as_view(),
+        name="api_document_email_legacy",
     ),
     path(
         "api/dms/v1/upload/raw/",

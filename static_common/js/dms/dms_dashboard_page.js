@@ -13,7 +13,6 @@ function dmsDashboardApp() {
     },
     ...window.DMSUploadMixin(),
     ...window.DMSDocumentActionsMixin(),
-    ...window.DMSDashboardSearchMixin(),
 
     init() {
       this.endpoints.rawUpload = this.$el.dataset.rawUploadUrl || "";

@@ -47,26 +47,13 @@ TANKGAUGE_DEFAULT_TANK_LIMITS_SOURCE_PRIORITY = os.environ.get(
     "TANKGAUGE_DEFAULT_TANK_LIMITS_SOURCE_PRIORITY", "OFFICIAL_FIRST"
 ).upper()
 
-# Location Document Hub Settings
-HUB_FUZZY_STORE_THRESHOLD = int(os.environ.get("HUB_FUZZY_STORE_THRESHOLD", "50"))
-HUB_FUZZY_DOCUMENT_THRESHOLD = int(os.environ.get("HUB_FUZZY_DOCUMENT_THRESHOLD", "55"))
-HUB_ICONTAINS_BOOST = int(os.environ.get("HUB_ICONTAINS_BOOST", "25"))
-HUB_MIN_QUERY_LENGTH = int(os.environ.get("HUB_MIN_QUERY_LENGTH", "2"))
-HUB_SEARCH_LIMIT = int(os.environ.get("HUB_SEARCH_LIMIT", "20"))
-HUB_FUZZY_DOCUMENTS = os.environ.get("HUB_FUZZY_DOCUMENTS", "True").lower() in (
-    "true",
-    "1",
-    "t",
-    "y",
-    "yes",
+# DMS dashboard token-aware search tuning
+DMS_STORE_TOKEN_THRESHOLD = int(os.environ.get("DMS_STORE_TOKEN_THRESHOLD", "50"))
+DMS_DOCUMENT_TOKEN_THRESHOLD = int(
+    os.environ.get("DMS_DOCUMENT_TOKEN_THRESHOLD", "55")
 )
-HUB_FUZZY_FULL_CORPUS = os.environ.get("HUB_FUZZY_FULL_CORPUS", "False").lower() in (
-    "true",
-    "1",
-    "t",
-    "y",
-    "yes",
-)
+
+CHART_MIN_READINGS = int(os.environ.get("CHART_MIN_READINGS", "10"))
 
 # FEEDBACK_MAX_METADATA_BYTES:
 # Maximum serialized JSON size accepted for feedback page metadata payloads.
@@ -258,6 +245,12 @@ LOGGING = {
         "json_full": {
             "()": "thejoshproject.logging_utils.TacticalJSONFullFormatter",
         },
+        "crash": {
+            "format": (
+                "[%(asctime)s] %(levelname)s [%(ip)s] [%(path)s] [%(user)s] "
+                "[%(name)s:%(lineno)d] %(message)s\n%(exc_text)s"
+            ),
+        },
     },
     "filters": {
         "tactical_filter": {
@@ -283,6 +276,15 @@ LOGGING = {
             "formatter": "json_full",
             "filters": ["tactical_filter"],
         },
+        "file_crash": {
+            "level": "ERROR",
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": BASE_DIR / "logs/crashes.log",
+            "maxBytes": 1024 * 1024 * 25,
+            "backupCount": 0,
+            "formatter": "crash",
+            "filters": ["tactical_filter"],
+        },
         "console": {
             "class": "logging.StreamHandler",
             "formatter": "tactical",
@@ -291,22 +293,22 @@ LOGGING = {
     },
     "loggers": {
         "django": {
-            "handlers": ["file_minimal", "file_full", "console"],
+            "handlers": ["file_minimal", "file_full", "file_crash", "console"],
             "level": "INFO",
             "propagate": True,
         },
         "django.request": {
-            "handlers": ["file_minimal", "file_full", "console"],
+            "handlers": ["file_minimal", "file_full", "file_crash", "console"],
             "level": "ERROR",
             "propagate": False,
         },
         "django.server": {
-            "handlers": ["file_minimal", "file_full", "console"],
+            "handlers": ["file_minimal", "file_full", "file_crash", "console"],
             "level": "INFO",
             "propagate": False,
         },
         "tankgauge": {
-            "handlers": ["file_minimal", "file_full", "console"],
+            "handlers": ["file_minimal", "file_full", "file_crash", "console"],
             "level": "INFO",
             "propagate": True,
         },
@@ -365,7 +367,6 @@ REST_FRAMEWORK = {
             "FEEDBACK_THROTTLE_INITIATE_RATE", "30/min"
         ),
         "feedback_submit": os.environ.get("FEEDBACK_THROTTLE_SUBMIT_RATE", "20/min"),
-        "hub_search": os.environ.get("HUB_SEARCH_THROTTLE_RATE", "30/min"),
         "chart_email_anon": os.environ.get("CHART_EMAIL_ANON_THROTTLE", "5/min"),
         "chart_email_user": os.environ.get("CHART_EMAIL_USER_THROTTLE", "10/min"),
     },

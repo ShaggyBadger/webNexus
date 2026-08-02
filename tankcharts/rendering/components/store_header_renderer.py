@@ -16,7 +16,13 @@ class StoreHeaderRenderer:
         )
         tank_summaries = " | ".join(
             [
-                f'{tank.fuel_type.upper()[:3]} T{tank.tank_index} {tank.max_depth_inches}"'
+                (
+                    f'{tank.fuel_type.upper()[:3]} '
+                    f"T{tank.tank_index if tank.tank_index is not None else '?'} "
+                    f'{tank.max_depth_inches}" '
+                    f"N={tank.veeder_observation_count or tank.sample_count}"
+                    f"{' LOW' if tank.is_low_confidence else ''}"
+                )
                 for tank in chart.tanks
             ]
         )

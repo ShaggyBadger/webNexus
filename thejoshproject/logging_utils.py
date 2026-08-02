@@ -142,6 +142,8 @@ class TacticalJSONFullFormatter(logging.Formatter):
             "line": record.lineno,
             "message": record.getMessage(),
         }
+        if record.exc_info:
+            log_record["traceback"] = self.formatException(record.exc_info)
 
         # 2. Append 'extra' metadata from the view
         standard_fields = [

@@ -29,6 +29,8 @@ class TankFieldChart:
     official_chart_source: str | None
     coverage_percent: float
     veeder_observation_count: int
+    estimation_sample_count: int
+    is_low_confidence: bool
 
     curves: list[dict]
     veeder_points: list[dict]
@@ -49,9 +51,19 @@ class StoreTankSummary:
     tank_type_name: str
     capacity_gallons: int
     max_depth_inches: int
-    has_official_chart: bool
     veeder_observation_count: int
-    official_row_count: int
+    sample_count: int
+    is_low_confidence: bool
+
+
+@dataclass
+class StoreTankOmission:
+    """Summary metadata for mapped tanks omitted from Veeder-only store charts."""
+
+    tank_index: int | None
+    fuel_type: str
+    reason_code: str
+    veeder_observation_count: int
 
 
 @dataclass
@@ -70,6 +82,7 @@ class StoreFieldChart:
     longitude: float | None
 
     tanks: list[StoreTankSummary]
+    omitted_tanks: list[StoreTankOmission]
     combined_table_rows: list[dict]
     curves: list[dict]
 

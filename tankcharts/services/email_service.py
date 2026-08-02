@@ -6,6 +6,7 @@ from typing import Any
 from django.conf import settings
 from django.core.files.storage import default_storage
 from django.core.mail import EmailMultiAlternatives
+from django.db import transaction
 from django.template.loader import render_to_string
 from django.utils import timezone
 
@@ -100,6 +101,7 @@ class EmailChartService:
                     mimetype="application/pdf",
                 )
                 msg.send()
+                self._increment_email_count(document=document)
                 logger.info(
                     "EMAIL_CHART_SENT",
                     extra={
@@ -164,3 +166,26 @@ class EmailChartService:
         """Read the PDF bytes from Django default_storage."""
         with default_storage.open(document.file_path, "rb") as f:
             return f.read()
+
+    @staticmethod
+    def _increment_email_count(*, document: Document) -> None:
+        """
+        Preserve per-document email send telemetry for admin audit visibility.
+
+        Commander's Intent:
+        Operators depend on delivery telemetry to confirm charts are actually being
+        distributed in the field. Counter failures must never block chart delivery.
+        """
+        try:
+            with transaction.atomic():
+                locked_document = Document.objects.select_for_update().get(id=document.id)
+                locked_document.email_count += 1
+                locked_document.save(update_fields=["email_count"])
+        except Exception:
+            logger.exception(
+                "EMAIL_CHART_COUNT_INCREMENT_FAILED",
+                extra={
+                    "document_id": document.id,
+                    "reason_code": "email_count_increment_error",
+                },
+            )
