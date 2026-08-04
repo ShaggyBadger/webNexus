@@ -30,7 +30,7 @@ def parse_production_hours(data: dict, *, required: bool) -> Decimal | None:
                 "Production time must be a valid number.",
                 "hours_on_duty_not_driving",
             ) from exc
-        if value < 0:
+        if not value.is_finite() or value < 0:
             raise ProductionHoursValidationError(
                 "Production hours cannot be negative.",
                 "hours_on_duty_not_driving",
@@ -76,6 +76,8 @@ def _parse_component(
             f"{label} must be a whole number.", field
         ) from exc
 
+    if not value.is_finite():
+        raise ProductionHoursValidationError(f"{label} must be a whole number.", field)
     if value != value.to_integral_value():
         raise ProductionHoursValidationError(f"{label} must be a whole number.", field)
     integer_value = int(value)
