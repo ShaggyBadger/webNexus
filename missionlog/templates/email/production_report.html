@@ -1,0 +1,98 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Production Report</title>
+</head>
+<body style="margin:0;padding:0;background:#f4f6f8;color:#1f2933;font-family:Arial,sans-serif;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding:24px 0;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="720" cellspacing="0" cellpadding="0" style="max-width:720px;background:#ffffff;border:1px solid #d7dde4;">
+          <tr>
+            <td style="padding:24px 28px 12px 28px;">
+              <h1 style="margin:0 0 8px 0;font-size:24px;letter-spacing:0.04em;color:#1f2933;">PRODUCTION REPORT</h1>
+              <p style="margin:0;font-size:15px;color:#4a5568;">
+                Period: {{ period.start_date|date:"F j, Y" }} - {{ period.end_date|date:"F j, Y" }}
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:6px 28px 0 28px;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">
+                <tr>
+                  <td style="padding:6px 0;font-size:15px;color:#1f2933;">Total Gallons</td>
+                  <td align="right" style="padding:6px 0;font-size:15px;color:#1f2933;">{{ summary.total_gallons|floatformat:1 }}</td>
+                </tr>
+                <tr>
+                  <td style="padding:6px 0;font-size:15px;color:#1f2933;">Total Hours</td>
+                  <td align="right" style="padding:6px 0;font-size:15px;color:#1f2933;">{{ summary.total_hours|floatformat:2 }}</td>
+                </tr>
+                <tr>
+                  <td style="padding:6px 0;font-size:15px;color:#1f2933;">Overall GPH</td>
+                  <td align="right" style="padding:6px 0;font-size:15px;color:#1f2933;">{% if summary.overall_gph is not None %}{{ summary.overall_gph|floatformat:1 }}{% else %}N/A{% endif %}</td>
+                </tr>
+                <tr>
+                  <td style="padding:6px 0;font-size:15px;color:#1f2933;">Production Entries Included</td>
+                  <td align="right" style="padding:6px 0;font-size:15px;color:#1f2933;">{{ summary.included_count }}</td>
+                </tr>
+                <tr>
+                  <td style="padding:6px 0;font-size:15px;color:#1f2933;">Production Entries Excluded</td>
+                  <td align="right" style="padding:6px 0;font-size:15px;color:#1f2933;">{{ summary.excluded_count }}</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:16px 28px 0 28px;">
+              <h2 style="margin:0 0 6px 0;font-size:16px;color:#1f2933;">BEST PERIOD</h2>
+              <p style="margin:0;font-size:15px;color:#374151;">
+                {% if summary.best_bucket %}
+                  {{ summary.best_bucket.bucket_label }} - {{ summary.best_bucket.gph|floatformat:1 }} GPH
+                {% else %}
+                  N/A
+                {% endif %}
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:14px 28px 0 28px;">
+              <h2 style="margin:0 0 6px 0;font-size:16px;color:#1f2933;">LOWEST PERIOD</h2>
+              <p style="margin:0;font-size:15px;color:#374151;">
+                {% if summary.lowest_bucket %}
+                  {{ summary.lowest_bucket.bucket_label }} - {{ summary.lowest_bucket.gph|floatformat:1 }} GPH
+                {% else %}
+                  N/A
+                {% endif %}
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:14px 28px 0 28px;">
+              <h2 style="margin:0 0 6px 0;font-size:16px;color:#1f2933;">COMPARISON</h2>
+              <p style="margin:0;font-size:15px;color:#374151;">{{ comparison_text }}</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:18px 28px 10px 28px;">
+              <img src="cid:production-gph-chart" alt="GPH graph over time" style="display:block;width:100%;max-width:664px;height:auto;border:1px solid #d7dde4;">
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 28px 22px 28px;">
+              <p style="margin:0 0 6px 0;font-size:13px;color:#4a5568;">Excluded mission summary:</p>
+              <ul style="margin:0 0 0 18px;padding:0;color:#4a5568;font-size:13px;line-height:1.5;">
+                {% for reason, count in summary.excluded_reason_counts.items %}
+                  <li>{{ reason }}: {{ count }}</li>
+                {% empty %}
+                  <li>None</li>
+                {% endfor %}
+              </ul>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

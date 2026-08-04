@@ -8,6 +8,7 @@ from .views import (
     store_views,
     post_trip_views,
     report_views,
+    report_email_views,
 )
 
 app_name = "missionlog"
@@ -16,6 +17,11 @@ urlpatterns = [
     # Reporting API
     path("api/reports/<int:mission_id>/", report_views.report_api, name="report_api"),
     path("reports/<int:mission_id>/", report_views.report_view, name="report_view"),
+    path(
+        "api/v1/reports/production-email/",
+        report_email_views.production_report_email_request,
+        name="production_report_email",
+    ),
     # Mission Lifecycle API Endpoints
     path(
         "api/missions/",

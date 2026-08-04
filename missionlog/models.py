@@ -292,3 +292,57 @@ class TruckFuelLog(models.Model):
 
     def __str__(self):
         return f"{self.gallons} gal at ${self.price_per_gallon}/gal (Mission ID: {self.mission.id})"
+
+
+class ProductionReportEmailAudit(models.Model):
+    """
+    Minimal audit trail for MissionLog production-report email requests.
+    """
+
+    class ReportRange(models.TextChoices):
+        WEEK = "week", "Week"
+        MONTH = "month", "Month"
+        QUARTER = "quarter", "Quarter"
+        YEAR = "year", "Year"
+
+    class Status(models.TextChoices):
+        QUEUED = "queued", "Queued"
+        SENT = "sent", "Sent"
+        FAILED = "failed", "Failed"
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="production_report_email_audits",
+    )
+    report_range = models.CharField(max_length=16, choices=ReportRange.choices)
+    period_start = models.DateField()
+    period_end = models.DateField()
+    requested_at = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(
+        max_length=16,
+        choices=Status.choices,
+        default=Status.QUEUED,
+    )
+    failure_reason = models.TextField(blank=True)
+    exception_type = models.CharField(max_length=128, blank=True)
+    generation_duration_ms = models.IntegerField(null=True, blank=True)
+    render_duration_ms = models.IntegerField(null=True, blank=True)
+    smtp_duration_ms = models.IntegerField(null=True, blank=True)
+    trace_id = models.CharField(max_length=64, blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-requested_at"]
+        indexes = [
+            models.Index(fields=["user", "status", "requested_at"]),
+            models.Index(fields=["report_range", "status"]),
+        ]
+
+    def __str__(self):
+        return (
+            f"ProductionReportEmailAudit #{self.id} "
+            f"({self.user_id}/{self.report_range}/{self.status})"
+        )

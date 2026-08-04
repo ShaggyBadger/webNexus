@@ -15,6 +15,9 @@ function missionlogApp() {
     pendingMode: "",
     showUpgradeConfirm: false,
     showCompleteConfirm: false,
+    showProductionReportForm: false,
+    productionReportRange: "month",
+    productionReportSubmitting: false,
     form: {
       shift_start: "",
       hours_on_duty: "",
@@ -269,7 +272,7 @@ function missionlogApp() {
         const message =
           (data && data.error && data.error.message) ||
           (data && data.message) ||
-          "MissionLog request failed.";
+           "Production request failed.";
         throw new Error(message);
       }
       return data;
@@ -518,7 +521,7 @@ function missionlogApp() {
 
       const missionId = this.activeMission.id;
       const confirmed = window.confirm(
-        "Cancel the active mission? This will permanently delete it and reset MissionLog.",
+        "Cancel this entry? This will permanently delete it and reset Production.",
       );
       if (!confirmed) {
         return;
@@ -592,6 +595,30 @@ function missionlogApp() {
         this.errorMessage = error.message;
       } finally {
         this.loading = false;
+      }
+    },
+
+    async sendProductionReportEmail() {
+      this.productionReportSubmitting = true;
+      this.errorMessage = "";
+      this.successMessage = "";
+      try {
+        await this.fetchJson("/missionlog/api/v1/reports/production-email/", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": this.getCsrfToken(),
+          },
+          body: JSON.stringify({ range: this.productionReportRange }),
+        });
+        this.successMessage =
+          "Report generation started. Please allow a few minutes for it to finish, " +
+          "then check your email and spam folder. If you find it in spam, mark it as not spam.";
+      } catch (error) {
+        console.error("MISSIONLOG_PRODUCTION_REPORT_QUEUE_FAILED", error);
+        this.errorMessage = "Report could not be started. Please try again.";
+      } finally {
+        this.productionReportSubmitting = false;
       }
     },
 

@@ -351,6 +351,20 @@ DEFAULT_FROM_EMAIL = os.environ.get(
 )
 EMAIL_TIMEOUT = 30
 
+MISSIONLOG_REPORT_USER_RATE_PER_MINUTE = int(
+    os.environ.get("MISSIONLOG_REPORT_USER_RATE_PER_MINUTE", "6")
+)
+MISSIONLOG_REPORT_IP_RATE_PER_MINUTE = int(
+    os.environ.get("MISSIONLOG_REPORT_IP_RATE_PER_MINUTE", "12")
+)
+MISSIONLOG_PRODUCTION_GPH_TARGET = float(
+    os.environ.get("MISSIONLOG_PRODUCTION_GPH_TARGET", "5000")
+)
+MISSIONLOG_REPORT_FROM_EMAIL = os.environ.get(
+    "MISSIONLOG_REPORT_FROM_EMAIL",
+    "theJoshProject <josh@thejoshproject.xyz>",
+)
+
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework.authentication.SessionAuthentication",

@@ -153,7 +153,7 @@ class MissionLogShellAccessTests(TestCase):
         response = self.client.get(reverse("missionlog:spa_index"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "[ MISSIONLOG CONSOLE ]")
+        self.assertContains(response, "[ PRODUCTION CONSOLE ]")
 
 
 class PostTripPayloadHandlingTests(TestCase):

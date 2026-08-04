@@ -5,6 +5,7 @@ from .models import (
     OrderNumber,
     PurchaseOrder,
     LoadDelivery,
+    ProductionReportEmailAudit,
     TruckFuelLog,
 )
 
@@ -54,3 +55,18 @@ class LoadDeliveryAdmin(admin.ModelAdmin):
 @admin.register(TruckFuelLog)
 class TruckFuelLogAdmin(admin.ModelAdmin):
     list_display = ("mission", "gallons", "price_per_gallon", "timestamp")
+
+
+@admin.register(ProductionReportEmailAudit)
+class ProductionReportEmailAuditAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "user",
+        "report_range",
+        "period_start",
+        "period_end",
+        "status",
+        "requested_at",
+    )
+    list_filter = ("report_range", "status")
+    search_fields = ("user__username", "user__email", "trace_id")

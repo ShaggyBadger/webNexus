@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}MISSIONLOG | {{ SITE_NAME }}{% endblock %}
+{% block title %}PRODUCTION | {{ SITE_NAME }}{% endblock %}
 
 {% block extra_head %}
 <style>
@@ -44,7 +44,7 @@
     <div class="row justify-content-center">
         <div class="col-12 col-xl-10">
             <div class="mb-3">
-                <h1 class="mono h4 mb-2 text-primary">[ MISSIONLOG CONSOLE ]</h1>
+                <h1 class="mono h4 mb-2 text-primary">[ PRODUCTION CONSOLE ]</h1>
                 <div class="d-flex flex-wrap gap-2">
                     <button
                         class="btn btn-sm mono"
@@ -75,6 +75,39 @@
 
             <div class="ml-card p-3 mb-3 mono" x-show="successMessage" x-cloak>
                 <div class="text-tactical-success" x-text="successMessage"></div>
+            </div>
+
+            <div class="ml-card p-3 mb-3 mono" x-cloak>
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <div>
+                        <div class="text-primary">[ PRODUCTION REPORT EMAIL ]</div>
+                        <div class="small text-muted-custom">Send production summary to your account email.</div>
+                    </div>
+                    <button
+                        type="button"
+                        class="btn btn-warning text-dark mono"
+                        @click="showProductionReportForm = !showProductionReportForm"
+                    >EMAIL PRODUCTION REPORT</button>
+                </div>
+
+                <form class="row g-2 mt-2" x-show="showProductionReportForm" @submit.prevent="sendProductionReportEmail()">
+                    <div class="col-12 col-md-5">
+                        <label class="form-label small text-muted-custom">REPORTING_PERIOD</label>
+                        <select class="form-select ml-input mono" x-model="productionReportRange" required>
+                            <option value="week">Week</option>
+                            <option value="month">Month</option>
+                            <option value="quarter">Quarter</option>
+                            <option value="year">Year</option>
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-3 d-grid align-self-end">
+                        <button
+                            type="submit"
+                            class="btn btn-primary mono"
+                            :disabled="productionReportSubmitting"
+                        >SEND REPORT</button>
+                    </div>
+                </form>
             </div>
 
             <div x-show="view === 'active'" x-cloak>
