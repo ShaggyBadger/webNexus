@@ -30,7 +30,12 @@ class ProductionReportEmailService:
         html_body = render_to_string("email/production_report.html", context)
         text_body = render_to_string("email/production_report.txt", context)
 
-        subject = f"Production Report - {period['label']}"
+        start_date_display = period["start_date"].strftime("%b %d, %Y")
+        end_date_display = period["end_date"].strftime("%b %d, %Y")
+        subject = (
+            f"Production Report - {period['type_label']} "
+            f"({start_date_display} to {end_date_display})"
+        )
         last_error = None
 
         for attempt_number, delay_seconds in enumerate(_RETRY_DELAYS_SECONDS, start=1):

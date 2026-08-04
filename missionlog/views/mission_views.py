@@ -4,10 +4,17 @@ from decimal import Decimal, InvalidOperation
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
+from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
 from ..models import FuelType, Mission, OrderNumber
+from ..services.datetime_normalization import (
+    MissionDateTimeValidationError,
+    parse_user_datetime_to_utc,
+    resolve_user_timezone,
+)
+from ..services.production_report_service import ProductionReportService
 from .api_contract import json_error_response, json_success_response
 
 logger = logging.getLogger("webnexus")
@@ -109,11 +116,23 @@ def mission_list_or_create(request):
         try:
             data = json.loads(request.body)
             start_time_str = data.get("shift_start")
-            shift_start = (
-                timezone.datetime.fromisoformat(start_time_str)
-                if start_time_str
-                else timezone.now()
-            )
+            if start_time_str:
+                try:
+                    shift_start = parse_user_datetime_to_utc(
+                        value=start_time_str,
+                        user=request.user,
+                        field_name="shift_start",
+                    )
+                except MissionDateTimeValidationError as exc:
+                    return json_error_response(
+                        request=request,
+                        code="invalid_datetime_input",
+                        message=str(exc),
+                        details={"field": "shift_start"},
+                        status_code=400,
+                    )
+            else:
+                shift_start = timezone.now()
 
             active_shift = (
                 Mission.objects.filter(user=request.user, is_completed=False)
@@ -299,6 +318,90 @@ def mission_detail_or_update(request, pk):
 
 
 @login_required
+def mission_history_delete(request, pk):
+    """DELETE a completed mission from History for the authenticated user."""
+    if request.method != "DELETE":
+        return json_error_response(
+            request=request,
+            code="method_not_allowed",
+            message="Method not allowed.",
+            details={"method": request.method},
+            status_code=405,
+        )
+
+    mission = get_object_or_404(Mission, pk=pk, user=request.user)
+    if not mission.is_completed:
+        return json_error_response(
+            request=request,
+            code="history_delete_incomplete_mission",
+            message="Only completed missions can be deleted from History.",
+            status_code=400,
+        )
+
+    mission_id = mission.id
+    try:
+        with transaction.atomic():
+            mission.delete()
+    except Exception as exc:
+        logger.error("MISSION_HISTORY_DELETE_FAIL: %s", str(exc))
+        return json_error_response(
+            request=request,
+            code="mission_history_delete_failed",
+            message="Mission history deletion failed.",
+            details={"exception": str(exc)},
+            status_code=400,
+        )
+
+    logger.info(
+        "MISSION_HISTORY_DELETE",
+        extra={"mission_id": mission_id, "user": request.user.username},
+    )
+    return json_success_response(
+        data={"message": "Mission deleted from history.", "mission_id": mission_id}
+    )
+
+
+@login_required
+def production_gph_telemetry(request):
+    """GET a compact rolling daily GPH telemetry series for MissionLog sparkline."""
+    if request.method != "GET":
+        return json_error_response(
+            request=request,
+            code="method_not_allowed",
+            message="Method not allowed.",
+            details={"method": request.method},
+            status_code=405,
+        )
+
+    window_raw = request.GET.get("window", "30")
+    try:
+        window_days = int(window_raw)
+    except (TypeError, ValueError):
+        return json_error_response(
+            request=request,
+            code="invalid_window",
+            message="window must be an integer day count.",
+            details={"window": window_raw},
+            status_code=400,
+        )
+
+    if window_days != 30:
+        return json_error_response(
+            request=request,
+            code="invalid_window",
+            message="Only a 30-day window is currently supported.",
+            details={"window": window_days},
+            status_code=400,
+        )
+
+    payload = ProductionReportService.build_daily_gph_telemetry(
+        user=request.user,
+        window_days=window_days,
+    )
+    return json_success_response(data=payload)
+
+
+@login_required
 def complete_mission(request, pk):
     """POST finalization of mission log."""
     if request.method == "POST":
@@ -307,11 +410,23 @@ def complete_mission(request, pk):
             data = json.loads(request.body)
 
             end_time_str = data.get("shift_end")
-            mission.shift_end = (
-                timezone.datetime.fromisoformat(end_time_str)
-                if end_time_str
-                else timezone.now()
-            )
+            if end_time_str:
+                try:
+                    mission.shift_end = parse_user_datetime_to_utc(
+                        value=end_time_str,
+                        user=request.user,
+                        field_name="shift_end",
+                    )
+                except MissionDateTimeValidationError as exc:
+                    return json_error_response(
+                        request=request,
+                        code="invalid_datetime_input",
+                        message=str(exc),
+                        details={"field": "shift_end"},
+                        status_code=400,
+                    )
+            else:
+                mission.shift_end = timezone.now()
 
             if "end_miles" in data:
                 val = data["end_miles"]
@@ -472,6 +587,7 @@ def agent_info(request):
     """GET tactical agent identity details."""
     if request.method == "GET":
         profile = getattr(request.user, "profile", None)
+        resolved_timezone = resolve_user_timezone(request.user)
         return json_success_response(
             data={
                 "username": request.user.username,
@@ -481,6 +597,7 @@ def agent_info(request):
                     else request.user.username.upper()
                 ),
                 "is_verified": profile.is_verified_field_agent if profile else False,
+                "timezone": str(resolved_timezone),
                 "version": settings.APP_VERSION,
             }
         )

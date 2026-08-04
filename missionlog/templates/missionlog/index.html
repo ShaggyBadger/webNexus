@@ -44,19 +44,36 @@
     <div class="row justify-content-center">
         <div class="col-12 col-xl-10">
             <div class="mb-3">
-                <h1 class="mono h4 mb-2 text-primary">[ PRODUCTION CONSOLE ]</h1>
-                <div class="d-flex flex-wrap gap-2">
-                    <button
-                        class="btn btn-sm mono"
-                        :class="view === 'active' ? 'btn-primary' : 'btn-secondary'"
-                        @click="view='active'"
-                    >ACTIVE</button>
-                    <button
-                        class="btn btn-sm mono"
-                        :class="view === 'history' ? 'btn-primary' : 'btn-secondary'"
-                        @click="switchToHistory()"
-                    >HISTORY</button>
-                    <a href="/" class="btn btn-secondary btn-sm mono">[ EXIT ]</a>
+                <div class="d-flex flex-column flex-lg-row justify-content-between gap-3 align-items-stretch align-items-lg-start mb-2">
+                    <div>
+                        <h1 class="mono h4 mb-2 text-primary">[ PRODUCTION CONSOLE ]</h1>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button
+                                class="btn btn-sm mono"
+                                :class="view === 'active' ? 'btn-primary' : 'btn-secondary'"
+                                @click="view='active'"
+                            >ACTIVE</button>
+                            <button
+                                class="btn btn-sm mono"
+                                :class="view === 'history' ? 'btn-primary' : 'btn-secondary'"
+                                @click="switchToHistory()"
+                            >HISTORY</button>
+                            <a href="/" class="btn btn-secondary btn-sm mono">[ EXIT ]</a>
+                        </div>
+                    </div>
+
+                    <div class="ml-card p-2 px-3 mono" style="width:100%;max-width:300px;min-height:84px;">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <div class="small text-primary">30-DAY GPH</div>
+                            <div class="small text-muted-custom">TARGET 5000</div>
+                        </div>
+                        <div x-show="telemetryLoading" x-cloak class="small text-muted-custom">SYNCING GPH...</div>
+                        <div x-show="!telemetryLoading && telemetryError" x-cloak class="small text-tactical-danger" x-text="telemetryError"></div>
+                        <div x-show="!telemetryLoading && !telemetryError && telemetryNoData" x-cloak class="small text-muted-custom">NO PRODUCTION DATA</div>
+                        <div x-show="!telemetryLoading && !telemetryError && !telemetryNoData" x-cloak style="height:64px;">
+                            <canvas id="missionlog-gph-sparkline" aria-label="30 day GPH telemetry sparkline"></canvas>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -294,19 +311,35 @@
                         <table class="table table-sm table-dark table-bordered align-middle mb-0 mono" style="font-size: 0.72rem;">
                             <thead>
                                 <tr>
+                                    <th>MISSION</th>
                                     <th>DATE</th>
+                                    <th>TIME</th>
                                     <th>STATUS</th>
                                     <th>GALLONS / HOUR</th>
+                                    <th>ACTION</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <template x-for="mission in missions" :key="'mission-' + mission.id">
                                     <tr>
+                                        <td x-text="'#' + mission.id"></td>
                                         <td x-text="formatDateOnly(mission.shift_start)"></td>
+                                        <td x-text="formatTimeOnly(mission.shift_start)"></td>
                                         <td>
                                             <span class="badge" :class="mission.is_completed ? 'text-bg-success' : 'text-bg-warning text-dark'" x-text="mission.is_completed ? 'COMPLETED' : 'INCOMPLETE'"></span>
                                         </td>
                                         <td x-text="formatGallonsPerHour(mission)"></td>
+                                        <td>
+                                            <button
+                                                type="button"
+                                                class="btn btn-danger btn-sm mono"
+                                                x-show="mission.is_completed"
+                                                x-cloak
+                                                @click="deleteHistoryMission(mission)"
+                                                :disabled="historyDeleteMissionId === mission.id"
+                                                x-text="historyDeleteMissionId === mission.id ? 'DELETING...' : 'DELETE'"
+                                            ></button>
+                                        </td>
                                     </tr>
                                 </template>
                             </tbody>
@@ -320,5 +353,6 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="{% static 'js/missionlog/missionlog_shell.js' %}"></script>
 {% endblock %}

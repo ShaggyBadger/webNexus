@@ -1,6 +1,7 @@
 PRODUCTION REPORT
 
-Period: {{ period.start_date|date:"F j, Y" }} - {{ period.end_date|date:"F j, Y" }}
+Report Type: {{ period.type_label }} (rolling {{ period.window_days }}-day window)
+Date Range (local): {{ period.start_date|date:"F j, Y" }} - {{ period.end_date|date:"F j, Y" }}
 
 Total Gallons       {{ summary.total_gallons|floatformat:1 }}
 Total Hours         {{ summary.total_hours|floatformat:2 }}

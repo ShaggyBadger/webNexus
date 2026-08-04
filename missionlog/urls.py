@@ -45,6 +45,11 @@ urlpatterns = [
         name="mission_detail_or_update",
     ),
     path(
+        "api/missions/<int:pk>/history/",
+        mission_views.mission_history_delete,
+        name="mission_history_delete",
+    ),
+    path(
         "api/missions/<int:pk>/complete/",
         mission_views.complete_mission,
         name="complete_mission",
@@ -57,6 +62,11 @@ urlpatterns = [
     # Fuel Types API Endpoint
     path("api/fuel-types/", mission_views.fuel_types_list, name="fuel_types_list"),
     path("api/agent-info/", mission_views.agent_info, name="agent_info"),
+    path(
+        "api/missions/production-gph/",
+        mission_views.production_gph_telemetry,
+        name="production_gph_telemetry",
+    ),
     # Order Number API Endpoints
     path(
         "api/missions/<int:mission_id>/orders/",

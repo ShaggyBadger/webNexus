@@ -1,13 +1,21 @@
 import json
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone as datetime_timezone
 from decimal import Decimal
 
 from django.contrib.auth.models import User
-from django.test import TestCase
+from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from missionlog.models import Mission
+from accounts.models import Profile
+from missionlog.models import (
+    FuelType,
+    LoadDelivery,
+    Mission,
+    OrderNumber,
+    PurchaseOrder,
+    TruckFuelLog,
+)
 
 
 class MissionResumeBehaviorTests(TestCase):
@@ -138,6 +146,349 @@ class MissionResumeBehaviorTests(TestCase):
         payload = active_response.json()
         self.assertEqual(payload["status"], "success")
         self.assertFalse(payload["data"]["active"])
+
+
+class MissionHistoryDeleteTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="history_owner", password="pass12345"
+        )
+        self.other_user = User.objects.create_user(
+            username="history_other", password="pass12345"
+        )
+        self.fuel_type = FuelType.objects.create(name="Regular", abbreviation="REG")
+
+    def _csrf_client(self, user):
+        client = Client(enforce_csrf_checks=True)
+        client.force_login(user)
+        client.get(reverse("missionlog:spa_index"))
+        csrf_token = client.cookies["csrftoken"].value
+        return client, csrf_token
+
+    def _build_completed_mission_graph(self, user):
+        mission = Mission.objects.create(
+            user=user,
+            shift_start=timezone.now() - timedelta(days=1),
+            shift_end=timezone.now(),
+            is_completed=True,
+            total_gallons=Decimal("100.00"),
+            hours_on_duty_not_driving=Decimal("2.00"),
+        )
+        order = OrderNumber.objects.create(
+            mission=mission, order_number=f"ORD-{mission.id}"
+        )
+        purchase_order = PurchaseOrder.objects.create(
+            order_parent=order,
+            po_number=900000 + mission.id,
+        )
+        LoadDelivery.objects.create(
+            purchase_order=purchase_order,
+            fuel_type=self.fuel_type,
+            gross_gal=100,
+        )
+        TruckFuelLog.objects.create(
+            mission=mission,
+            gallons=Decimal("10.000"),
+            price_per_gallon=Decimal("3.250"),
+        )
+        return mission
+
+    def test_history_delete_requires_authentication(self):
+        mission = self._build_completed_mission_graph(self.user)
+        response = self.client.delete(
+            reverse("missionlog:mission_history_delete", kwargs={"pk": mission.id})
+        )
+        self.assertEqual(response.status_code, 302)
+
+    def test_history_delete_requires_csrf(self):
+        mission = self._build_completed_mission_graph(self.user)
+        client = Client(enforce_csrf_checks=True)
+        client.force_login(self.user)
+        response = client.delete(
+            reverse("missionlog:mission_history_delete", kwargs={"pk": mission.id})
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_user_can_delete_own_completed_history_mission_with_cascade(self):
+        mission = self._build_completed_mission_graph(self.user)
+        client, csrf_token = self._csrf_client(self.user)
+
+        response = client.delete(
+            reverse("missionlog:mission_history_delete", kwargs={"pk": mission.id}),
+            HTTP_X_CSRFTOKEN=csrf_token,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "success")
+        self.assertEqual(payload["data"]["mission_id"], mission.id)
+        self.assertFalse(Mission.objects.filter(id=mission.id).exists())
+        self.assertEqual(OrderNumber.objects.count(), 0)
+        self.assertEqual(PurchaseOrder.objects.count(), 0)
+        self.assertEqual(LoadDelivery.objects.count(), 0)
+        self.assertEqual(TruckFuelLog.objects.count(), 0)
+
+    def test_user_cannot_delete_another_users_completed_history_mission(self):
+        mission = self._build_completed_mission_graph(self.user)
+        client, csrf_token = self._csrf_client(self.other_user)
+
+        response = client.delete(
+            reverse("missionlog:mission_history_delete", kwargs={"pk": mission.id}),
+            HTTP_X_CSRFTOKEN=csrf_token,
+        )
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(Mission.objects.filter(id=mission.id).exists())
+
+    def test_history_delete_rejects_incomplete_mission(self):
+        mission = Mission.objects.create(
+            user=self.user,
+            shift_start=timezone.now() - timedelta(hours=2),
+            is_completed=False,
+        )
+        client, csrf_token = self._csrf_client(self.user)
+
+        response = client.delete(
+            reverse("missionlog:mission_history_delete", kwargs={"pk": mission.id}),
+            HTTP_X_CSRFTOKEN=csrf_token,
+        )
+
+        self.assertEqual(response.status_code, 400)
+        payload = response.json()
+        self.assertEqual(payload["error"]["code"], "history_delete_incomplete_mission")
+        self.assertTrue(Mission.objects.filter(id=mission.id).exists())
+
+    def test_replacement_entry_with_past_shift_start_appears_in_history_order(self):
+        self.client.force_login(self.user)
+        older_shift_start = (timezone.now() - timedelta(days=7)).isoformat()
+        newer_shift_start = (timezone.now() - timedelta(days=1)).isoformat()
+
+        older_create_response = self.client.post(
+            reverse("missionlog:post_trip_create"),
+            data=json.dumps(
+                {
+                    "shift_start": older_shift_start,
+                    "entry_type": "basic",
+                    "is_completed": True,
+                    "total_gallons": "50",
+                    "hours_on_duty_not_driving": "1.5",
+                }
+            ),
+            content_type="application/json",
+        )
+        self.assertEqual(older_create_response.status_code, 201)
+
+        newer_create_response = self.client.post(
+            reverse("missionlog:post_trip_create"),
+            data=json.dumps(
+                {
+                    "shift_start": newer_shift_start,
+                    "entry_type": "basic",
+                    "is_completed": True,
+                    "total_gallons": "60",
+                    "hours_on_duty_not_driving": "2.0",
+                }
+            ),
+            content_type="application/json",
+        )
+        self.assertEqual(newer_create_response.status_code, 201)
+
+        history_response = self.client.get(reverse("missionlog:mission_list_or_create"))
+        self.assertEqual(history_response.status_code, 200)
+        missions = history_response.json()["data"]["missions"]
+        self.assertGreaterEqual(len(missions), 2)
+        self.assertGreater(missions[0]["shift_start"], missions[1]["shift_start"])
+
+
+class MissionTimezoneNormalizationTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="tzuser", password="pass12345")
+        self.client.force_login(self.user)
+
+    def _set_profile_timezone(self, tz_name):
+        Profile.objects.update_or_create(user=self.user, defaults={"timezone": tz_name})
+
+    def test_post_trip_create_naive_shift_start_uses_profile_timezone(self):
+        self._set_profile_timezone("America/New_York")
+
+        response = self.client.post(
+            reverse("missionlog:post_trip_create"),
+            data=json.dumps(
+                {
+                    "shift_start": "2026-08-04T01:30",
+                    "is_completed": True,
+                    "entry_type": "basic",
+                    "total_gallons": "100",
+                    "hours_on_duty_not_driving": "2.0",
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        mission = Mission.objects.get(id=response.json()["data"]["mission"]["id"])
+        self.assertEqual(
+            mission.shift_start,
+            datetime(2026, 8, 4, 5, 30, tzinfo=datetime_timezone.utc),
+        )
+
+    def test_legacy_create_aware_shift_start_is_not_localized_twice(self):
+        self._set_profile_timezone("America/New_York")
+
+        response = self.client.post(
+            reverse("missionlog:mission_list_or_create"),
+            data=json.dumps({"shift_start": "2026-08-04T01:30:00-07:00"}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        mission = Mission.objects.get(id=response.json()["data"]["mission"]["id"])
+        self.assertEqual(
+            mission.shift_start,
+            datetime(2026, 8, 4, 8, 30, tzinfo=datetime_timezone.utc),
+        )
+
+    def test_invalid_datetime_input_returns_stable_error(self):
+        response = self.client.post(
+            reverse("missionlog:post_trip_create"),
+            data=json.dumps(
+                {
+                    "shift_start": "not-a-date",
+                    "is_completed": True,
+                    "entry_type": "basic",
+                    "total_gallons": "100",
+                    "hours_on_duty_not_driving": "2.0",
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        payload = response.json()
+        self.assertEqual(payload["error"]["code"], "invalid_datetime_input")
+        self.assertEqual(payload["error"]["details"]["field"], "shift_start")
+
+    def test_post_trip_update_preserves_shift_start_when_omitted(self):
+        mission = Mission.objects.create(
+            user=self.user,
+            shift_start=datetime(2026, 8, 4, 12, 0, tzinfo=datetime_timezone.utc),
+            is_completed=False,
+            entry_type="advanced",
+        )
+
+        response = self.client.put(
+            reverse("missionlog:post_trip_update", kwargs={"pk": mission.id}),
+            data=json.dumps({"entry_type": "advanced", "deliveries": []}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        mission.refresh_from_db()
+        self.assertEqual(
+            mission.shift_start,
+            datetime(2026, 8, 4, 12, 0, tzinfo=datetime_timezone.utc),
+        )
+
+    def test_complete_mission_normalizes_naive_shift_end_with_user_timezone(self):
+        self._set_profile_timezone("America/New_York")
+        mission = Mission.objects.create(
+            user=self.user,
+            shift_start=datetime(2026, 8, 4, 5, 30, tzinfo=datetime_timezone.utc),
+            is_completed=False,
+        )
+
+        response = self.client.post(
+            reverse("missionlog:complete_mission", kwargs={"pk": mission.id}),
+            data=json.dumps({"shift_end": "2026-08-04T10:00"}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        mission.refresh_from_db()
+        self.assertEqual(
+            mission.shift_end,
+            datetime(2026, 8, 4, 14, 0, tzinfo=datetime_timezone.utc),
+        )
+
+    def test_agent_info_includes_resolved_timezone(self):
+        self._set_profile_timezone("America/Los_Angeles")
+
+        response = self.client.get(reverse("missionlog:agent_info"))
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["data"]["timezone"], "America/Los_Angeles")
+
+    def test_invalid_profile_timezone_falls_back_to_project_timezone(self):
+        self._set_profile_timezone("Invalid/Timezone")
+
+        response = self.client.post(
+            reverse("missionlog:post_trip_create"),
+            data=json.dumps(
+                {
+                    "shift_start": "2026-08-04T01:30",
+                    "is_completed": True,
+                    "entry_type": "basic",
+                    "total_gallons": "100",
+                    "hours_on_duty_not_driving": "2.0",
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        mission = Mission.objects.get(id=response.json()["data"]["mission"]["id"])
+        self.assertEqual(
+            mission.shift_start,
+            datetime(2026, 8, 4, 1, 30, tzinfo=datetime_timezone.utc),
+        )
+
+
+class MissionGphTelemetryEndpointTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="sparkuser", password="pass12345")
+        self.other_user = User.objects.create_user(
+            username="sparkother", password="pass12345"
+        )
+        Profile.objects.update_or_create(
+            user=self.user,
+            defaults={"timezone": "UTC"},
+        )
+        self.url = reverse("missionlog:production_gph_telemetry")
+
+    def test_requires_authentication(self):
+        response = self.client.get(f"{self.url}?window=30")
+        self.assertEqual(response.status_code, 302)
+
+    def test_rejects_unsupported_window(self):
+        self.client.force_login(self.user)
+        response = self.client.get(f"{self.url}?window=7")
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"]["code"], "invalid_window")
+
+    def test_returns_only_authenticated_users_series(self):
+        Mission.objects.create(
+            user=self.user,
+            shift_start=timezone.now() - timedelta(days=2),
+            is_completed=True,
+            hours_on_duty_not_driving=2,
+            total_gallons=200,
+        )
+        Mission.objects.create(
+            user=self.other_user,
+            shift_start=timezone.now() - timedelta(days=2),
+            is_completed=True,
+            hours_on_duty_not_driving=2,
+            total_gallons=800,
+        )
+
+        self.client.force_login(self.user)
+        response = self.client.get(f"{self.url}?window=30")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()["data"]
+        non_null_points = [row for row in payload["series"] if row["gph"] is not None]
+        self.assertEqual(len(non_null_points), 1)
+        self.assertEqual(non_null_points[0]["gph"], 100.0)
 
 
 class MissionLogShellAccessTests(TestCase):

@@ -30,6 +30,21 @@ class PeriodBounds:
     period_label: str
 
 
+_RANGE_WINDOW_DAYS = {
+    "week": 7,
+    "month": 30,
+    "quarter": 90,
+    "year": 365,
+}
+
+_RANGE_TYPE_LABELS = {
+    "week": "Weekly",
+    "month": "Monthly",
+    "quarter": "Quarterly",
+    "year": "Yearly",
+}
+
+
 class ProductionReportService:
     """
     Commander's Intent:
@@ -54,55 +69,23 @@ class ProductionReportService:
 
     @staticmethod
     def resolve_period_bounds(
-        *, report_range: str, now_utc: datetime, tz: ZoneInfo
+        *,
+        report_range: str,
+        now_utc: datetime,
+        tz: ZoneInfo,
+        end_date_local: date | None = None,
     ) -> PeriodBounds:
         now_local = timezone.localtime(now_utc, tz)
 
-        if report_range == "week":
-            current_week_start = (
-                now_local - timedelta(days=now_local.weekday())
-            ).date()
-            start_date = current_week_start
-            end_date = current_week_start + timedelta(days=6)
-            previous_start = start_date - timedelta(days=7)
-            previous_end = start_date - timedelta(days=1)
-        elif report_range == "month":
-            first_of_current_month = now_local.date().replace(day=1)
-            if first_of_current_month.month == 12:
-                next_month_start = date(first_of_current_month.year + 1, 1, 1)
-            else:
-                next_month_start = date(
-                    first_of_current_month.year,
-                    first_of_current_month.month + 1,
-                    1,
-                )
-            start_date = first_of_current_month
-            end_date = next_month_start - timedelta(days=1)
-            previous_end = start_date - timedelta(days=1)
-            previous_start = previous_end.replace(day=1)
-        elif report_range == "quarter":
-            quarter_start_month = ((now_local.month - 1) // 3) * 3 + 1
-            current_quarter_start = date(now_local.year, quarter_start_month, 1)
-            if quarter_start_month == 10:
-                next_quarter_start = date(now_local.year + 1, 1, 1)
-            else:
-                next_quarter_start = date(now_local.year, quarter_start_month + 3, 1)
-            start_date = current_quarter_start
-            end_date = next_quarter_start - timedelta(days=1)
-            previous_end = start_date - timedelta(days=1)
-            previous_start_month = quarter_start_month - 3
-            previous_start_year = now_local.year
-            if previous_start_month <= 0:
-                previous_start_month += 12
-                previous_start_year -= 1
-            previous_start = date(previous_start_year, previous_start_month, 1)
-        elif report_range == "year":
-            start_date = date(now_local.year, 1, 1)
-            end_date = date(now_local.year, 12, 31)
-            previous_start = date(now_local.year - 1, 1, 1)
-            previous_end = date(now_local.year - 1, 12, 31)
-        else:
+        if report_range not in _RANGE_WINDOW_DAYS:
             raise ValueError("Unsupported report range.")
+
+        end_date = end_date_local or now_local.date()
+        day_window = _RANGE_WINDOW_DAYS[report_range]
+
+        start_date = end_date - timedelta(days=day_window)
+        previous_end = start_date - timedelta(days=1)
+        previous_start = previous_end - timedelta(days=day_window)
 
         start_local = datetime.combine(start_date, time.min, tzinfo=tz)
         end_local = datetime.combine(end_date, time.max, tzinfo=tz)
@@ -123,15 +106,61 @@ class ProductionReportService:
 
     @staticmethod
     def build_report(
-        *, user: AbstractBaseUser, report_range: str, now_utc: datetime | None = None
+        *,
+        user: AbstractBaseUser,
+        report_range: str,
+        now_utc: datetime | None = None,
+        period_start_date: date | None = None,
+        period_end_date: date | None = None,
     ) -> dict:
         now_utc = now_utc or timezone.now()
         user_tz = ProductionReportService.resolve_user_timezone(user)
-        bounds = ProductionReportService.resolve_period_bounds(
-            report_range=report_range,
-            now_utc=now_utc,
-            tz=user_tz,
-        )
+        if (period_start_date is None) != (period_end_date is None):
+            raise ValueError(
+                "period_start_date and period_end_date must both be provided."
+            )
+
+        if period_start_date is not None and period_end_date is not None:
+            if period_start_date > period_end_date:
+                raise ValueError("period_start_date cannot be after period_end_date.")
+
+            previous_end_date = period_start_date - timedelta(days=1)
+            day_window = (period_end_date - period_start_date).days
+            previous_start_date = previous_end_date - timedelta(days=day_window)
+            bounds = PeriodBounds(
+                report_range=report_range,
+                period_start_local=datetime.combine(
+                    period_start_date,
+                    time.min,
+                    tzinfo=user_tz,
+                ),
+                period_end_local=datetime.combine(
+                    period_end_date,
+                    time.max,
+                    tzinfo=user_tz,
+                ),
+                previous_start_local=datetime.combine(
+                    previous_start_date,
+                    time.min,
+                    tzinfo=user_tz,
+                ),
+                previous_end_local=datetime.combine(
+                    previous_end_date,
+                    time.max,
+                    tzinfo=user_tz,
+                ),
+                period_label=ProductionReportService._period_label(
+                    period_start_date,
+                    period_end_date,
+                    report_range,
+                ),
+            )
+        else:
+            bounds = ProductionReportService.resolve_period_bounds(
+                report_range=report_range,
+                now_utc=now_utc,
+                tz=user_tz,
+            )
 
         missions = ProductionReportService._fetch_missions(
             user=user,
@@ -172,6 +201,8 @@ class ProductionReportService:
         return {
             "period": {
                 "range": report_range,
+                "type_label": _RANGE_TYPE_LABELS[report_range],
+                "window_days": _RANGE_WINDOW_DAYS[report_range],
                 "start_date": bounds.period_start_local.date(),
                 "end_date": bounds.period_end_local.date(),
                 "label": bounds.period_label,
@@ -179,6 +210,105 @@ class ProductionReportService:
             "summary": current_metrics,
             "comparison_text": comparison_text,
             "chart_png_bytes": chart_png_bytes,
+        }
+
+    @staticmethod
+    def build_daily_gph_telemetry(
+        *,
+        user: AbstractBaseUser,
+        window_days: int = 30,
+        now_utc: datetime | None = None,
+    ) -> dict:
+        now_utc = now_utc or timezone.now()
+        user_tz = ProductionReportService.resolve_user_timezone(user)
+        now_local = timezone.localtime(now_utc, user_tz)
+        end_date = now_local.date()
+        start_date = end_date - timedelta(days=window_days)
+
+        start_local = datetime.combine(start_date, time.min, tzinfo=user_tz)
+        end_local = datetime.combine(end_date, time.max, tzinfo=user_tz)
+
+        missions = ProductionReportService._fetch_missions(
+            user=user,
+            start_local=start_local,
+            end_local=end_local,
+            tz=user_tz,
+        )
+
+        daily_totals = {}
+        for mission in missions:
+            gallons = ProductionReportService._resolve_mission_gallons(mission)
+            valid_hours, _ = ProductionReportService._resolve_valid_hours(mission)
+
+            if gallons <= 0 or valid_hours is None:
+                continue
+
+            local_day = timezone.localtime(mission.shift_start, user_tz).date()
+            day_entry = daily_totals.setdefault(
+                local_day,
+                {
+                    "gallons": Decimal("0"),
+                    "hours": Decimal("0"),
+                    "included_missions": 0,
+                },
+            )
+            day_entry["gallons"] += gallons
+            day_entry["hours"] += valid_hours
+            day_entry["included_missions"] += 1
+
+        if not daily_totals:
+            return {
+                "window_days": window_days,
+                "timezone": str(user_tz),
+                "target_gph": float(
+                    getattr(settings, "MISSIONLOG_PRODUCTION_GPH_TARGET", 5000)
+                ),
+                "window_start_date": start_date.isoformat(),
+                "window_end_date": end_date.isoformat(),
+                "latest_data_date": None,
+                "series": [],
+            }
+
+        latest_data_date = max(daily_totals.keys())
+        series = []
+        current_date = start_date
+        while current_date <= latest_data_date:
+            if current_date in daily_totals:
+                totals = daily_totals[current_date]
+                gph = float(
+                    (totals["gallons"] / totals["hours"]).quantize(Decimal("0.1"))
+                )
+                series.append(
+                    {
+                        "local_date": current_date.isoformat(),
+                        "gph": gph,
+                        "gallons": float(totals["gallons"]),
+                        "hours": float(totals["hours"]),
+                        "included_missions": totals["included_missions"],
+                    }
+                )
+            else:
+                series.append(
+                    {
+                        "local_date": current_date.isoformat(),
+                        "gph": None,
+                        "gallons": None,
+                        "hours": None,
+                        "included_missions": 0,
+                    }
+                )
+            current_date += timedelta(days=1)
+
+        return {
+            "window_days": window_days,
+            "timezone": str(user_tz),
+            "target_gph": float(
+                getattr(settings, "MISSIONLOG_PRODUCTION_GPH_TARGET", 5000)
+            ),
+            "window_start_date": start_date.isoformat(),
+            "window_end_date": end_date.isoformat(),
+            "latest_data_date": latest_data_date.isoformat(),
+            "series": series,
         }
 
     @staticmethod
@@ -375,14 +505,10 @@ class ProductionReportService:
 
     @staticmethod
     def _period_label(start_date: date, end_date: date, report_range: str) -> str:
-        if report_range == "week":
-            return f"Week of {start_date.strftime('%b %-d, %Y')}"
-        if report_range == "month":
-            return start_date.strftime("%B %Y")
-        if report_range == "quarter":
-            quarter = ((start_date.month - 1) // 3) + 1
-            return f"Q{quarter} {start_date.year}"
-        return str(start_date.year)
+        range_name = report_range.capitalize()
+        start_display = start_date.strftime("%b %-d, %Y")
+        end_display = end_date.strftime("%b %-d, %Y")
+        return f"{range_name}: {start_display} - {end_display}"
 
     @staticmethod
     def _render_gph_chart(

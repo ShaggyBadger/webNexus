@@ -18,6 +18,12 @@ function missionlogApp() {
     showProductionReportForm: false,
     productionReportRange: "month",
     productionReportSubmitting: false,
+    historyDeleteMissionId: null,
+    userTimezone: "UTC",
+    telemetryLoading: true,
+    telemetryError: "",
+    telemetryNoData: false,
+    telemetryChart: null,
     form: {
       shift_start: "",
       hours_on_duty: "",
@@ -41,6 +47,7 @@ function missionlogApp() {
 
     async init() {
       await this.fetchAgentInfo();
+      this.loadGphTelemetry();
       await this.loadFuelTypes();
       await this.refreshActiveMission();
       if (!this.form.deliveries.length) {
@@ -294,9 +301,11 @@ function missionlogApp() {
       try {
         const data = await this.fetchJson("/missionlog/api/agent-info/");
         this.agentLabel = data.callsign || data.username || "UNKNOWN_AGENT";
+        this.userTimezone = data.timezone || "UTC";
       } catch (error) {
         console.warn("MISSIONLOG_AGENT_INFO_FAILED", error);
         this.agentLabel = "UNKNOWN_AGENT";
+        this.userTimezone = "UTC";
       }
     },
 
@@ -505,6 +514,8 @@ function missionlogApp() {
           this.successMessage = "Mission completed and archived.";
         }
 
+        this.loadGphTelemetry();
+
         window.scrollTo({ top: 0, behavior: "smooth" });
       } catch (error) {
         console.error("MISSIONLOG_SUBMIT_FAILED", error);
@@ -542,6 +553,7 @@ function missionlogApp() {
         this.view = "active";
         this.missions = [];
         this.successMessage = `Mission #${missionId} cancelled and removed.`;
+        this.loadGphTelemetry();
         window.scrollTo({ top: 0, behavior: "smooth" });
       } catch (error) {
         console.error("MISSIONLOG_CANCEL_FAILED", error);
@@ -598,6 +610,147 @@ function missionlogApp() {
       }
     },
 
+    formatTelemetryDate(dateStr) {
+      const parsed = new Date(`${dateStr}T00:00:00`);
+      if (Number.isNaN(parsed.getTime())) {
+        return dateStr;
+      }
+      return new Intl.DateTimeFormat(undefined, {
+        month: "short",
+        day: "numeric",
+      }).format(parsed);
+    },
+
+    destroyTelemetryChart() {
+      if (this.telemetryChart) {
+        this.telemetryChart.destroy();
+        this.telemetryChart = null;
+      }
+    },
+
+    async loadGphTelemetry() {
+      this.telemetryLoading = true;
+      this.telemetryError = "";
+      this.telemetryNoData = false;
+      try {
+        const data = await this.fetchJson("/missionlog/api/missions/production-gph/?window=30");
+        const series = data.series || [];
+        if (!series.length) {
+          this.destroyTelemetryChart();
+          this.telemetryNoData = true;
+          return;
+        }
+
+        this.telemetryNoData = false;
+        this.$nextTick(() => {
+          this.renderGphTelemetryChart(data);
+        });
+      } catch (error) {
+        console.error("MISSIONLOG_GPH_TELEMETRY_FETCH_FAILED", error);
+        this.destroyTelemetryChart();
+        this.telemetryError = "Unable to load GPH telemetry.";
+      } finally {
+        this.telemetryLoading = false;
+      }
+    },
+
+    renderGphTelemetryChart(data) {
+      const canvas = document.getElementById("missionlog-gph-sparkline");
+      if (!canvas || typeof Chart === "undefined") {
+        this.telemetryError = "Telemetry chart unavailable.";
+        return;
+      }
+
+      const series = data.series || [];
+      const labels = series.map((row) => this.formatTelemetryDate(row.local_date));
+      const points = series.map((row) => row.gph);
+      const targetGph = Number(data.target_gph || 5000);
+      const targetSeries = new Array(labels.length).fill(targetGph);
+
+      const pointColors = points.map((value) => {
+        if (value === null || value === undefined) {
+          return "rgba(0,0,0,0)";
+        }
+        return value >= targetGph ? "#8da35d" : "#ffb86c";
+      });
+
+      this.destroyTelemetryChart();
+      this.telemetryChart = new Chart(canvas, {
+        type: "line",
+        data: {
+          labels,
+          datasets: [
+            {
+              data: points,
+              borderWidth: 1.5,
+              tension: 0.2,
+              spanGaps: false,
+              pointRadius: 2,
+              pointHoverRadius: 3,
+              pointBackgroundColor: pointColors,
+              pointBorderColor: pointColors,
+              segment: {
+                borderColor: (ctx) => {
+                  const start = ctx.p0.parsed.y;
+                  const end = ctx.p1.parsed.y;
+                  if (start == null || end == null) {
+                    return "#8da35d";
+                  }
+                  return start >= targetGph && end >= targetGph ? "#8da35d" : "#ffb86c";
+                },
+              },
+            },
+            {
+              data: targetSeries,
+              borderColor: "rgba(248,249,250,0.45)",
+              borderWidth: 1,
+              borderDash: [4, 4],
+              pointRadius: 0,
+              tension: 0,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (context) => {
+                  if (context.datasetIndex !== 0) {
+                    return `Target: ${targetGph.toFixed(0)} GPH`;
+                  }
+                  const row = series[context.dataIndex];
+                  if (!row || row.gph === null || row.gph === undefined) {
+                    return "No valid production data";
+                  }
+                  const gallons = row.gallons != null ? row.gallons.toFixed(1) : "N/A";
+                  const hours = row.hours != null ? row.hours.toFixed(2) : "N/A";
+                  return [
+                    `GPH: ${row.gph.toFixed(1)}`,
+                    `Gallons: ${gallons}`,
+                    `Hours: ${hours}`,
+                    `Missions: ${row.included_missions || 0}`,
+                  ];
+                },
+              },
+            },
+          },
+          scales: {
+            x: {
+              display: false,
+            },
+            y: {
+              min: 0,
+              display: false,
+            },
+          },
+        },
+      });
+    },
+
     async sendProductionReportEmail() {
       this.productionReportSubmitting = true;
       this.errorMessage = "";
@@ -629,6 +782,40 @@ function missionlogApp() {
       }
     },
 
+    async deleteHistoryMission(mission) {
+      if (!mission || !mission.id || !mission.is_completed) {
+        return;
+      }
+
+      const missionDate = this.formatDateOnly(mission.shift_start);
+      const confirmed = window.confirm(
+        `Delete completed mission #${mission.id} (${missionDate}) from history? This permanently removes the entry and related records.`,
+      );
+      if (!confirmed) {
+        return;
+      }
+
+      this.historyDeleteMissionId = mission.id;
+      this.errorMessage = "";
+      this.successMessage = "";
+      try {
+        await this.fetchJson(`/missionlog/api/missions/${mission.id}/history/`, {
+          method: "DELETE",
+          headers: {
+            "X-CSRFToken": this.getCsrfToken(),
+          },
+        });
+        await this.loadMissionHistory();
+        this.loadGphTelemetry();
+        this.successMessage = `Mission #${mission.id} deleted from history.`;
+      } catch (error) {
+        console.error("MISSIONLOG_HISTORY_DELETE_FAILED", error);
+        this.errorMessage = error.message;
+      } finally {
+        this.historyDeleteMissionId = null;
+      }
+    },
+
     formatIso(value) {
       if (!value) {
         return "N/A";
@@ -648,7 +835,27 @@ function missionlogApp() {
       if (Number.isNaN(parsed.getTime())) {
         return value;
       }
-      return parsed.toLocaleDateString();
+      return new Intl.DateTimeFormat(undefined, {
+        timeZone: this.userTimezone,
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      }).format(parsed);
+    },
+
+    formatTimeOnly(value) {
+      if (!value) {
+        return "N/A";
+      }
+      const parsed = new Date(value);
+      if (Number.isNaN(parsed.getTime())) {
+        return value;
+      }
+      return new Intl.DateTimeFormat(undefined, {
+        timeZone: this.userTimezone,
+        hour: "numeric",
+        minute: "2-digit",
+      }).format(parsed);
     },
 
     formatGallonsPerHour(mission) {

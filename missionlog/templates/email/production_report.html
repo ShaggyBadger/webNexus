@@ -13,7 +13,10 @@
             <td style="padding:24px 28px 12px 28px;">
               <h1 style="margin:0 0 8px 0;font-size:24px;letter-spacing:0.04em;color:#1f2933;">PRODUCTION REPORT</h1>
               <p style="margin:0;font-size:15px;color:#4a5568;">
-                Period: {{ period.start_date|date:"F j, Y" }} - {{ period.end_date|date:"F j, Y" }}
+                Report Type: {{ period.type_label }} (rolling {{ period.window_days }}-day window)
+              </p>
+              <p style="margin:4px 0 0 0;font-size:15px;color:#4a5568;">
+                Date Range (local): {{ period.start_date|date:"F j, Y" }} - {{ period.end_date|date:"F j, Y" }}
               </p>
             </td>
           </tr>

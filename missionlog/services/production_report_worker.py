@@ -44,6 +44,8 @@ def process_production_report_email(*, audit_id: int) -> None:
         report_payload = ProductionReportService.build_report(
             user=audit.user,
             report_range=audit.report_range,
+            period_start_date=audit.period_start,
+            period_end_date=audit.period_end,
         )
         generation_duration_ms = int((time.monotonic() - generation_started) * 1000)
         render_duration_ms = generation_duration_ms

@@ -18,6 +18,10 @@ from ..models import (
 from tankgauge.models.store_models import Store
 from .mission_views import serialize_mission
 from .api_contract import json_error_response, json_success_response
+from ..services.datetime_normalization import (
+    MissionDateTimeValidationError,
+    parse_user_datetime_to_utc,
+)
 
 logger = logging.getLogger("webnexus")
 
@@ -62,12 +66,19 @@ def post_trip_create(request):
 
             shift_start_str = data.get("shift_start")
             if shift_start_str:
-                # Support ISO strings like 2026-05-29T12:00
-                shift_start = timezone.datetime.fromisoformat(shift_start_str)
-                # Assign default timezone if naive
-                if timezone.is_naive(shift_start):
-                    shift_start = timezone.make_aware(
-                        shift_start, timezone.get_default_timezone()
+                try:
+                    shift_start = parse_user_datetime_to_utc(
+                        value=shift_start_str,
+                        user=request.user,
+                        field_name="shift_start",
+                    )
+                except MissionDateTimeValidationError as exc:
+                    return json_error_response(
+                        request=request,
+                        code="invalid_datetime_input",
+                        message=str(exc),
+                        details={"field": "shift_start"},
+                        status_code=400,
                     )
             else:
                 shift_start = timezone.now()
@@ -346,10 +357,19 @@ def post_trip_update(request, pk):
 
             shift_start_str = data.get("shift_start")
             if shift_start_str:
-                shift_start = timezone.datetime.fromisoformat(shift_start_str)
-                if timezone.is_naive(shift_start):
-                    shift_start = timezone.make_aware(
-                        shift_start, timezone.get_default_timezone()
+                try:
+                    shift_start = parse_user_datetime_to_utc(
+                        value=shift_start_str,
+                        user=request.user,
+                        field_name="shift_start",
+                    )
+                except MissionDateTimeValidationError as exc:
+                    return json_error_response(
+                        request=request,
+                        code="invalid_datetime_input",
+                        message=str(exc),
+                        details={"field": "shift_start"},
+                        status_code=400,
                     )
             else:
                 shift_start = mission.shift_start
