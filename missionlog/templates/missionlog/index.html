@@ -338,9 +338,7 @@
                         <table class="table table-sm table-dark table-bordered align-middle mb-0 mono" style="font-size: 0.72rem;">
                             <thead>
                                 <tr>
-                                    <th>SHIFT</th>
                                     <th>DATE</th>
-                                    <th>TIME</th>
                                     <th>STATUS</th>
                                     <th>GALLONS / HOUR</th>
                                     <th>ACTION</th>
@@ -349,9 +347,7 @@
                             <tbody>
                                 <template x-for="mission in missions" :key="'mission-' + mission.id">
                                     <tr>
-                                        <td x-text="'#' + mission.id"></td>
                                         <td x-text="formatDateOnly(mission.shift_start)"></td>
-                                        <td x-text="formatTimeOnly(mission.shift_start)"></td>
                                         <td>
                                             <span class="badge" :class="mission.is_completed ? 'text-bg-success' : 'text-bg-warning text-dark'" x-text="mission.is_completed ? 'COMPLETED' : 'INCOMPLETE'"></span>
                                         </td>
