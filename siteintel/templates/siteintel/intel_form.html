@@ -8,7 +8,7 @@
     <div class="row justify-content-center">
         <div class="col-12 col-md-8 col-lg-6">
             <div class="mb-4 text-center">
-                <h2 class="mono text-primary">[ FIELD_INTEL_REPORT ]</h2>
+                <h2 class="mono text-primary">STORE SITE NOTES</h2>
                 <div class="mono text-muted-custom small">
                     LOCATION: {{ object.location.name }} // AUTHOR: {{ request.user.username }}
                 </div>
@@ -24,10 +24,10 @@
                         </label>
                         <!-- Tactical Markdown Toolbar -->
                         <div id="intel-md-toolbar" class="d-flex gap-2">
-                            <button type="button" class="btn btn-tactical-secondary btn-sm py-0 px-2 mono" data-md-cmd="bold" title="BOLD" style="font-size: 0.7rem;">[ B ]</button>
-                            <button type="button" class="btn btn-tactical-secondary btn-sm py-0 px-2 mono" data-md-cmd="italic" title="ITALIC" style="font-size: 0.7rem;">[ I ]</button>
-                            <button type="button" class="btn btn-tactical-secondary btn-sm py-0 px-2 mono" data-md-cmd="list" title="LIST" style="font-size: 0.7rem;">[ L ]</button>
-                            <button type="button" class="btn btn-tactical-secondary btn-sm py-0 px-2 mono" data-md-cmd="link" title="LINK" style="font-size: 0.7rem;">[ K ]</button>
+                            <button type="button" class="btn btn-tactical-secondary btn-sm py-0 px-2 mono" data-md-cmd="bold" title="BOLD" style="font-size: 0.7rem;">B</button>
+                            <button type="button" class="btn btn-tactical-secondary btn-sm py-0 px-2 mono" data-md-cmd="italic" title="ITALIC" style="font-size: 0.7rem;">I</button>
+                            <button type="button" class="btn btn-tactical-secondary btn-sm py-0 px-2 mono" data-md-cmd="list" title="LIST" style="font-size: 0.7rem;">L</button>
+                            <button type="button" class="btn btn-tactical-secondary btn-sm py-0 px-2 mono" data-md-cmd="link" title="LINK" style="font-size: 0.7rem;">K</button>
                         </div>
                     </div>
                     {{ form.notes }}
@@ -38,10 +38,10 @@
 
                 <div class="d-grid gap-2">
                     <button type="submit" class="btn btn-primary mono fw-bold">
-                        [ TRANSMIT_INTELLIGENCE ]
+                        SAVE STORE NOTES
                     </button>
                     <a href="{% url 'siteintel:location_detail' object.location.id %}" class="btn btn-tactical-secondary mono">
-                        [ ABORT_AND_RETURN ]
+                        CANCEL AND RETURN
                     </a>
                 </div>
             </form>
@@ -52,7 +52,7 @@
                 - NOTE_UNUSUAL_TANK_CONFIGURATIONS<br>
                 - DOCUMENT_ON_SITE_CONTACTS<br>
                 - IDENTIFY_POTENTIAL_HAZARDS<br>
-                - <span class="text-primary">MARKDOWN_SUPPORTED:</span> **BOLD**, *ITALIC*, [LINKS]
+                - <span class="text-primary">MARKDOWN_SUPPORTED:</span> **BOLD**, *ITALIC*, LINKS
             </div>
         </div>
     </div>

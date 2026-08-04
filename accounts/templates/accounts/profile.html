@@ -49,7 +49,7 @@
         <h1 class="mono tankgauge-title">
             SERVICE <span class="text-accent">RECORD</span>
         </h1>
-        <p class="text-muted-custom mono small">[ AGENT_PROFILE_V{{ VERSION }} // STATUS: ACTIVE ]</p>
+        <p class="text-muted-custom mono small">AGENT PROFILE V{{ VERSION }} // STATUS: ACTIVE</p>
     </div>
 
     {% if messages %}
@@ -63,7 +63,7 @@
 
     <div class="card p-4 tankgauge-card mb-4">
         <div class="mb-4 text-center">
-            <span class="mono small text-muted-custom d-block mb-1">[ AUTHENTICATION_CORE ]</span>
+            <span class="mono small text-muted-custom d-block mb-1">AUTHENTICATION CORE</span>
             <div class="mono fs-5 text-primary">{{ user.email }}</div>
             <span class="mono x-small text-muted-custom" style="font-size: 0.6rem;">SYSTEM_UID: #{{ user.id|stringformat:"05d" }}</span>
         </div>
@@ -72,23 +72,23 @@
 
         <div class="row">
             <div class="col-md-6 mb-3">
-                <div class="tactical-label">[ FIRST_NAME ]</div>
+                <div class="tactical-label">FIRST NAME</div>
                 <div class="tactical-value">{{ user.first_name|default:"UNSPECIFIED"|upper }}</div>
             </div>
             <div class="col-md-6 mb-3">
-                <div class="tactical-label">[ LAST_NAME ]</div>
+                <div class="tactical-label">LAST NAME</div>
                 <div class="tactical-value">{{ user.last_name|default:"UNSPECIFIED"|upper }}</div>
             </div>
             <div class="col-md-6 mb-3">
-                <div class="tactical-label">[ CALLSIGN ]</div>
+                <div class="tactical-label">CALLSIGN</div>
                 <div class="tactical-value">{{ profile.callsign|default:"NONE"|upper }}</div>
             </div>
             <div class="col-md-6 mb-3">
-                <div class="tactical-label">[ MAP_PREFERENCE ]</div>
+                <div class="tactical-label">MAP PREFERENCE</div>
                 <div class="tactical-value">{{ profile.map_preference|upper }}</div>
             </div>
             <div class="col-md-6 mb-3">
-                <div class="tactical-label">[ NORMAL_SHIFT ]</div>
+                <div class="tactical-label">NORMAL SHIFT</div>
                 <div class="tactical-value">
                     {% if profile.normal_shift_start %}
                         {{ profile.normal_shift_start|time:"H:i" }} - {{ profile.normal_shift_end|time:"H:i" }}
@@ -98,11 +98,11 @@
                 </div>
             </div>
             <div class="col-md-6 mb-3">
-                <div class="tactical-label">[ TIMEZONE ]</div>
+                <div class="tactical-label">TIMEZONE</div>
                 <div class="tactical-value">{{ profile.timezone|upper }}</div>
             </div>
             <div class="col-md-6 mb-3">
-                <div class="tactical-label">[ HOURLY_RATE ]</div>
+                <div class="tactical-label">HOURLY RATE</div>
                 <div class="tactical-value">
                     {% if profile.hourly_pay_rate %}
                         ${{ profile.hourly_pay_rate }} / HR
@@ -112,12 +112,12 @@
                 </div>
             </div>
             <div class="col-md-6 mb-3">
-                <div class="tactical-label">[ NORMAL_WORKDAYS ]</div>
+                <div class="tactical-label">NORMAL WORKDAYS</div>
                 <div class="tactical-value">{{ profile.work_days|join:", "|upper|default:"UNSPECIFIED" }}</div>
             </div>
             
             <div class="col-12 mt-3">
-                <div class="tactical-label">[ CLEARANCE_LEVEL ]</div>
+                <div class="tactical-label">CLEARANCE LEVEL</div>
                 {% if profile.is_verified_field_agent %}
                     <span class="mono status-badge status-verified">
                         <i class="fas fa-shield-alt me-1"></i> VERIFIED_FIELD_AGENT

@@ -38,6 +38,21 @@ def process_production_report_email(*, audit_id: int) -> None:
         )
         return
 
+    if not audit.recipient_email:
+        _mark_failed(
+            audit=audit,
+            failure_reason="Queued report has no recipient email.",
+            exception_type="MissingRecipientError",
+            generation_duration_ms=None,
+            render_duration_ms=None,
+            smtp_duration_ms=None,
+        )
+        logger.error(
+            "MISSIONLOG_REPORT_EMAIL_RECIPIENT_MISSING",
+            extra={"audit_id": audit.id, "user_id": audit.user_id},
+        )
+        return
+
     generation_started = time.monotonic()
     render_duration_ms = None
     try:
@@ -66,7 +81,7 @@ def process_production_report_email(*, audit_id: int) -> None:
         return
 
     email_result = ProductionReportEmailService.send_report(
-        recipient_email=audit.user.email,
+        recipient_email=audit.recipient_email,
         report_payload=report_payload,
     )
 

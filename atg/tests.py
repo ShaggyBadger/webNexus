@@ -203,16 +203,89 @@ class VeederUploadServiceTestCase(TestCase):
             )
 
 
+class VeederStaffPageAccessTests(TestCase):
+    def setUp(self):
+        self.normal_user = User.objects.create_user(
+            username="normaluser", password="password123"
+        )
+        self.staff_user = User.objects.create_user(
+            username="staffuser", password="password123", is_staff=True
+        )
+        self.store = Store.objects.create(store_num=101, store_name="Store 101")
+        self.ticket = VeederTicket.objects.create(
+            store=self.store,
+            image=get_test_image(),
+        )
+
+    def test_non_staff_cannot_access_atg_pages(self):
+        self.client.force_login(self.normal_user)
+
+        urls = [
+            reverse("atg:ticket_upload"),
+            reverse("atg:veeder_list"),
+            reverse("atg:veeder_detail", kwargs={"pk": self.ticket.pk}),
+        ]
+
+        for url in urls:
+            with self.subTest(url=url):
+                self.assertEqual(self.client.get(url).status_code, 403)
+
+    def test_staff_can_access_atg_pages(self):
+        self.client.force_login(self.staff_user)
+
+        urls = [
+            reverse("atg:ticket_upload"),
+            reverse("atg:veeder_list"),
+            reverse("atg:veeder_detail", kwargs={"pk": self.ticket.pk}),
+        ]
+
+        for url in urls:
+            with self.subTest(url=url):
+                self.assertEqual(self.client.get(url).status_code, 200)
+
+
 class VeederAPITestCase(APITestCase):
     def setUp(self):
         self.user = User.objects.create_user(
-            username="testuser", password="password123"
+            username="testuser", password="password123", is_staff=True
         )
         self.store = Store.objects.create(store_num=101, store_name="Store 101")
         self.fuel_type = FuelType.objects.create(name="Regular")
         self.image = get_test_image()
 
         self.client.login(username="testuser", password="password123")
+
+    def test_non_staff_cannot_access_staff_atg_apis(self):
+        normal_user = User.objects.create_user(
+            username="normaluser", password="password123"
+        )
+        self.client.logout()
+        self.client.login(username="normaluser", password="password123")
+
+        requests = [
+            self.client.get(reverse("atg:ticket-list")),
+            self.client.get(reverse("atg:reading-list")),
+            self.client.get(reverse("atg:store-list")),
+            self.client.get(reverse("atg:veeder_stats")),
+            self.client.get(
+                reverse(
+                    "atg:store_tank_profile_api",
+                    kwargs={"store_num": self.store.store_num},
+                )
+            ),
+            self.client.post(
+                reverse("atg:readings_preflight"),
+                {},
+                format="json",
+            ),
+        ]
+
+        self.assertTrue(
+            all(
+                response.status_code == status.HTTP_403_FORBIDDEN
+                for response in requests
+            )
+        )
 
     def test_ticket_viewset_create_multipart(self):
         readings_data = [
@@ -545,6 +618,23 @@ class VeederQuickCaptureApiTests(APITestCase):
         self.assertEqual(ticket.store, self.store)
         self.assertIsNone(ticket.uploaded_by)
         self.assertEqual(ticket.notes, "Quick capture ticket")
+
+    def test_quick_capture_remains_available_to_non_staff_users(self):
+        user = User.objects.create_user(username="normaluser", password="password123")
+        self.client.login(username="normaluser", password="password123")
+
+        response = self.client.post(
+            reverse("atg:ticket_quick_capture"),
+            {
+                "store_num": "101",
+                "image": get_test_image(),
+            },
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        ticket = VeederTicket.objects.get(id=response.json()["data"]["ticket_id"])
+        self.assertEqual(ticket.uploaded_by, user)
         self.assertIsNotNone(ticket.image)
 
     def test_quick_capture_resolves_store_by_riso_number(self):

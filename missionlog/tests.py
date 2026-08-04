@@ -417,6 +417,7 @@ class MissionTimezoneNormalizationTests(TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertEqual(payload["data"]["timezone"], "America/Los_Angeles")
+        self.assertEqual(payload["data"]["email"], self.user.email)
 
     def test_invalid_profile_timezone_falls_back_to_project_timezone(self):
         self._set_profile_timezone("Invalid/Timezone")
@@ -504,7 +505,7 @@ class MissionLogShellAccessTests(TestCase):
         response = self.client.get(reverse("missionlog:spa_index"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "[ PRODUCTION CONSOLE ]")
+        self.assertContains(response, "PRODUCTION OPS")
 
 
 class PostTripPayloadHandlingTests(TestCase):
@@ -667,6 +668,89 @@ class BasicAdvancedModeTests(TestCase):
         mission = Mission.objects.get(id=payload["data"]["mission"]["id"])
         self.assertEqual(mission.entry_type, "basic")
         self.assertEqual(mission.total_gallons, Decimal("9500"))
+
+    def test_basic_progress_can_save_before_final_values_are_known(self):
+        response = self.client.post(
+            reverse("missionlog:post_trip_create"),
+            data=json.dumps(
+                {
+                    "shift_start": timezone.now().isoformat(),
+                    "is_completed": False,
+                    "entry_type": "basic",
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        mission = Mission.objects.get(id=response.json()["data"]["mission"]["id"])
+        self.assertFalse(mission.is_completed)
+        self.assertIsNone(mission.total_gallons)
+        self.assertIsNone(mission.hours_on_duty_not_driving)
+
+    def test_basic_progress_converts_hours_and_minutes_to_decimal_hours(self):
+        response = self.client.post(
+            reverse("missionlog:post_trip_create"),
+            data=json.dumps(
+                {
+                    "shift_start": timezone.now().isoformat(),
+                    "is_completed": False,
+                    "entry_type": "basic",
+                    "hours_on_duty_not_driving_hours": 4,
+                    "hours_on_duty_not_driving_minutes": 21,
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        mission = Mission.objects.get(id=response.json()["data"]["mission"]["id"])
+        self.assertEqual(mission.hours_on_duty_not_driving, Decimal("4.35"))
+
+    def test_basic_completion_converts_hours_and_minutes(self):
+        response = self.client.post(
+            reverse("missionlog:post_trip_create"),
+            data=json.dumps(
+                {
+                    "shift_start": timezone.now().isoformat(),
+                    "is_completed": True,
+                    "entry_type": "basic",
+                    "total_gallons": "9500",
+                    "hours_on_duty_not_driving_hours": 4,
+                    "hours_on_duty_not_driving_minutes": 21,
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        mission = Mission.objects.get(id=response.json()["data"]["mission"]["id"])
+        self.assertTrue(mission.is_completed)
+        self.assertEqual(mission.hours_on_duty_not_driving, Decimal("4.35"))
+
+    def test_basic_completion_rejects_minutes_outside_range(self):
+        response = self.client.post(
+            reverse("missionlog:post_trip_create"),
+            data=json.dumps(
+                {
+                    "shift_start": timezone.now().isoformat(),
+                    "is_completed": True,
+                    "entry_type": "basic",
+                    "total_gallons": "9500",
+                    "hours_on_duty_not_driving_hours": 4,
+                    "hours_on_duty_not_driving_minutes": 60,
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        payload = response.json()
+        self.assertEqual(payload["error"]["code"], "INVALID_BASIC_SUBMISSION")
+        self.assertIn(
+            "hours_on_duty_not_driving_minutes",
+            payload["error"]["details"]["field_errors"],
+        )
 
     def test_basic_mode_missing_total_gallons_returns_400(self):
         response = self.client.post(

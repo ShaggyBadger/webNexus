@@ -315,6 +315,12 @@ class ProductionReportEmailAudit(models.Model):
         on_delete=models.CASCADE,
         related_name="production_report_email_audits",
     )
+    recipient_email = models.EmailField(
+        max_length=254,
+        null=True,
+        blank=True,
+        help_text="Validated destination captured when the report was queued.",
+    )
     report_range = models.CharField(max_length=16, choices=ReportRange.choices)
     period_start = models.DateField()
     period_end = models.DateField()

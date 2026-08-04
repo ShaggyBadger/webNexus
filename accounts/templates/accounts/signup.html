@@ -36,7 +36,7 @@
         <h1 class="mono tankgauge-title">
             AGENT <span class="text-accent">ENLISTMENT</span>
         </h1>
-        <p class="text-muted-custom mono small">[ RECRUITMENT_SEQUENCE_V1.0 // CMD: NEW_ENTRY ]</p>
+        <p class="text-muted-custom mono small">RECRUITMENT SEQUENCE V1.0 // COMMAND: NEW ENTRY</p>
     </div>
 
     <div class="card p-4 tankgauge-card">
@@ -65,7 +65,7 @@
                            {% if field.field.required %}required{% endif %}
                            {% if field.value %}value="{{ field.value }}"{% endif %}>
                     {% if field.help_text %}
-                        <span class="helptext mono uppercase">[ {{ field.help_text|striptags|upper }} ]</span>
+                        <span class="helptext mono uppercase">{{ field.help_text|striptags|upper }}</span>
                     {% endif %}
                     {% for error in field.errors %}
                         <div class="error-feedback mono mt-1">{{ error|upper }}</div>

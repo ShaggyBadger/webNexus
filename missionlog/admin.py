@@ -62,6 +62,7 @@ class ProductionReportEmailAuditAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "user",
+        "recipient_email",
         "report_range",
         "period_start",
         "period_end",
@@ -69,4 +70,9 @@ class ProductionReportEmailAuditAdmin(admin.ModelAdmin):
         "requested_at",
     )
     list_filter = ("report_range", "status")
-    search_fields = ("user__username", "user__email", "trace_id")
+    search_fields = (
+        "user__username",
+        "user__email",
+        "recipient_email",
+        "trace_id",
+    )

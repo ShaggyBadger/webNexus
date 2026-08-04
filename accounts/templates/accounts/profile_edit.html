@@ -60,7 +60,7 @@
         <h1 class="mono tankgauge-title">
             UPDATE <span class="text-accent">RECORD</span>
         </h1>
-        <p class="text-muted-custom mono small">[ EDIT_MODE // AGENT: {{ user.username|upper }} ]</p>
+        <p class="text-muted-custom mono small">EDIT MODE // AGENT: {{ user.username|upper }}</p>
     </div>
 
     {% if messages %}
@@ -76,7 +76,7 @@
         <form method="POST">
             {% csrf_token %}
             
-            <div class="mono small text-muted-custom mb-4">[ IDENTITY_UPDATE_PROTOCOL ]</div>
+            <div class="mono small text-muted-custom mb-4">IDENTITY UPDATE PROTOCOL</div>
             
             {% for field in profile_form %}
                 <div class="mb-4">
@@ -85,7 +85,7 @@
                     </label>
                     {{ field }}
                     {% if field.help_text %}
-                        <span class="helptext mono uppercase small d-block mt-1">[ {{ field.help_text|upper }} ]</span>
+                        <span class="helptext mono uppercase small d-block mt-1">{{ field.help_text|upper }}</span>
                     {% endif %}
                     {% for error in field.errors %}
                         <div class="error-feedback mono mt-1">{{ error|upper }}</div>

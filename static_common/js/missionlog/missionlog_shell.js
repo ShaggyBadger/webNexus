@@ -10,6 +10,7 @@ function missionlogApp() {
     autoCalculateTotalMiles: true,
     errorMessage: "",
     successMessage: "",
+    successMessageTimeout: null,
     agentLabel: "RECOGNIZING...",
     showModeConfirm: false,
     pendingMode: "",
@@ -17,6 +18,7 @@ function missionlogApp() {
     showCompleteConfirm: false,
     showProductionReportForm: false,
     productionReportRange: "month",
+    productionReportRecipientEmail: "",
     productionReportSubmitting: false,
     historyDeleteMissionId: null,
     userTimezone: "UTC",
@@ -27,7 +29,8 @@ function missionlogApp() {
     form: {
       shift_start: "",
       hours_on_duty: "",
-      hours_on_duty_not_driving: "",
+      production_hours: "",
+      production_minutes: "",
       total_miles: "",
       start_miles: "",
       end_miles: "",
@@ -59,7 +62,8 @@ function missionlogApp() {
       this.form = {
         shift_start: "",
         hours_on_duty: "",
-        hours_on_duty_not_driving: "",
+        production_hours: "",
+        production_minutes: "",
         total_miles: "",
         start_miles: "",
         end_miles: "",
@@ -110,14 +114,15 @@ function missionlogApp() {
       const startMiles = this.toNumeric(this.form.start_miles);
       const endMiles = this.toNumeric(this.form.end_miles);
       const hoursOnDuty = this.toNumeric(this.form.hours_on_duty);
-      const hoursNotDriving = this.toNumeric(this.form.hours_on_duty_not_driving);
+      const productionHours = this.toNumeric(this.form.production_hours);
+      const productionMinutes = this.toNumeric(this.form.production_minutes);
       const totalGallons = this.toNumeric(this.form.total_gallons);
       
       const hasDeliveries = this.form.deliveries.length > 0 && 
         (this.form.deliveries[0].store_number_or_riso !== "" || 
          (this.form.deliveries[0].fuel_entries && this.form.deliveries[0].fuel_entries.length > 0 && String(this.form.deliveries[0].fuel_entries[0].gallons || "").trim() !== ""));
 
-      const isDirty = (hoursOnDuty !== null || hoursNotDriving !== null || totalGallons !== null || startMiles !== null || endMiles !== null || this.form.notes !== "" || hasDeliveries);
+      const isDirty = (hoursOnDuty !== null || productionHours !== null || productionMinutes !== null || totalGallons !== null || startMiles !== null || endMiles !== null || this.form.notes !== "" || hasDeliveries);
 
       if (isDirty) {
         this.pendingMode = newType;
@@ -185,6 +190,57 @@ function missionlogApp() {
       }
       const parsed = Number(value);
       return Number.isNaN(parsed) ? null : parsed;
+    },
+
+    productionHoursPayload() {
+      const rawHours = String(this.form.production_hours ?? "").trim();
+      const rawMinutes = String(this.form.production_minutes ?? "").trim();
+      if (!rawHours && !rawMinutes) {
+        return {
+          hours_on_duty_not_driving_hours: null,
+          hours_on_duty_not_driving_minutes: null,
+        };
+      }
+      return {
+        hours_on_duty_not_driving_hours: rawHours === "" ? 0 : Number(rawHours),
+        hours_on_duty_not_driving_minutes: rawMinutes === "" ? 0 : Number(rawMinutes),
+      };
+    },
+
+    validateBasicCompletion() {
+      if (this.toNumeric(this.form.total_gallons) === null) {
+        return "Total gallons are required to complete a Basic shift.";
+      }
+
+      const rawHours = String(this.form.production_hours ?? "").trim();
+      const rawMinutes = String(this.form.production_minutes ?? "").trim();
+      if (!rawHours && !rawMinutes) {
+        return "Production time is required to complete a Basic shift.";
+      }
+
+      const hours = rawHours === "" ? 0 : Number(rawHours);
+      const minutes = rawMinutes === "" ? 0 : Number(rawMinutes);
+      if (!Number.isInteger(hours) || hours < 0) {
+        return "Production hours must be a whole number of zero or more.";
+      }
+      if (!Number.isInteger(minutes) || minutes < 0 || minutes > 59) {
+        return "Production minutes must be a whole number from 0 to 59.";
+      }
+      return "";
+    },
+
+    splitProductionHours(value) {
+      const decimalHours = this.toNumeric(value);
+      if (decimalHours === null) {
+        return { hours: "", minutes: "" };
+      }
+      let hours = Math.floor(decimalHours);
+      let minutes = Math.round((decimalHours - hours) * 60);
+      if (minutes === 60) {
+        hours += 1;
+        minutes = 0;
+      }
+      return { hours: String(hours), minutes: String(minutes) };
     },
 
     onMileageInput() {
@@ -301,6 +357,7 @@ function missionlogApp() {
       try {
         const data = await this.fetchJson("/missionlog/api/agent-info/");
         this.agentLabel = data.callsign || data.username || "UNKNOWN_AGENT";
+        this.productionReportRecipientEmail = data.email || "";
         this.userTimezone = data.timezone || "UTC";
       } catch (error) {
         console.warn("MISSIONLOG_AGENT_INFO_FAILED", error);
@@ -325,10 +382,11 @@ function missionlogApp() {
       }
       this.form.shift_start = this.toDateTimeLocal(mission.shift_start);
       this.form.hours_on_duty = mission.hours_on_duty != null ? String(mission.hours_on_duty) : "";
-      this.form.hours_on_duty_not_driving =
-        mission.hours_on_duty_not_driving != null
-          ? String(mission.hours_on_duty_not_driving)
-          : "";
+      const productionTime = this.splitProductionHours(
+        mission.hours_on_duty_not_driving,
+      );
+      this.form.production_hours = productionTime.hours;
+      this.form.production_minutes = productionTime.minutes;
       this.form.start_miles = mission.start_miles != null ? String(mission.start_miles) : "";
       this.form.end_miles = mission.end_miles != null ? String(mission.end_miles) : "";
       this.form.total_miles = mission.total_miles != null ? String(mission.total_miles) : "";
@@ -433,7 +491,7 @@ function missionlogApp() {
           shift_start: this.form.shift_start,
           entry_type: "basic",
           total_gallons: this.toNumeric(this.form.total_gallons),
-          hours_on_duty_not_driving: this.toNumeric(this.form.hours_on_duty_not_driving),
+          ...this.productionHoursPayload(),
           is_completed: Boolean(isCompleted),
         };
       }
@@ -451,7 +509,7 @@ function missionlogApp() {
         entry_type: this.form.entry_type,
         total_gallons: null,
         hours_on_duty: this.form.hours_on_duty || null,
-        hours_on_duty_not_driving: this.form.hours_on_duty_not_driving || null,
+        ...this.productionHoursPayload(),
         total_miles: totalMiles,
         start_miles: this.form.start_miles || null,
         end_miles: this.form.end_miles || null,
@@ -486,6 +544,13 @@ function missionlogApp() {
 
     async submitMission(isCompleted) {
       this.showCompleteConfirm = false;
+      if (isCompleted && this.form.entry_type === "basic") {
+        const validationError = this.validateBasicCompletion();
+        if (validationError) {
+          this.errorMessage = validationError;
+          return;
+        }
+      }
       this.submitting = true;
       this.errorMessage = "";
       this.successMessage = "";
@@ -642,13 +707,13 @@ function missionlogApp() {
         }
 
         this.telemetryNoData = false;
-        this.$nextTick(() => {
-          this.renderGphTelemetryChart(data);
-        });
+        await new Promise((resolve) => window.requestAnimationFrame(resolve));
+        this.renderGphTelemetryChart(data);
       } catch (error) {
         console.error("MISSIONLOG_GPH_TELEMETRY_FETCH_FAILED", error);
-        this.destroyTelemetryChart();
-        this.telemetryError = "Unable to load GPH telemetry.";
+        if (!this.telemetryChart) {
+          this.telemetryError = "Unable to load GPH telemetry.";
+        }
       } finally {
         this.telemetryLoading = false;
       }
@@ -684,7 +749,7 @@ function missionlogApp() {
               data: points,
               borderWidth: 1.5,
               tension: 0.2,
-              spanGaps: false,
+              spanGaps: true,
               pointRadius: 2,
               pointHoverRadius: 3,
               pointBackgroundColor: pointColors,
@@ -755,21 +820,31 @@ function missionlogApp() {
       this.productionReportSubmitting = true;
       this.errorMessage = "";
       this.successMessage = "";
+      if (this.successMessageTimeout) {
+        clearTimeout(this.successMessageTimeout);
+        this.successMessageTimeout = null;
+      }
       try {
-        await this.fetchJson("/missionlog/api/v1/reports/production-email/", {
+        const data = await this.fetchJson("/missionlog/api/v1/reports/production-email/", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             "X-CSRFToken": this.getCsrfToken(),
           },
-          body: JSON.stringify({ range: this.productionReportRange }),
+          body: JSON.stringify({
+            range: this.productionReportRange,
+            recipient_email: this.productionReportRecipientEmail,
+          }),
         });
-        this.successMessage =
-          "Report generation started. Please allow a few minutes for it to finish, " +
-          "then check your email and spam folder. If you find it in spam, mark it as not spam.";
+        this.successMessage = data.message ||
+          "Report generation started. Please allow a few minutes for it to finish.";
+        this.successMessageTimeout = setTimeout(() => {
+          this.successMessage = "";
+          this.successMessageTimeout = null;
+        }, 5000);
       } catch (error) {
         console.error("MISSIONLOG_PRODUCTION_REPORT_QUEUE_FAILED", error);
-        this.errorMessage = "Report could not be started. Please try again.";
+        this.errorMessage = error.message || "Report could not be started. Please try again.";
       } finally {
         this.productionReportSubmitting = false;
       }

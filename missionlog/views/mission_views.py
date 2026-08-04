@@ -14,6 +14,10 @@ from ..services.datetime_normalization import (
     parse_user_datetime_to_utc,
     resolve_user_timezone,
 )
+from ..services.mission_duration import (
+    ProductionHoursValidationError,
+    parse_production_hours,
+)
 from ..services.production_report_service import ProductionReportService
 from .api_contract import json_error_response, json_success_response
 
@@ -159,14 +163,33 @@ def mission_list_or_create(request):
             if total_gallons is not None:
                 try:
                     total_gallons = Decimal(str(total_gallons))
+                    if total_gallons < 0:
+                        raise ValueError()
                 except (ValueError, TypeError, InvalidOperation):
-                    total_gallons = None
+                    return json_error_response(
+                        request=request,
+                        code="INVALID_BASIC_SUBMISSION",
+                        message="Total gallons must be a non-negative number.",
+                        details={"field": "total_gallons"},
+                        status_code=400,
+                    )
+
+            try:
+                production_hours = parse_production_hours(data, required=False)
+            except ProductionHoursValidationError as exc:
+                return json_error_response(
+                    request=request,
+                    code="INVALID_BASIC_SUBMISSION",
+                    message=str(exc),
+                    details={"field": exc.field},
+                    status_code=400,
+                )
 
             mission = Mission.objects.create(
                 user=request.user,
                 shift_start=shift_start,
                 start_miles=data.get("start_miles"),
-                hours_on_duty_not_driving=data.get("hours_on_duty_not_driving"),
+                hours_on_duty_not_driving=production_hours,
                 notes=data.get("notes", ""),
                 entry_type=entry_type,
                 total_gallons=total_gallons,
@@ -597,6 +620,7 @@ def agent_info(request):
                     else request.user.username.upper()
                 ),
                 "is_verified": profile.is_verified_field_agent if profile else False,
+                "email": request.user.email or "",
                 "timezone": str(resolved_timezone),
                 "version": settings.APP_VERSION,
             }

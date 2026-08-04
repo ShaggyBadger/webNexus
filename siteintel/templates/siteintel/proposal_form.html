@@ -114,11 +114,11 @@
 <div class="container py-4">
     <div class="row justify-content-center">
         <div class="col-lg-10">
-            <h2 class="mono text-primary mb-4">[ PROPOSE_SITE_INTEL ]</h2>
+            <h2 class="mono text-primary mb-4">PROPOSE STORE UPDATE</h2>
             
             {% if form.errors or tank_formset.errors %}
             <div class="alert alert-danger bg-dark border-danger mono mb-4" style="font-size: 0.75rem;">
-                <div class="text-danger fw-bold mb-2">[ FORM_VALIDATION_ERROR ]</div>
+                <div class="text-danger fw-bold mb-2">FORM VALIDATION ERROR</div>
                 <ul class="m-0">
                     {% for field, errors in form.errors.items %}
                         <li>{{ field|upper }}: {{ errors|striptags }}</li>
@@ -175,7 +175,7 @@
                                                 {% for stype in existing_store_types %}
                                                     <option value="{{ stype }}" {% if form.initial.store_type == stype %}selected{% endif %}>{{ stype }}</option>
                                                 {% endfor %}
-                                                <option value="CUSTOM" {% if form.initial.store_type and form.initial.store_type not in existing_store_types %}selected{% endif %}>[ CUSTOM_ENTRY ]</option>
+                                                <option value="CUSTOM" {% if form.initial.store_type and form.initial.store_type not in existing_store_types %}selected{% endif %}>CUSTOM ENTRY</option>
                                             </select>
                                             <input type="text" id="custom-store-type" class="form-control mono {% if not form.initial.store_type or form.initial.store_type in existing_store_types %}d-none{% endif %}" 
                                                    placeholder="Enter brand..." value="{% if form.initial.store_type and form.initial.store_type not in existing_store_types %}{{ form.initial.store_type }}{% endif %}" style="font-size: 0.8rem;">
@@ -217,10 +217,10 @@
                                     <label class="form-label m-0">Geospatial Data</label>
                                     <div class="d-flex gap-2">
                                         <button type="button" class="btn btn-tactical-secondary btn-sm mono" id="geocode-btn" style="font-size: 0.7rem;">
-                                            [ DECODE_COORDINATES ]
+                                            DECODE COORDINATES
                                         </button>
                                         <button type="button" class="btn btn-primary btn-sm mono text-dark" id="gps-capture-btn" style="font-size: 0.7rem;">
-                                            [ RE-CAPTURE GPS_PULSE ]
+                                            RE-CAPTURE GPS
                                         </button>
                                     </div>
                                 </div>
@@ -257,14 +257,14 @@
                                     <!-- Proximity Warning Container -->
                                     <div class="col-12 d-none" id="proximity-warning">
                                         <div class="alert alert-warning bg-dark border-warning mono py-2 px-3 mb-2" style="font-size: 0.7rem;">
-                                            <div class="text-tactical-warning fw-bold mb-1">[ PROXIMITY_ALERT: EXISTING SITE DETECTED WITHIN 250FT ]</div>
+                                            <div class="text-tactical-warning fw-bold mb-1">PROXIMITY ALERT: EXISTING STORE WITHIN 250FT</div>
                                             <div id="proximity-matches"></div>
                                             <div class="mt-1 text-muted-custom">IS THIS THE SITE YOU ARE LOOKING FOR? IF SO, ABORT THIS MISSION AND UPDATE THE EXISTING RECORD.</div>
                                         </div>
                                     </div>
 
                                     <div class="col-12 mb-3">
-                                        <div class="mono text-primary small mb-1">[ TACTICAL_SATELLITE_OVERLAY ]</div>
+                                        <div class="mono text-primary small mb-1">STORE MAP OVERLAY</div>
                                         <div id="map"></div>
                                         <small class="text-muted-custom mono mt-2 d-block text-center" style="font-size: 0.6rem;">
                                             DRAG MARKER OR CLICK MAP TO ADJUST TARGET COORDINATES
@@ -299,7 +299,7 @@
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <label class="form-label m-0">Custom Attributes</label>
                             <button type="button" class="btn btn-tactical-secondary btn-sm mono" id="add-custom-attr-btn" style="font-size: 0.7rem;">
-                                [ + ADD CUSTOM QUIRK ]
+                                + ADD CUSTOM NOTE
                             </button>
                         </div>
                         
@@ -343,7 +343,7 @@
                                         {{ tank_form.DELETE }}
                                     </div>
                                     <button type="button" class="btn btn-tactical-danger btn-sm remove-tank mono py-0 px-1" style="font-size: 0.6rem;">
-                                        [ REMOVE ]
+                                        REMOVE
                                     </button>
                                 {% endif %}
                             </div>
@@ -351,17 +351,17 @@
                         </div>
                         
                         <button type="button" class="btn btn-tactical-amber btn-sm mono mt-2" id="add-tank-btn">
-                            [ + ADD TANK RECORD ]
+                            + ADD TANK RECORD
                         </button>
                     </div>
                 </div>
 
                 <div class="d-grid gap-2 mt-4">
                     <button type="submit" class="btn btn-primary btn-lg mono">
-                        [ TRANSMIT_PROPOSAL ]
+                        SUBMIT STORE UPDATE
                     </button>
                     <a href="{% url 'siteintel:proposal_list' %}" class="btn btn-tactical-secondary btn-sm mono">
-                        [ CANCEL_MISSION ]
+                        CANCEL UPDATE
                     </a>
                 </div>
             </form>
@@ -373,7 +373,7 @@
     <div class="tank-entry" data-index="__prefix__">
         {% include "siteintel/components/tank_entry_row.html" with tank_form=tank_formset.empty_form assigned_tank=None %}
         <button type="button" class="btn btn-tactical-danger btn-sm remove-tank mono py-0 px-1" style="font-size: 0.6rem;">
-            [ REMOVE ]
+                            REMOVE
         </button>
     </div>
 </div>

@@ -3,8 +3,9 @@ from datetime import datetime, timedelta
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
+from django.core.cache import cache
 from django.core import mail
-from django.test import Client, TestCase
+from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -326,6 +327,13 @@ class ProductionReportEmailAPITests(TestCase):
         )
         self.url = reverse("missionlog:production_report_email")
 
+    @staticmethod
+    def _request_payload(*, report_range="month", recipient_email="api_user@example.com"):
+        return {
+            "range": report_range,
+            "recipient_email": recipient_email,
+        }
+
     def _csrf_client(self, user=None):
         client = Client(enforce_csrf_checks=True)
         if user is not None:
@@ -341,7 +349,7 @@ class ProductionReportEmailAPITests(TestCase):
         client = Client()
         response = client.post(
             self.url,
-            data=json.dumps({"range": "month"}),
+            data=json.dumps(self._request_payload()),
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 401)
@@ -351,7 +359,7 @@ class ProductionReportEmailAPITests(TestCase):
         client.force_login(self.user)
         response = client.post(
             self.url,
-            data=json.dumps({"range": "month"}),
+            data=json.dumps(self._request_payload()),
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 403)
@@ -363,7 +371,7 @@ class ProductionReportEmailAPITests(TestCase):
 
         response = client.post(
             self.url,
-            data=json.dumps({"range": "month"}),
+            data=json.dumps(self._request_payload()),
             content_type="application/json",
             HTTP_X_CSRFTOKEN=csrf_token,
         )
@@ -372,7 +380,12 @@ class ProductionReportEmailAPITests(TestCase):
         payload = response.json()
         self.assertEqual(payload["status"], "success")
         self.assertIn("check your email", payload["data"]["message"])
+        self.assertEqual(payload["data"]["recipient_email"], "api_user@example.com")
         self.assertEqual(ProductionReportEmailAudit.objects.count(), 1)
+        self.assertEqual(
+            ProductionReportEmailAudit.objects.get().recipient_email,
+            "api_user@example.com",
+        )
 
     @patch("missionlog.views.report_email_views.ProductionReportDispatcher.enqueue")
     def test_enqueue_failure_returns_503(self, mock_enqueue):
@@ -381,7 +394,7 @@ class ProductionReportEmailAPITests(TestCase):
 
         response = client.post(
             self.url,
-            data=json.dumps({"range": "month"}),
+            data=json.dumps(self._request_payload()),
             content_type="application/json",
             HTTP_X_CSRFTOKEN=csrf_token,
         )
@@ -395,7 +408,13 @@ class ProductionReportEmailAPITests(TestCase):
 
         response = client.post(
             self.url,
-            data=json.dumps({"range": "month", "email": "hacker@example.com"}),
+            data=json.dumps(
+                {
+                    "range": "month",
+                    "email": "hacker@example.com",
+                    "recipient_email": "api_user@example.com",
+                }
+            ),
             content_type="application/json",
             HTTP_X_CSRFTOKEN=csrf_token,
         )
@@ -409,7 +428,7 @@ class ProductionReportEmailAPITests(TestCase):
 
         response = client.post(
             self.url,
-            data=json.dumps({"range": "daily"}),
+            data=json.dumps(self._request_payload(report_range="daily")),
             content_type="application/json",
             HTTP_X_CSRFTOKEN=csrf_token,
         )
@@ -417,10 +436,8 @@ class ProductionReportEmailAPITests(TestCase):
         self.assertEqual(response.json()["error"]["code"], "invalid_range")
 
     @patch("missionlog.views.report_email_views.ProductionReportDispatcher.enqueue")
-    def test_missing_account_email_returns_422(self, mock_enqueue):
+    def test_missing_recipient_returns_400(self, mock_enqueue):
         mock_enqueue.return_value = True
-        self.user.email = ""
-        self.user.save(update_fields=["email"])
         client, csrf_token = self._csrf_client(user=self.user)
 
         response = client.post(
@@ -429,8 +446,128 @@ class ProductionReportEmailAPITests(TestCase):
             content_type="application/json",
             HTTP_X_CSRFTOKEN=csrf_token,
         )
-        self.assertEqual(response.status_code, 422)
-        self.assertEqual(response.json()["error"]["code"], "verified_email_required")
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"]["code"], "recipient_email_required")
+
+    @patch("missionlog.views.report_email_views.ProductionReportDispatcher.enqueue")
+    def test_recipient_can_override_account_email(self, mock_enqueue):
+        mock_enqueue.return_value = True
+        client, csrf_token = self._csrf_client(user=self.user)
+
+        response = client.post(
+            self.url,
+            data=json.dumps(self._request_payload(recipient_email="manager@example.com")),
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=csrf_token,
+        )
+
+        self.assertEqual(response.status_code, 202)
+        self.assertEqual(
+            ProductionReportEmailAudit.objects.get().recipient_email,
+            "manager@example.com",
+        )
+
+    @patch("missionlog.views.report_email_views.ProductionReportDispatcher.enqueue")
+    def test_user_without_account_email_can_supply_recipient(self, mock_enqueue):
+        mock_enqueue.return_value = True
+        self.user.email = ""
+        self.user.save(update_fields=["email"])
+        client, csrf_token = self._csrf_client(user=self.user)
+
+        response = client.post(
+            self.url,
+            data=json.dumps(self._request_payload(recipient_email="manual@example.com")),
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=csrf_token,
+        )
+
+        self.assertEqual(response.status_code, 202)
+
+    @patch("missionlog.views.report_email_views.ProductionReportDispatcher.enqueue")
+    def test_invalid_recipient_returns_400(self, mock_enqueue):
+        mock_enqueue.return_value = True
+        client, csrf_token = self._csrf_client(user=self.user)
+
+        response = client.post(
+            self.url,
+            data=json.dumps(self._request_payload(recipient_email="not-an-email")),
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=csrf_token,
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"]["code"], "invalid_recipient_email")
+
+    @patch("missionlog.views.report_email_views.ProductionReportDispatcher.enqueue")
+    def test_multiple_recipient_input_returns_400(self, mock_enqueue):
+        mock_enqueue.return_value = True
+        client, csrf_token = self._csrf_client(user=self.user)
+
+        response = client.post(
+            self.url,
+            data=json.dumps(
+                self._request_payload(recipient_email="one@example.com,two@example.com")
+            ),
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=csrf_token,
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"]["code"], "invalid_recipient_email")
+
+    @override_settings(
+        MISSIONLOG_REPORT_USER_RATE_PER_MINUTE=100,
+        MISSIONLOG_REPORT_IP_RATE_PER_MINUTE=100,
+        MISSIONLOG_REPORT_USER_RATE_PER_DAY=1,
+        MISSIONLOG_REPORT_IP_RATE_PER_DAY=100,
+    )
+    @patch("missionlog.views.report_email_views.ProductionReportDispatcher.enqueue")
+    def test_daily_user_quota_returns_429_without_new_audit(self, mock_enqueue):
+        mock_enqueue.return_value = True
+        cache.clear()
+        client, csrf_token = self._csrf_client(user=self.user)
+
+        first_response = client.post(
+            self.url,
+            data=json.dumps(self._request_payload(recipient_email="one@example.com")),
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=csrf_token,
+        )
+        second_response = client.post(
+            self.url,
+            data=json.dumps(self._request_payload(recipient_email="two@example.com")),
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=csrf_token,
+        )
+
+        self.assertEqual(first_response.status_code, 202)
+        self.assertEqual(second_response.status_code, 429)
+        self.assertEqual(
+            second_response.json()["error"]["code"], "daily_quota_exceeded"
+        )
+        self.assertEqual(ProductionReportEmailAudit.objects.count(), 1)
+
+    @patch("missionlog.views.report_email_views.ProductionReportDispatcher.enqueue")
+    def test_different_recipient_can_queue_for_same_period(self, mock_enqueue):
+        mock_enqueue.return_value = True
+        client, csrf_token = self._csrf_client(user=self.user)
+
+        first_response = client.post(
+            self.url,
+            data=json.dumps(self._request_payload(recipient_email="one@example.com")),
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=csrf_token,
+        )
+        second_response = client.post(
+            self.url,
+            data=json.dumps(self._request_payload(recipient_email="two@example.com")),
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=csrf_token,
+        )
+
+        self.assertEqual(first_response.status_code, 202)
+        self.assertEqual(second_response.status_code, 202)
+        self.assertEqual(ProductionReportEmailAudit.objects.count(), 2)
 
     @patch("missionlog.views.report_email_views.ProductionReportDispatcher.enqueue")
     def test_dedupes_same_period_but_allows_next_rolled_period(
@@ -444,7 +581,7 @@ class ProductionReportEmailAPITests(TestCase):
             mock_now.return_value = timezone.make_aware(datetime(2026, 8, 4, 12, 0, 0))
             first_response = client.post(
                 self.url,
-                data=json.dumps({"range": "month"}),
+                data=json.dumps(self._request_payload()),
                 content_type="application/json",
                 HTTP_X_CSRFTOKEN=csrf_token,
             )
@@ -455,7 +592,7 @@ class ProductionReportEmailAPITests(TestCase):
             mock_now.return_value = timezone.make_aware(datetime(2026, 8, 4, 12, 0, 0))
             second_same_period = client.post(
                 self.url,
-                data=json.dumps({"range": "month"}),
+                data=json.dumps(self._request_payload()),
                 content_type="application/json",
                 HTTP_X_CSRFTOKEN=csrf_token,
             )
@@ -466,9 +603,44 @@ class ProductionReportEmailAPITests(TestCase):
             mock_now.return_value = timezone.make_aware(datetime(2026, 8, 5, 12, 0, 0))
             next_rolled_period = client.post(
                 self.url,
-                data=json.dumps({"range": "month"}),
+                data=json.dumps(self._request_payload()),
                 content_type="application/json",
                 HTTP_X_CSRFTOKEN=csrf_token,
             )
         self.assertEqual(next_rolled_period.status_code, 202)
         self.assertEqual(ProductionReportEmailAudit.objects.count(), 2)
+
+
+class ProductionReportEmailWorkerTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="worker_user",
+            email="worker@example.com",
+            password="pass12345",
+        )
+
+    @patch("missionlog.services.production_report_worker.ProductionReportEmailService.send_report")
+    @patch("missionlog.services.production_report_worker.ProductionReportService.build_report")
+    def test_worker_uses_audited_recipient(self, mock_build_report, mock_send_report):
+        mock_build_report.return_value = {"report": "payload"}
+        mock_send_report.return_value = {"status": "success", "smtp_duration_ms": 4}
+        audit = ProductionReportEmailAudit.objects.create(
+            user=self.user,
+            recipient_email="manager@example.com",
+            report_range="month",
+            period_start=datetime(2026, 7, 5).date(),
+            period_end=datetime(2026, 8, 4).date(),
+        )
+
+        from missionlog.services.production_report_worker import (
+            process_production_report_email,
+        )
+
+        process_production_report_email(audit_id=audit.id)
+
+        mock_send_report.assert_called_once_with(
+            recipient_email="manager@example.com",
+            report_payload={"report": "payload"},
+        )
+        audit.refresh_from_db()
+        self.assertEqual(audit.status, ProductionReportEmailAudit.Status.SENT)

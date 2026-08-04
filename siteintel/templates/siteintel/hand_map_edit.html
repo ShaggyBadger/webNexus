@@ -185,10 +185,10 @@
 >
     <canvas id="hand-map-canvas"></canvas>
 
-    <button id="btn-toggle-controls" type="button" class="btn btn-tactical-secondary btn-sm mono controls-toggle-btn">[ HIDE_TOOLS ]</button>
+    <button id="btn-toggle-controls" type="button" class="btn btn-tactical-secondary btn-sm mono controls-toggle-btn">HIDE TOOLS</button>
 
     <div class="nav-hint mono">
-        ALT+DRAG or [PAN_MODE] to move
+                ALT+DRAG or PAN MODE to move
     </div>
 
     <div class="zoom-indicator mono" id="zoom-level">ZOOM: 100%</div>
@@ -209,11 +209,11 @@
 
         <div class="tool-panel">
             <div class="d-flex gap-1 mb-1">
-                <button class="btn btn-tactical-secondary btn-sm mono flex-grow-1" id="btn-undo" title="UNDO" style="font-size: 0.55rem; padding: 2px;">[ UNDO ]</button>
-                <button class="btn btn-tactical-secondary btn-sm mono flex-grow-1" id="btn-redo" title="REDO" style="font-size: 0.55rem; padding: 2px;">[ REDO ]</button>
+                <button class="btn btn-tactical-secondary btn-sm mono flex-grow-1" id="btn-undo" title="UNDO" style="font-size: 0.55rem; padding: 2px;">UNDO</button>
+                <button class="btn btn-tactical-secondary btn-sm mono flex-grow-1" id="btn-redo" title="REDO" style="font-size: 0.55rem; padding: 2px;">REDO</button>
             </div>
 
-            <button class="btn btn-tactical-amber btn-sm mono mb-2" id="btn-toggle-pan" style="font-size: 0.6rem;">[ PAN_MODE: OFF ]</button>
+            <button class="btn btn-tactical-amber btn-sm mono mb-2" id="btn-toggle-pan" style="font-size: 0.6rem;">PAN MODE: OFF</button>
             
             <div class="mb-2">
                 <div class="control-label">Stroke_Tools</div>
@@ -238,13 +238,13 @@
                 <input type="range" class="form-range" id="stroke-width" min="1" max="20" value="3">
             </div>
             <div class="advanced-tools flex-column gap-2">
-                 <button class="btn btn-tactical-secondary btn-sm mono" id="btn-add-text" style="font-size: 0.6rem;">[ ADD_LABEL ]</button>
-                 <button class="btn btn-tactical-secondary btn-sm mono" id="btn-add-callout" style="font-size: 0.6rem;">[ ADD_CALLOUT ]</button>
-                 <button class="btn btn-tactical-secondary btn-sm mono" id="btn-add-rect" style="font-size: 0.6rem;">[ ADD_BOX ]</button>
-                 <button class="btn btn-tactical-secondary btn-sm mono" id="btn-delete-selected" style="font-size: 0.6rem;">[ DELETE_OBJ ]</button>
+                 <button class="btn btn-tactical-secondary btn-sm mono" id="btn-add-text" style="font-size: 0.6rem;">ADD LABEL</button>
+                 <button class="btn btn-tactical-secondary btn-sm mono" id="btn-add-callout" style="font-size: 0.6rem;">ADD CALLOUT</button>
+                 <button class="btn btn-tactical-secondary btn-sm mono" id="btn-add-rect" style="font-size: 0.6rem;">ADD BOX</button>
+                 <button class="btn btn-tactical-secondary btn-sm mono" id="btn-delete-selected" style="font-size: 0.6rem;">DELETE OBJECT</button>
             </div>
-            <button class="btn btn-tactical-danger btn-sm mono mt-1" id="btn-clear-canvas" style="font-size: 0.6rem;">[ CLEAR_ALL ]</button>
-            <button class="btn btn-tactical-amber btn-sm mono" id="btn-reset-view" style="font-size: 0.6rem;">[ RESET_VIEW ]</button>
+             <button class="btn btn-tactical-danger btn-sm mono mt-1" id="btn-clear-canvas" style="font-size: 0.6rem;">CLEAR ALL</button>
+             <button class="btn btn-tactical-amber btn-sm mono" id="btn-reset-view" style="font-size: 0.6rem;">RESET VIEW</button>
         </div>
         
         <div class="tool-panel mono text-muted-custom" style="font-size: 0.5rem; opacity: 0.8;">
@@ -254,8 +254,8 @@
     </div>
 
     <div class="map-actions">
-        <button id="btn-save-map" class="btn btn-primary btn-tactical shadow">[ COMMIT_INTEL ]</button>
-        <a href="{% url 'siteintel:location_detail' location.id %}" class="btn btn-tactical-secondary btn-tactical shadow" style="background: rgba(18, 20, 23, 0.8);">[ ABORT ]</a>
+        <button id="btn-save-map" class="btn btn-primary btn-tactical shadow">SAVE STORE MAP</button>
+        <a href="{% url 'siteintel:location_detail' location.id %}" class="btn btn-tactical-secondary btn-tactical shadow" style="background: rgba(18, 20, 23, 0.8);">CANCEL</a>
     </div>
 </div>
 {% endblock %}

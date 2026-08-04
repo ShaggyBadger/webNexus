@@ -46,7 +46,7 @@
             <div class="mb-3">
                 <div class="d-flex flex-column flex-lg-row justify-content-between gap-3 align-items-stretch align-items-lg-start mb-2">
                     <div>
-                        <h1 class="mono h4 mb-2 text-primary">[ PRODUCTION CONSOLE ]</h1>
+                        <h1 class="mono h4 mb-2 text-primary">PRODUCTION OPS</h1>
                         <div class="d-flex flex-wrap gap-2">
                             <button
                                 class="btn btn-sm mono"
@@ -58,7 +58,7 @@
                                 :class="view === 'history' ? 'btn-primary' : 'btn-secondary'"
                                 @click="switchToHistory()"
                             >HISTORY</button>
-                            <a href="/" class="btn btn-secondary btn-sm mono">[ EXIT ]</a>
+                            <a href="/" class="btn btn-secondary btn-sm mono">EXIT</a>
                         </div>
                     </div>
 
@@ -77,13 +77,8 @@
                 </div>
             </div>
 
-            <div class="ml-card p-3 mb-3 mono">
-                <div class="small text-muted-custom">AGENT_CALLSIGN</div>
-                <div class="text-light" x-text="agentLabel"></div>
-            </div>
-
             <div class="ml-card p-3 mb-3 mono" x-show="loading" x-cloak>
-                <div class="text-primary">[ SYNCING_LATEST_MISSION_STATE... ]</div>
+                <div class="text-primary">SYNCING PRODUCTION STATE...</div>
             </div>
 
             <div class="ml-card p-3 mb-3 mono" x-show="errorMessage" x-cloak>
@@ -94,51 +89,18 @@
                 <div class="text-tactical-success" x-text="successMessage"></div>
             </div>
 
-            <div class="ml-card p-3 mb-3 mono" x-cloak>
-                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
-                    <div>
-                        <div class="text-primary">[ PRODUCTION REPORT EMAIL ]</div>
-                        <div class="small text-muted-custom">Send production summary to your account email.</div>
-                    </div>
-                    <button
-                        type="button"
-                        class="btn btn-warning text-dark mono"
-                        @click="showProductionReportForm = !showProductionReportForm"
-                    >EMAIL PRODUCTION REPORT</button>
-                </div>
-
-                <form class="row g-2 mt-2" x-show="showProductionReportForm" @submit.prevent="sendProductionReportEmail()">
-                    <div class="col-12 col-md-5">
-                        <label class="form-label small text-muted-custom">REPORTING_PERIOD</label>
-                        <select class="form-select ml-input mono" x-model="productionReportRange" required>
-                            <option value="week">Week</option>
-                            <option value="month">Month</option>
-                            <option value="quarter">Quarter</option>
-                            <option value="year">Year</option>
-                        </select>
-                    </div>
-                    <div class="col-12 col-md-3 d-grid align-self-end">
-                        <button
-                            type="submit"
-                            class="btn btn-primary mono"
-                            :disabled="productionReportSubmitting"
-                        >SEND REPORT</button>
-                    </div>
-                </form>
-            </div>
-
             <div x-show="view === 'active'" x-cloak>
                 <div class="ml-card p-3 mb-3 mono" x-show="activeMission">
                     <div class="d-flex justify-content-between align-items-center">
-                        <div class="text-primary">[ RESUME MISSION ]</div>
+                        <div class="text-primary">RESUME SHIFT</div>
                     </div>
                 </div>
 
                 <div class="ml-card p-3 mb-3 mono" x-show="!loading && !activeMission && !showEntryForm" x-cloak>
-                    <div class="text-primary mb-2">[ NO_ACTIVE_ENTRY ]</div>
+                    <div class="text-primary mb-2">NO ACTIVE SHIFT</div>
                     <div class="small text-muted-custom mb-3">No incomplete mission found. Start a new entry when ready.</div>
                     <div class="d-grid">
-                        <button type="button" class="btn btn-warning text-dark mono" @click="beginNewEntry()">[ BEGIN NEW ENTRY ]</button>
+                        <button type="button" class="btn btn-warning text-dark mono" @click="beginNewEntry()">BEGIN NEW SHIFT</button>
                     </div>
                 </div>
 
@@ -154,8 +116,16 @@
                             <input type="number" step="any" inputmode="decimal" class="form-control ml-input mono" x-model="form.total_gallons" :required="form.entry_type === 'basic'">
                         </div>
                         <div class="col-12 col-md-4" x-show="form.entry_type === 'basic'" x-cloak>
-                            <label class="form-label small text-muted-custom">HOURS_ON_DUTY_NOT_DRIVING</label>
-                            <input type="number" step="0.01" inputmode="decimal" class="form-control ml-input mono" x-model="form.hours_on_duty_not_driving" :required="form.entry_type === 'basic'">
+                            <label class="form-label small text-muted-custom">PRODUCTION_TIME</label>
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <input type="number" min="0" step="1" inputmode="numeric" class="form-control ml-input mono" x-model="form.production_hours" placeholder="HOURS" aria-label="Production hours">
+                                </div>
+                                <div class="col-6">
+                                    <input type="number" min="0" max="59" step="1" inputmode="numeric" class="form-control ml-input mono" x-model="form.production_minutes" placeholder="MINUTES" aria-label="Production minutes">
+                                </div>
+                            </div>
+                            <div class="small text-muted-custom mt-1">Time working while not driving. Example: 4 hours, 21 minutes.</div>
                         </div>
                     </div>
 
@@ -177,9 +147,9 @@
                         </div>
                         <div class="d-flex gap-2">
                             <button type="button" class="btn btn-sm btn-warning text-dark mono"
-                                    @click="executeUpgradeToAdvanced()">[ CONFIRM ]</button>
+                                    @click="executeUpgradeToAdvanced()">CONFIRM</button>
                             <button type="button" class="btn btn-sm btn-secondary mono"
-                                    @click="showUpgradeConfirm = false">[ CANCEL ]</button>
+                                    @click="showUpgradeConfirm = false">CANCEL</button>
                         </div>
                     </div>
 
@@ -199,7 +169,7 @@
                                         <div class="small text-tactical-danger" x-show="delivery.storeValid === false">STORE_NOT_FOUND</div>
                                     </div>
                                     <div class="col-12 col-md-3 d-grid">
-                                        <button type="button" class="btn btn-danger btn-sm mono" @click="removeDelivery(dIdx)">[ REMOVE ]</button>
+                                        <button type="button" class="btn btn-danger btn-sm mono" @click="removeDelivery(dIdx)">REMOVE</button>
                                     </div>
                                 </div>
 
@@ -223,13 +193,13 @@
                                             </div>
                                         </div>
                                     </template>
-                                    <button type="button" class="btn btn-secondary btn-sm mono" @click="addFuelEntry(dIdx)">[ + FUEL ]</button>
+                                    <button type="button" class="btn btn-secondary btn-sm mono" @click="addFuelEntry(dIdx)">+ FUEL</button>
                                 </div>
                             </div>
                         </template>
 
                         <div class="d-grid mt-2">
-                            <button type="button" class="btn btn-primary mono" @click="addDelivery()">[ + DELIVERY ]</button>
+                            <button type="button" class="btn btn-primary mono" @click="addDelivery()">+ DELIVERY</button>
                         </div>
                     </div>
 
@@ -239,8 +209,16 @@
                             <input type="number" step="0.01" inputmode="decimal" class="form-control ml-input mono" x-model="form.hours_on_duty">
                         </div>
                         <div class="col-12 col-md-6">
-                            <label class="form-label small text-muted-custom">HOURS_ON_DUTY_NOT_DRIVING</label>
-                            <input type="number" step="0.01" inputmode="decimal" class="form-control ml-input mono" x-model="form.hours_on_duty_not_driving">
+                            <label class="form-label small text-muted-custom">PRODUCTION_TIME</label>
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <input type="number" min="0" step="1" inputmode="numeric" class="form-control ml-input mono" x-model="form.production_hours" placeholder="HOURS" aria-label="Production hours">
+                                </div>
+                                <div class="col-6">
+                                    <input type="number" min="0" max="59" step="1" inputmode="numeric" class="form-control ml-input mono" x-model="form.production_minutes" placeholder="MINUTES" aria-label="Production minutes">
+                                </div>
+                            </div>
+                            <div class="small text-muted-custom mt-1">Time working while not driving.</div>
                         </div>
                         <div class="col-12 col-md-4">
                             <label class="form-label small text-muted-custom">START_MILES</label>
@@ -283,10 +261,10 @@
                     </div>
 
                     <div class="d-flex flex-wrap gap-2 mt-3">
-                        <button type="submit" class="btn btn-primary mono" :disabled="submitting">[ SAVE_PROGRESS ]</button>
-                        <button type="button" class="btn btn-warning text-dark mono" @click="toggleCompleteConfirm()" :disabled="submitting">[ COMPLETE_SHIFT ]</button>
-                        <button type="button" class="btn btn-danger mono" x-show="activeMission" x-cloak @click="cancelActiveMission()" :disabled="submitting">[ CANCEL_MISSION ]</button>
-                        <button type="button" class="btn btn-secondary mono" @click="refreshActiveMission()">[ REFRESH ]</button>
+                        <button type="submit" class="btn btn-primary mono" :disabled="submitting">SAVE PROGRESS</button>
+                        <button type="button" class="btn btn-warning text-dark mono" @click="toggleCompleteConfirm()" :disabled="submitting">COMPLETE SHIFT</button>
+                        <button type="button" class="btn btn-danger mono" x-show="activeMission" x-cloak @click="cancelActiveMission()" :disabled="submitting">CANCEL SHIFT</button>
+                        <button type="button" class="btn btn-secondary mono" @click="refreshActiveMission()">REFRESH</button>
                     </div>
 
                     <div x-show="showCompleteConfirm" class="mt-2 p-2 border border-warning" x-cloak>
@@ -294,24 +272,73 @@
                             Complete and archive this mission now?
                         </div>
                         <div class="d-flex gap-2">
-                            <button type="button" class="btn btn-sm btn-warning text-dark mono" @click="confirmCompleteMission()">[ CONFIRM_COMPLETE ]</button>
-                            <button type="button" class="btn btn-sm btn-secondary mono" @click="showCompleteConfirm = false">[ CANCEL ]</button>
+                            <button type="button" class="btn btn-sm btn-warning text-dark mono" @click="confirmCompleteMission()">CONFIRM COMPLETE</button>
+                            <button type="button" class="btn btn-sm btn-secondary mono" @click="showCompleteConfirm = false">CANCEL</button>
                         </div>
                     </div>
                 </form>
             </div>
 
             <div x-show="view === 'history'" x-cloak>
+                <div class="ml-card p-3 mb-3 mono">
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                        <div>
+                            <div class="text-primary">PRODUCTION REPORT EMAIL</div>
+                        <div class="small text-muted-custom">Send production summary to the address below.</div>
+                        </div>
+                        <button
+                            type="button"
+                            class="btn btn-warning text-dark mono"
+                            @click="showProductionReportForm = !showProductionReportForm"
+                        >EMAIL PRODUCTION REPORT</button>
+                    </div>
+
+                    <form class="row g-2 mt-2" x-show="showProductionReportForm" @submit.prevent="sendProductionReportEmail()">
+                    <div class="col-12 col-md-5">
+                        <label class="form-label small text-muted-custom">REPORTING_PERIOD</label>
+                            <select class="form-select ml-input mono" x-model="productionReportRange" required>
+                                <option value="week">Week</option>
+                                <option value="month">Month</option>
+                                <option value="quarter">Quarter</option>
+                            <option value="year">Year</option>
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-7">
+                        <label class="form-label small text-muted-custom" for="production-report-recipient">RECIPIENT EMAIL</label>
+                        <input
+                            id="production-report-recipient"
+                            type="email"
+                            class="form-control ml-input mono"
+                            x-model.trim="productionReportRecipientEmail"
+                            autocomplete="email"
+                            inputmode="email"
+                            placeholder="name@example.com"
+                            required
+                        >
+                        <div class="small text-muted-custom mt-1">
+                            Confirm the destination before sending. The report contains your production data.
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-3 d-grid align-self-end">
+                            <button
+                                type="submit"
+                                class="btn btn-primary mono"
+                                :disabled="productionReportSubmitting"
+                            >SEND REPORT</button>
+                        </div>
+                    </form>
+                </div>
+
                 <div class="ml-card p-3 mono">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <div class="text-primary">[ HISTORY ]</div>
-                        <button class="btn btn-secondary btn-sm mono" @click="loadMissionHistory()">[ REFRESH ]</button>
+                        <div class="text-primary">SHIFT HISTORY</div>
+                        <button class="btn btn-secondary btn-sm mono" @click="loadMissionHistory()">REFRESH</button>
                     </div>
                     <div class="table-responsive">
                         <table class="table table-sm table-dark table-bordered align-middle mb-0 mono" style="font-size: 0.72rem;">
                             <thead>
                                 <tr>
-                                    <th>MISSION</th>
+                                    <th>SHIFT</th>
                                     <th>DATE</th>
                                     <th>TIME</th>
                                     <th>STATUS</th>
@@ -354,5 +381,5 @@
 
 {% block extra_scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="{% static 'js/missionlog/missionlog_shell.js' %}"></script>
+<script src="{% static 'js/missionlog/missionlog_shell.js' %}?v=20260804-gph-sparkline-fix2"></script>
 {% endblock %}

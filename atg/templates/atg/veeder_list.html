@@ -45,13 +45,13 @@
 {% block content %}
 <div class="container py-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="mono text-primary m-0">[ ATG_DATA_ARCHIVE ]</h2>
+        <h2 class="mono text-primary m-0">GAUGE DATA ARCHIVE</h2>
         <div class="d-flex gap-2">
             <a href="{% url 'atg:review_queue' %}" class="btn btn-warning mono btn-sm text-dark">
-                [ REVIEW_QUEUE ]
+                REVIEW QUEUE
             </a>
             <a href="{% url 'atg:ticket_upload' %}" class="btn btn-success mono btn-sm">
-                [ + NEW_INGEST ]
+                + NEW DATA INTAKE
             </a>
         </div>
     </div>
@@ -84,7 +84,7 @@
         <div class="col-12 text-center py-5">
             <div class="text-muted-custom mono mb-3">NO DATA PACKAGES FOUND IN ARCHIVE</div>
             <a href="{% url 'atg:ticket_upload' %}" class="btn btn-outline-primary mono">
-                [ INITIALIZE_FIRST_INGEST ]
+                INITIALIZE FIRST DATA INTAKE
             </a>
         </div>
         {% endfor %}
@@ -95,7 +95,7 @@
         <ul class="pagination justify-content-center mono">
             {% if page_obj.has_previous %}
             <li class="page-item">
-                <a class="page-link bg-dark border-secondary text-primary" href="?page={{ page_obj.previous_page_number }}">[ PREV ]</a>
+                <a class="page-link bg-dark border-secondary text-primary" href="?page={{ page_obj.previous_page_number }}">PREV</a>
             </li>
             {% endif %}
             
@@ -105,7 +105,7 @@
 
             {% if page_obj.has_next %}
             <li class="page-item">
-                <a class="page-link bg-dark border-secondary text-primary" href="?page={{ page_obj.next_page_number }}">[ NEXT ]</a>
+                <a class="page-link bg-dark border-secondary text-primary" href="?page={{ page_obj.next_page_number }}">NEXT</a>
             </li>
             {% endif %}
         </ul>

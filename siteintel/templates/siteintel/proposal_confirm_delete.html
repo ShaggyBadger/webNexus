@@ -8,7 +8,7 @@
     <div class="row justify-content-center">
         <div class="col-12 col-md-8 col-lg-6">
             <div class="card bg-dark-custom border-danger p-4 tactical-card" style="border-left-color: #ff5555;">
-                <h2 class="mono text-danger mb-4">[ CONFIRM_RETRACTION ]</h2>
+                <h2 class="mono text-danger mb-4">CONFIRM PROPOSAL RETRACTION</h2>
                 
                 <p class="mono text-white mb-4">
                     YOU ARE ABOUT TO RETRACT THE PROPOSAL FOR:<br>
@@ -23,8 +23,8 @@
                 <form method="post" class="mt-4">
                     {% csrf_token %}
                     <div class="d-grid gap-2">
-                        <button type="submit" class="btn btn-danger mono">[ CONFIRM_DELETE ]</button>
-                        <a href="{% url 'siteintel:proposal_list' %}" class="btn btn-tactical-secondary mono">[ ABORT_ACTION ]</a>
+                        <button type="submit" class="btn btn-danger mono">CONFIRM DELETE</button>
+                        <a href="{% url 'siteintel:proposal_list' %}" class="btn btn-tactical-secondary mono">CANCEL</a>
                     </div>
                 </form>
             </div>

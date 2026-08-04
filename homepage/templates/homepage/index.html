@@ -44,7 +44,7 @@
 
   <div class="d-flex align-items-center mb-4">
     <div class="flex-grow-1 border-bottom border-secondary opacity-25"></div>
-    <div class="mx-3 mono text-muted-custom small command-grid-label">[ COMMAND_GRID ]</div>
+    <div class="mx-3 mono text-muted-custom small command-grid-label">COMMAND GRID</div>
     <div class="flex-grow-1 border-bottom border-secondary opacity-25"></div>
   </div>
 
@@ -54,7 +54,7 @@
     {% include 'homepage/components/app_fieldintel.html' %}
     {% include 'homepage/components/app_missionlog.html' %}
     {% include 'homepage/components/app_dms.html' %}
-    {% if user.is_authenticated %}
+    {% if user.is_staff %}
       {% include 'homepage/components/app_atg.html' %}
     {% endif %}
   </div>

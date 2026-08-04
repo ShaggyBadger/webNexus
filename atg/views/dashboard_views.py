@@ -1,9 +1,9 @@
 from django.views.generic import ListView, DetailView
-from django.contrib.auth.mixins import LoginRequiredMixin
 from ..models import VeederTicket
+from ..utils.permissions import StaffRequiredMixin
 
 
-class VeederListView(LoginRequiredMixin, ListView):
+class VeederListView(StaffRequiredMixin, ListView):
     """
     TACTICAL UI:
     Historical archive of all ingested Veeder tickets.
@@ -24,7 +24,7 @@ class VeederListView(LoginRequiredMixin, ListView):
         )
 
 
-class VeederDetailView(LoginRequiredMixin, DetailView):
+class VeederDetailView(StaffRequiredMixin, DetailView):
     """
     TACTICAL UI:
     High-fidelity view of a single ticket package.

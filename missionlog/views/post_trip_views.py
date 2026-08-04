@@ -22,6 +22,10 @@ from ..services.datetime_normalization import (
     MissionDateTimeValidationError,
     parse_user_datetime_to_utc,
 )
+from ..services.mission_duration import (
+    ProductionHoursValidationError,
+    parse_production_hours,
+)
 
 logger = logging.getLogger("webnexus")
 
@@ -95,15 +99,6 @@ def post_trip_create(request):
                 hours_on_duty = None
                 shift_end = None
 
-            hours_on_duty_not_driving_raw = data.get("hours_on_duty_not_driving")
-            if (
-                hours_on_duty_not_driving_raw is not None
-                and str(hours_on_duty_not_driving_raw).strip() != ""
-            ):
-                hours_on_duty_not_driving = float(hours_on_duty_not_driving_raw)
-            else:
-                hours_on_duty_not_driving = None
-
             entry_type = data.get("entry_type")
             if entry_type is None:
                 entry_type = "basic"
@@ -119,9 +114,11 @@ def post_trip_create(request):
 
             total_gallons = None
             if entry_type == "basic":
-                # Validate total_gallons
                 total_gallons_raw = data.get("total_gallons")
-                if total_gallons_raw is None or str(total_gallons_raw).strip() == "":
+                total_gallons_blank = (
+                    total_gallons_raw is None or str(total_gallons_raw).strip() == ""
+                )
+                if total_gallons_blank and is_completed:
                     return json_error_response(
                         request=request,
                         code="INVALID_BASIC_SUBMISSION",
@@ -135,40 +132,41 @@ def post_trip_create(request):
                         },
                         status_code=400,
                     )
-                try:
-                    total_gallons = Decimal(str(total_gallons_raw))
-                    if total_gallons < 0:
-                        raise ValueError()
-                except (ValueError, TypeError, InvalidOperation):
-                    return json_error_response(
-                        request=request,
-                        code="INVALID_BASIC_SUBMISSION",
-                        message="total_gallons is required when entry_type is 'basic'",
-                        details={
-                            "field_errors": {
-                                "total_gallons": [
-                                    "This field may not be null or negative in basic mode."
-                                ]
-                            }
-                        },
-                        status_code=400,
-                    )
+                if not total_gallons_blank:
+                    try:
+                        total_gallons = Decimal(str(total_gallons_raw))
+                        if total_gallons < 0:
+                            raise ValueError()
+                    except (ValueError, TypeError, InvalidOperation):
+                        return json_error_response(
+                            request=request,
+                            code="INVALID_BASIC_SUBMISSION",
+                            message="Total gallons must be a non-negative number.",
+                            details={
+                                "field_errors": {
+                                    "total_gallons": [
+                                        "Enter zero or a positive gallons value."
+                                    ]
+                                }
+                            },
+                            status_code=400,
+                        )
 
-                # Validate hours_on_duty_not_driving
-                if hours_on_duty_not_driving is None or hours_on_duty_not_driving < 0:
+            try:
+                hours_on_duty_not_driving = parse_production_hours(
+                    data,
+                    required=entry_type == "basic" and is_completed,
+                )
+            except ProductionHoursValidationError as exc:
+                if entry_type == "basic":
                     return json_error_response(
                         request=request,
                         code="INVALID_BASIC_SUBMISSION",
-                        message="hours_on_duty_not_driving is required when entry_type is 'basic'",
-                        details={
-                            "field_errors": {
-                                "hours_on_duty_not_driving": [
-                                    "This field may not be null or negative in basic mode."
-                                ]
-                            }
-                        },
+                        message=str(exc),
+                        details={"field_errors": {exc.field: [str(exc)]}},
                         status_code=400,
                     )
+                raise
 
             start_miles, end_miles = _resolve_mileage_bounds(data)
 
@@ -384,15 +382,6 @@ def post_trip_update(request, pk):
                 hours_on_duty = None
                 shift_end = None
 
-            hours_on_duty_not_driving_raw = data.get("hours_on_duty_not_driving")
-            if (
-                hours_on_duty_not_driving_raw is not None
-                and str(hours_on_duty_not_driving_raw).strip() != ""
-            ):
-                hours_on_duty_not_driving = float(hours_on_duty_not_driving_raw)
-            else:
-                hours_on_duty_not_driving = None
-
             existing_entry_type = mission.entry_type
             requested_entry_type = data.get("entry_type")
             if requested_entry_type is None:
@@ -429,9 +418,11 @@ def post_trip_update(request, pk):
 
             total_gallons = None
             if requested_entry_type == "basic":
-                # Validate total_gallons
                 total_gallons_raw = data.get("total_gallons")
-                if total_gallons_raw is None or str(total_gallons_raw).strip() == "":
+                total_gallons_blank = (
+                    total_gallons_raw is None or str(total_gallons_raw).strip() == ""
+                )
+                if total_gallons_blank and is_completed:
                     return json_error_response(
                         request=request,
                         code="INVALID_BASIC_SUBMISSION",
@@ -445,40 +436,41 @@ def post_trip_update(request, pk):
                         },
                         status_code=400,
                     )
-                try:
-                    total_gallons = Decimal(str(total_gallons_raw))
-                    if total_gallons < 0:
-                        raise ValueError()
-                except (ValueError, TypeError, InvalidOperation):
-                    return json_error_response(
-                        request=request,
-                        code="INVALID_BASIC_SUBMISSION",
-                        message="total_gallons is required when entry_type is 'basic'",
-                        details={
-                            "field_errors": {
-                                "total_gallons": [
-                                    "This field may not be null or negative in basic mode."
-                                ]
-                            }
-                        },
-                        status_code=400,
-                    )
+                if not total_gallons_blank:
+                    try:
+                        total_gallons = Decimal(str(total_gallons_raw))
+                        if total_gallons < 0:
+                            raise ValueError()
+                    except (ValueError, TypeError, InvalidOperation):
+                        return json_error_response(
+                            request=request,
+                            code="INVALID_BASIC_SUBMISSION",
+                            message="Total gallons must be a non-negative number.",
+                            details={
+                                "field_errors": {
+                                    "total_gallons": [
+                                        "Enter zero or a positive gallons value."
+                                    ]
+                                }
+                            },
+                            status_code=400,
+                        )
 
-                # Validate hours_on_duty_not_driving
-                if hours_on_duty_not_driving is None or hours_on_duty_not_driving < 0:
+            try:
+                hours_on_duty_not_driving = parse_production_hours(
+                    data,
+                    required=requested_entry_type == "basic" and is_completed,
+                )
+            except ProductionHoursValidationError as exc:
+                if requested_entry_type == "basic":
                     return json_error_response(
                         request=request,
                         code="INVALID_BASIC_SUBMISSION",
-                        message="hours_on_duty_not_driving is required when entry_type is 'basic'",
-                        details={
-                            "field_errors": {
-                                "hours_on_duty_not_driving": [
-                                    "This field may not be null or negative in basic mode."
-                                ]
-                            }
-                        },
+                        message=str(exc),
+                        details={"field_errors": {exc.field: [str(exc)]}},
                         status_code=400,
                     )
+                raise
 
             start_miles, end_miles = _resolve_mileage_bounds(data)
 

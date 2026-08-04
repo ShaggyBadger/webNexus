@@ -1,5 +1,13 @@
-from rest_framework import permissions
 from django.conf import settings
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from rest_framework import permissions
+
+
+class StaffRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
+    """Restrict a Django view to authenticated staff users."""
+
+    def test_func(self):
+        return bool(self.request.user and self.request.user.is_staff)
 
 
 class IsRemoteOCRClient(permissions.BasePermission):

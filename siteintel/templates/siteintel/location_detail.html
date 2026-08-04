@@ -138,8 +138,8 @@
         <div class="d-flex justify-content-between align-items-start">
             <div style="min-width: 0;">
                 <h2 class="mono text-primary mb-1 text-nowrap">
-                    <span class="d-none d-md-inline">[ SITE INTELLIGENCE ]</span>
-                    <span class="d-md-none" style="font-size: 1.1rem;">SITE INTELLIGENCE</span>
+                    <span class="d-none d-md-inline">STORE DIRECTORY</span>
+                    <span class="d-md-none" style="font-size: 1.1rem;">STORE DIRECTORY</span>
                 </h2>
                 <div class="mono text-muted-custom small text-truncate">
                     TARGET: {{ location.name }}
@@ -153,12 +153,12 @@
                     rel="noopener"
                     class="btn btn-tactical-olive btn-sm mono"
                 >
-                    <span class="d-none d-md-inline">[ PRINT STORE CHART PACK ]</span>
+                        <span class="d-none d-md-inline">PRINT STORE CHART PACK</span>
                     <span class="d-md-none">STORE CHART</span>
                 </a>
                 {% endif %}
                 <a href="{% url 'siteintel:dashboard' %}" class="btn btn-tactical-secondary btn-sm mono">
-                    <span class="d-none d-md-inline">[ RETURN TO HUB ]</span>
+                        <span class="d-none d-md-inline">RETURN TO STORE DIRECTORY</span>
                     <span class="d-md-none">HUB</span>
                 </a>
             </div>
@@ -172,12 +172,12 @@
             <div class="card bg-dark-custom border-secondary p-3 mb-4">
                 <div class="intel-section-header">
                     <div>
-                        <span class="d-none d-md-inline">[ SITE_CONFIGURATION ]</span>
+                        <span class="d-none d-md-inline">STORE CONFIGURATION</span>
                         <span class="d-md-none">SITE_CONFIG</span>
                     </div>
                     {% if user.is_authenticated %}
                     <a href="{% url 'siteintel:proposal_create' %}?location_id={{ location.id }}" class="btn btn-tactical-amber btn-sm mono py-1 px-2 text-dark text-nowrap intel-action-btn" style="font-size: 0.65rem;">
-                        <span class="d-none d-md-inline">[ PROPOSE_UPDATE ]</span>
+                        <span class="d-none d-md-inline">PROPOSE STORE UPDATE</span>
                         <span class="d-md-none">UPDATE</span>
                     </a>
                     {% endif %}
@@ -247,7 +247,7 @@
                                         </div>
                                     {% else %}
                                         <div class="mono text-tactical-danger" style="font-size: 0.65rem; background: rgba(255, 85, 85, 0.05); padding: 4px 8px; border: 1px dashed var(--status-red);">
-                                            <i class="fas fa-triangle-exclamation fa-fade me-1"></i> [ MISSING_AUTHORITATIVE_DATA ]
+                                            <i class="fas fa-triangle-exclamation fa-fade me-1"></i> MISSING AUTHORITATIVE DATA
                                         </div>
                                     {% endif %}
                                 </div>
@@ -259,10 +259,10 @@
                                     onclick="USTVerification.showConfirmModal({{ store.id }})"
                                     {% if not ust_permit %}disabled title="SYNC permit data first"{% endif %}
                                 >
-                                    [ CONFIRM_ON_SITE ]
+                                    CONFIRM ON SITE
                                 </button>
                                 <button class="btn btn-tactical-amber btn-sm mono py-1 px-3 text-nowrap intel-action-btn text-dark" style="font-size: 0.62rem; letter-spacing: 1px;" onclick="USTVerification.showUpdateModal({{ store.id }})">
-                                    [ SYNC_COMPLIANCE_DATA ]
+                                    SYNC COMPLIANCE DATA
                                 </button>
                             </div>
                         </div>
@@ -364,7 +364,7 @@
                     <div class="mt-3 border border-secondary p-3" x-show="selectedTank" x-cloak>
                             <div class="d-flex justify-content-between align-items-center mb-2 mono tank-profile-header">
                                 <div class="text-primary tank-profile-title">
-                                    <span class="d-none d-md-inline">[ TANK_PROFILE :: <span x-text="tankDisplayTitle"></span> ]</span>
+                                    <span class="d-none d-md-inline">TANK PROFILE: <span x-text="tankDisplayTitle"></span></span>
                                     <span class="d-md-none" x-text="tankDisplayTitle"></span>
                                 </div>
                                 <div class="d-flex align-items-center gap-2">
@@ -439,8 +439,8 @@
             <div class="mb-4">
                 <div class="intel-section-header">
                     <div class="d-flex align-items-center gap-2" style="min-width: 0;">
-                        <span class="d-none d-md-inline">[ FIELD INTELLIGENCE ]</span>
-                        <span class="d-md-none">FIELD INTEL</span>
+                        <span class="d-none d-md-inline">STORE SITE NOTES</span>
+                        <span class="d-md-none">STORE SITE NOTES</span>
                         
                         {% if user.is_authenticated %}
                         <!-- Tactical Layer Selector -->
@@ -455,7 +455,7 @@
                     
                     {% if user.is_authenticated %}
                     <a href="{% url 'siteintel:intel_update' location.id %}" class="btn btn-tactical-amber btn-sm mono py-0 flex-shrink-0 ms-2 text-dark intel-action-btn" style="font-size: 0.65rem;">
-                        <span class="d-none d-md-inline">[ UPDATE INTEL ]</span>
+                        <span class="d-none d-md-inline">UPDATE STORE NOTES</span>
                         <span class="d-md-none">UPDATE</span>
                     </a>
                     {% endif %}
@@ -489,12 +489,12 @@
             <div class="mb-4">
                 <div class="intel-section-header">
                     <div class="d-flex align-items-center gap-2">
-                        <span class="d-none d-md-inline">[ TACTICAL_SKETCH ]</span>
+                        <span class="d-none d-md-inline">STORE MAP SKETCH</span>
                         <span class="d-md-none">SKETCH</span>
                     </div>
                     {% if user.is_authenticated %}
                     <a href="{% url 'siteintel:hand_map_edit' location.id %}" class="btn btn-tactical-amber btn-sm mono py-0 text-dark intel-action-btn" style="font-size: 0.65rem;">
-                        <span class="d-none d-md-inline">{% if personal_hand_map %}[ EDIT_SKETCH ]{% else %}[ ADD_SKETCH ]{% endif %}</span>
+                        <span class="d-none d-md-inline">{% if personal_hand_map %}EDIT SKETCH{% else %}ADD SKETCH{% endif %}</span>
                         <span class="d-md-none">{% if personal_hand_map %}EDIT{% else %}ADD{% endif %}</span>
                     </a>
                     {% endif %}
@@ -513,7 +513,7 @@
                             <div class="mono text-muted-custom small mb-3">NO TACTICAL SKETCH AVAILABLE</div>
                             {% if user.is_authenticated %}
                             <a href="{% url 'siteintel:hand_map_edit' location.id %}" class="btn btn-tactical-amber btn-sm mono">
-                                [ CREATE_INITIAL_SKETCH ]
+                                CREATE INITIAL SKETCH
                             </a>
                             {% endif %}
                         </div>
@@ -552,7 +552,7 @@
             {% if user.is_authenticated %}
             <div class="d-grid mb-3">
                 <a href="{% url 'siteintel:map_edit' location.id %}" class="btn btn-tactical-amber mono btn-sm">
-                    <span class="d-none d-md-inline">[ EDIT TACTICAL MAP ]</span>
+                        <span class="d-none d-md-inline">EDIT STORE MAP</span>
                     <span class="d-md-none">EDIT TACTICAL MAP</span>
                 </a>
             </div>

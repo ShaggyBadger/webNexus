@@ -2,6 +2,8 @@ import json
 import logging
 from django.conf import settings
 from django.core.cache import cache
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
 from django.db import transaction
 from django.utils import timezone
 
@@ -18,8 +20,9 @@ logger = logging.getLogger("webnexus")
 
 _ALLOWED_RANGES = {"week", "month", "quarter", "year"}
 _FORBIDDEN_RECIPIENT_FIELDS = {"to", "recipient", "email"}
+_RECIPIENT_FIELD = "recipient_email"
 _QUEUED_MESSAGE = (
-    "Report generation started. Please allow a few minutes for it to finish, "
+    "Report queued for {recipient_email}. Please allow a few minutes for it to finish, "
     "then check your email and spam folder. If you find it in spam, mark it "
     "as not spam."
 )
@@ -48,23 +51,6 @@ def production_report_email_request(request):
             status_code=401,
         )
 
-    if _is_throttled(request=request):
-        return json_error_response(
-            request=request,
-            code="rate_limited",
-            message="Too many report requests. Please try again shortly.",
-            status_code=429,
-        )
-
-    user_email = (request.user.email or "").strip()
-    if not user_email:
-        return json_error_response(
-            request=request,
-            code="verified_email_required",
-            message="A verified account email is required before sending reports.",
-            status_code=422,
-        )
-
     try:
         payload = json.loads(request.body or "{}")
     except json.JSONDecodeError:
@@ -75,13 +61,38 @@ def production_report_email_request(request):
             status_code=400,
         )
 
+    if not isinstance(payload, dict):
+        return json_error_response(
+            request=request,
+            code="invalid_json",
+            message="Request body must be a JSON object.",
+            status_code=400,
+        )
+
     forbidden_supplied = _FORBIDDEN_RECIPIENT_FIELDS.intersection(set(payload.keys()))
     if forbidden_supplied:
         return json_error_response(
             request=request,
             code="recipient_not_allowed",
-            message="Recipient fields are not allowed; report is sent to your account email.",
+            message="Use the recipient_email field for the report destination.",
             details={"fields": sorted(list(forbidden_supplied))},
+            status_code=400,
+        )
+
+    recipient_email = _normalize_recipient_email(payload.get(_RECIPIENT_FIELD))
+    if not recipient_email:
+        return json_error_response(
+            request=request,
+            code="recipient_email_required",
+            message="A recipient email address is required.",
+            status_code=400,
+        )
+
+    if not _is_valid_recipient_email(recipient_email):
+        return json_error_response(
+            request=request,
+            code="invalid_recipient_email",
+            message="Enter one valid recipient email address.",
             status_code=400,
         )
 
@@ -92,6 +103,19 @@ def production_report_email_request(request):
             code="invalid_range",
             message="Invalid range. Allowed values: week, month, quarter, year.",
             status_code=400,
+        )
+
+    throttle_code = _get_throttle_code(request=request)
+    if throttle_code:
+        return json_error_response(
+            request=request,
+            code=throttle_code,
+            message=(
+                "Daily report-email quota exceeded."
+                if throttle_code == "daily_quota_exceeded"
+                else "Too many report requests. Please try again shortly."
+            ),
+            status_code=429,
         )
 
     user_tz = ProductionReportService.resolve_user_timezone(request.user)
@@ -106,11 +130,15 @@ def production_report_email_request(request):
         report_range=report_range,
         period_start=bounds.period_start_local.date(),
         period_end=bounds.period_end_local.date(),
+        recipient_email__iexact=recipient_email,
         status=ProductionReportEmailAudit.Status.QUEUED,
     ).first()
     if existing_queued:
         return json_success_response(
-            data={"message": _QUEUED_MESSAGE},
+            data={
+                "message": _QUEUED_MESSAGE.format(recipient_email=recipient_email),
+                "recipient_email": recipient_email,
+            },
             status_code=202,
         )
 
@@ -120,6 +148,7 @@ def production_report_email_request(request):
     with transaction.atomic():
         audit = ProductionReportEmailAudit.objects.create(
             user=request.user,
+            recipient_email=recipient_email,
             report_range=report_range,
             period_start=bounds.period_start_local.date(),
             period_end=bounds.period_end_local.date(),
@@ -153,25 +182,68 @@ def production_report_email_request(request):
         },
     )
     return json_success_response(
-        data={"message": _QUEUED_MESSAGE},
+        data={
+            "message": _QUEUED_MESSAGE.format(recipient_email=recipient_email),
+            "recipient_email": recipient_email,
+        },
         status_code=202,
     )
 
 
-def _is_throttled(*, request) -> bool:
+def _normalize_recipient_email(value) -> str:
+    if not isinstance(value, str):
+        return ""
+    return value.strip()
+
+
+def _is_valid_recipient_email(value: str) -> bool:
+    if any(character in value for character in ("\r", "\n", ",", ";")):
+        return False
+    try:
+        validate_email(value)
+    except ValidationError:
+        return False
+    return True
+
+
+def _get_throttle_code(*, request) -> str | None:
     now_utc = timezone.now()
     minute_key = now_utc.strftime("%Y%m%d%H%M")
+    day_key = now_utc.strftime("%Y%m%d")
     user_limit = int(getattr(settings, "MISSIONLOG_REPORT_USER_RATE_PER_MINUTE", 6))
     ip_limit = int(getattr(settings, "MISSIONLOG_REPORT_IP_RATE_PER_MINUTE", 12))
+    user_day_limit = int(
+        getattr(settings, "MISSIONLOG_REPORT_USER_RATE_PER_DAY", 10)
+    )
+    ip_day_limit = int(getattr(settings, "MISSIONLOG_REPORT_IP_RATE_PER_DAY", 30))
 
     user_cache_key = f"missionlog_report_email:user:{request.user.id}:{minute_key}"
     ip_cache_key = (
         f"missionlog_report_email:ip:{request.META.get('REMOTE_ADDR', '')}:{minute_key}"
     )
+    user_day_cache_key = f"missionlog_report_email:user:{request.user.id}:day:{day_key}"
+    ip_day_cache_key = (
+        f"missionlog_report_email:ip:{request.META.get('REMOTE_ADDR', '')}:day:{day_key}"
+    )
 
-    user_count = cache.get(user_cache_key, 0) + 1
-    ip_count = cache.get(ip_cache_key, 0) + 1
-    cache.set(user_cache_key, user_count, timeout=80)
-    cache.set(ip_cache_key, ip_count, timeout=80)
+    user_count = _increment_cache_counter(user_cache_key, timeout=80)
+    ip_count = _increment_cache_counter(ip_cache_key, timeout=80)
+    user_day_count = _increment_cache_counter(user_day_cache_key, timeout=172800)
+    ip_day_count = _increment_cache_counter(ip_day_cache_key, timeout=172800)
 
-    return user_count > user_limit or ip_count > ip_limit
+    if user_day_count > user_day_limit or ip_day_count > ip_day_limit:
+        return "daily_quota_exceeded"
+    if user_count > user_limit or ip_count > ip_limit:
+        return "rate_limited"
+    return None
+
+
+def _increment_cache_counter(key: str, *, timeout: int) -> int:
+    if cache.add(key, 0, timeout=timeout):
+        return cache.incr(key)
+
+    try:
+        return cache.incr(key)
+    except ValueError:
+        cache.set(key, 1, timeout=timeout)
+        return 1

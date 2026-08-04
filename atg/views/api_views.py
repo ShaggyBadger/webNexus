@@ -35,7 +35,7 @@ class StoreViewSet(viewsets.ReadOnlyModelViewSet):
 
     queryset = Store.objects.all().select_related("location")
     serializer_class = StoreSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAdminUser]
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -197,7 +197,7 @@ class VeederTicketViewSet(viewsets.ModelViewSet):
 
     queryset = VeederTicket.objects.all().prefetch_related("readings")
     serializer_class = VeederTicketSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAdminUser]
 
     def perform_create(self, serializer):
         """
@@ -272,7 +272,7 @@ class VeederReadingViewSet(viewsets.ModelViewSet):
 
     queryset = VeederReading.objects.all()
     serializer_class = VeederReadingSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAdminUser]
     filterset_fields = ["fuel_type", "ticket__store"]
 
 
@@ -283,7 +283,7 @@ class VeederStatsView(APIView):
     Optimized for JSON/CSV consumption in Machine Learning environments.
     """
 
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAdminUser]
 
     def get(self, request):
         readings = VeederReading.objects.select_related(
@@ -317,7 +317,7 @@ class StoreTankProfileAPIView(APIView):
     Returns a normalized tank profile for ingest UI prefill/locking.
     """
 
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAdminUser]
 
     @staticmethod
     def _capacity_from_estimation(estimation):
@@ -515,7 +515,7 @@ class StoreTankProfileAPIView(APIView):
 class VeederReadingsPreflightAPIView(APIView):
     """Run server-side reading checks and mint one-time preflight tokens."""
 
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAdminUser]
 
     def post(self, request):
         store_id = request.data.get("store")

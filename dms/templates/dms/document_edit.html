@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}DMS - Edit Document Metadata{% endblock %}
+{% block title %}Document Library - Edit Document Metadata{% endblock %}
 
 {% block extra_head %}
 <link rel="stylesheet" href="{% static 'css/dms/dashboard.css' %}">
@@ -12,7 +12,7 @@
     <div class="d-flex justify-content-between align-items-center mb-4 border-bottom border-secondary pb-3">
         <div>
             <h1 class="h3 font-family-monospace text-uppercase tracking-wider mb-0 text-white font-weight-bold">
-                <i class="fa-solid fa-pen-to-square me-2 text-tactical-warning"></i>DMS // Edit Metadata
+                <i class="fa-solid fa-pen-to-square me-2 text-tactical-warning"></i>DOCUMENT LIBRARY // EDIT METADATA
             </h1>
             <p class="text-muted-custom small mb-0 font-family-monospace mt-1">{{ document.title }} // {{ document.original_filename }}</p>
         </div>
@@ -23,7 +23,7 @@
 
     <div class="card card-tactical">
         <div class="card-header card-tactical-header">
-            <span>[ DOCUMENT METADATA EDITOR ]</span>
+            <span>DOCUMENT METADATA EDITOR</span>
         </div>
         <div class="card-body">
             {% if error_message %}

@@ -58,7 +58,7 @@
         <!-- Main Canvas -->
         <div class="col-12 col-lg-9">
             <div class="mb-3 d-flex justify-content-between align-items-center">
-                <h2 class="mono text-primary m-0">[ TACTICAL_MAP_EDITOR ]</h2>
+                <h2 class="mono text-primary m-0">STORE MAP EDITOR</h2>
                 <div class="mono text-muted-custom small">SITE: {{ location.name }}</div>
             </div>
             
@@ -82,10 +82,10 @@
         <div class="col-12 col-lg-3">
             <form method="post" class="card bg-dark-custom border-secondary p-4 shadow-lg sticky-top" style="top: 2rem;">
                 {% csrf_token %}
-                <h4 class="mono text-primary mb-4">[ COMMIT_PROPOSAL ]</h4>
+                <h4 class="mono text-primary mb-4">SUBMIT MAP PROPOSAL</h4>
                 
                 <div class="mb-4">
-                    <label class="mono text-primary small mb-2 d-block">[ SELECT_ACTIVE_COLOR ]</label>
+                    <label class="mono text-primary small mb-2 d-block">SELECT ACTIVE COLOR</label>
                     <div class="d-flex gap-2 mb-2">
                         <div class="color-swatch active" data-color="#ffb86c" style="background-color: #ffb86c;" title="Tactical Amber"></div>
                         <div class="color-swatch" data-color="#50fa7b" style="background-color: #50fa7b;" title="Operation Green"></div>
@@ -106,10 +106,10 @@
 
                 <div class="d-grid gap-2">
                     <button type="submit" class="btn btn-primary mono fw-bold">
-                        [ SUBMIT_MAP_PROPOSAL ]
+                        SUBMIT MAP PROPOSAL
                     </button>
                     <a href="{% url 'siteintel:location_detail' location.id %}" class="btn btn-tactical-secondary mono">
-                        [ ABORT_AND_RETURN ]
+                        CANCEL AND RETURN
                     </a>
                 </div>
             </form>

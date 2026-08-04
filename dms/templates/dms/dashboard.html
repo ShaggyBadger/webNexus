@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}DMS - Tactical Command Console{% endblock %}
+{% block title %}Document Library - Tactical Command Console{% endblock %}
 
 {% block extra_head %}
 <link rel="stylesheet" href="{% static 'css/dms/dashboard.css' %}">
@@ -19,9 +19,9 @@
     <div class="mb-4 border-bottom border-secondary pb-3">
         <div>
             <h1 class="h3 font-family-monospace text-uppercase tracking-wider mb-0 text-white font-weight-bold">
-                <i class="fa-solid fa-folder-open me-2 text-tactical-warning"></i>DMS // Document Management System
+                <i class="fa-solid fa-folder-open me-2 text-tactical-warning"></i>DOCUMENT LIBRARY
             </h1>
-            <p class="text-muted-custom small mb-0 font-family-monospace mt-1">OPERATIONAL DATABASE INTERFACE // V{{ APP_VERSION|default:"1.0.0" }}</p>
+            <p class="text-muted-custom small mb-0 font-family-monospace mt-1">UPLOAD & SEARCH PDFS, TANK CHARTS & REFERENCE FILES // V{{ APP_VERSION|default:"1.0.0" }}</p>
         </div>
         {% if user.is_staff or user.is_superuser %}
             <div class="mt-3">
@@ -46,7 +46,7 @@
 
     <div class="card card-tactical">
         <div class="card-header card-tactical-header d-flex justify-content-between align-items-center">
-            <span>[ SYSTEM RECORDS: {{ documents_count }} REGISTERED DOCUMENTS ]</span>
+                    <span>{{ documents_count }} REGISTERED DOCUMENTS</span>
             <span class="badge bg-secondary font-family-monospace">{{ request.GET.status|default:"ACTIVE" }}</span>
         </div>
         <div class="card-body p-0">

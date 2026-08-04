@@ -1,9 +1,10 @@
 from django.views.generic import TemplateView
-from django.contrib.auth.mixins import LoginRequiredMixin
 from missionlog.models import FuelType
 
+from ..utils.permissions import StaffRequiredMixin
 
-class VeederUploadView(LoginRequiredMixin, TemplateView):
+
+class VeederUploadView(StaffRequiredMixin, TemplateView):
     """
     TACTICAL UI:
     The primary mobile-optimized entry point for ATG data collection.

@@ -1,6 +1,6 @@
 <div class="card card-tactical mb-4" x-show="uploadOpen" x-cloak>
     <div class="card-header card-tactical-header d-flex justify-content-between align-items-center">
-        <span>[ PHASE A: RAW FILE INGESTION ]</span>
+        <span>PHASE A: UPLOAD DOCUMENT</span>
         <button type="button" class="btn-close btn-close-white btn-sm" @click="closeUploadPanel()" aria-label="Close"></button>
     </div>
     <div class="card-body">
@@ -29,7 +29,7 @@
         </div>
 
         <div class="mt-2 pt-3 border-top border-secondary" x-show="upload.phase === 'finalize'" x-cloak>
-            <h6 class="font-family-monospace text-tactical-warning mb-3">[ PHASE B: METADATA & LINKAGE FINALIZATION ]</h6>
+            <h6 class="font-family-monospace text-tactical-warning mb-3">PHASE B: DOCUMENT DETAILS & LINKING</h6>
             <form @submit.prevent="submitFinalize()">
                 <div class="row g-3">
                     <div class="col-md-6">
