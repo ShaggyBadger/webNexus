@@ -10,6 +10,7 @@ from rest_framework import viewsets, permissions, status, serializers
 from rest_framework.response import Response
 from missionlog.models import FuelType
 from tankgauge.logic.utils import canonicalize_fuel
+from tankgauge.logic.veeder_source_policy import VeederSourcePolicy
 from tankgauge.models import (
     Store,
     StoreTankMapping,
@@ -359,6 +360,11 @@ class StoreTankProfileAPIView(APIView):
 
         for mapping in mappings:
             if mapping.tank_index is None:
+                continue
+
+            # Official mappings describe defaults, not Veeder ticket identity.
+            # Never prefill a ticket with a tank that has no accepted reading.
+            if not VeederSourcePolicy.mapping_has_readings(mapping):
                 continue
 
             fuel_key = canonicalize_fuel(mapping.fuel_type)

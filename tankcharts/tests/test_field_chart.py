@@ -98,7 +98,7 @@ class TankFieldChartServiceTests(TestCase):
         )
         self.assertEqual(coverage_percent, 0.0)
 
-    def test_build_store_returns_combined_rows_and_sorted_tanks(self):
+    def test_build_store_omits_unobserved_tanks_for_active_store(self):
         tank_two = StoreTankMapping.objects.create(
             store=self.store,
             tank_type=self.tank_type,
@@ -121,14 +121,15 @@ class TankFieldChartServiceTests(TestCase):
         store_chart = service.build_store(store_num=self.store.store_num)
 
         self.assertEqual(store_chart.store_num, self.store.store_num)
-        self.assertEqual([tank.tank_index for tank in store_chart.tanks], [1, 2])
+        self.assertEqual([tank.tank_index for tank in store_chart.tanks], [1])
         self.assertGreater(len(store_chart.combined_table_rows), 0)
         first_row = store_chart.combined_table_rows[0]
         self.assertIn("tank_1_gallons", first_row)
-        self.assertIn("tank_2_gallons", first_row)
+        self.assertNotIn("tank_2_gallons", first_row)
+        self.assertEqual(store_chart.omitted_tanks[0].reason_code, "no_veeder_readings")
 
         chunks = service.chunk_store_tanks(store_chart, page_size=4)
-        self.assertEqual(chunks, [[1, 2]])
+        self.assertEqual(chunks, [[1]])
 
     def test_build_store_omits_null_tank_index(self):
         tank_none = StoreTankMapping.objects.create(

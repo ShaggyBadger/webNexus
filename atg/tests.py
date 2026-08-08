@@ -15,6 +15,7 @@ from tankgauge.models import Store, StoreTankMapping, TankEstimation, TankType
 from missionlog.models import FuelType
 from .models import VeederTicket, VeederReading, VeederReadingPreflightToken
 from .services import VeederUploadService
+from .services.auto_mapper import AutoMapperService
 
 from PIL import Image
 
@@ -150,6 +151,36 @@ class VeederUploadServiceTestCase(TestCase):
         self.assertTrue(
             TankType.objects.filter(name=mapping.tank_type.name).exists(),
         )
+
+    def test_auto_mapping_preserves_single_reading_identity_when_geometry_pending(self):
+        ticket = VeederTicket.objects.create(store=self.store, uploaded_by=self.user)
+        VeederReading.objects.create(
+            ticket=ticket,
+            tank_index=8,
+            fuel_type=self.fuel_type,
+            volume=8000,
+            ullage=4000,
+            height=40.0,
+        )
+
+        with patch(
+            "atg.services.auto_mapper.EstimationService.run_virtual_estimation",
+            return_value=None,
+        ):
+            created = AutoMapperService.ensure_mapping(
+                self.store,
+                self.fuel_type.name,
+                8,
+            )
+
+        self.assertTrue(created)
+        mapping = StoreTankMapping.objects.get(
+            store=self.store,
+            tank_index=8,
+            fuel_type="regular",
+        )
+        self.assertEqual(mapping.tank_type.capacity, 12000)
+        self.assertIsNone(mapping.tank_type.max_depth)
 
     def test_process_ticket_submission_rejects_duplicate_tank_indices(self):
         readings_data = [
@@ -479,13 +510,7 @@ class VeederAPITestCase(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         payload = response.json()
-        self.assertEqual(len(payload["known_tanks"]), 1)
-        self.assertEqual(payload["known_tanks"][0]["tank_index"], 1)
-        self.assertFalse(payload["known_tanks"][0]["locked_identity"])
-        self.assertEqual(
-            payload["known_tanks"][0]["verification_status"],
-            "unverified_mapping",
-        )
+        self.assertEqual(payload["known_tanks"], [])
 
     def test_store_tank_profile_prefers_veeder_estimation_capacity(self):
         tank_type = TankType.objects.create(name="8k96", capacity=8000, max_depth=96)
@@ -506,6 +531,15 @@ class VeederAPITestCase(APITestCase):
             algorithm_version="v1",
             diagnostics={"capacity": 9000.0},
             is_active=True,
+        )
+        ticket = VeederTicket.objects.create(store=self.store, uploaded_by=self.user)
+        VeederReading.objects.create(
+            ticket=ticket,
+            tank_index=1,
+            fuel_type=self.fuel_type,
+            volume=6000,
+            ullage=3000,
+            height=50.0,
         )
 
         url = reverse(

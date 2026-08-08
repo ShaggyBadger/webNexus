@@ -148,12 +148,13 @@ class AutoMapperService:
         )
 
         if not estimation:
-            logger.warning(
-                "AUTO_MAPPER: Estimation failed for Store %s Tank %s. Mapping skipped.",
+            logger.info(
+                "AUTO_MAPPER: Creating Veeder-backed identity without geometry "
+                "for Store %s Tank %s.",
                 store.store_num,
                 tank_index,
+                extra={"reason_code": "veeder_geometry_pending"},
             )
-            return False
 
         with transaction.atomic():
             existing_mapping = StoreTankMapping.objects.filter(
@@ -165,12 +166,17 @@ class AutoMapperService:
                 return False
 
             tank_type_name = f"AUTO_{store.store_num}_T{tank_index}_{fuel_key.upper()}"
+            estimation_note = (
+                f"Auto-mapped based on estimation {estimation.id}"
+                if estimation
+                else "Auto-mapped from accepted Veeder reading; geometry pending"
+            )
             new_tank_type, _ = TankType.objects.get_or_create(
                 name=tank_type_name,
                 defaults={
                     "capacity": int(total_capacity),
-                    "max_depth": int(estimation.radius * 2),
-                    "misc_info": f"Auto-mapped based on estimation {estimation.id}",
+                    "max_depth": int(estimation.radius * 2) if estimation else None,
+                    "misc_info": estimation_note,
                 },
             )
 

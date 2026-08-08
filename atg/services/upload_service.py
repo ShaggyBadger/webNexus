@@ -6,6 +6,7 @@ from django.db import transaction
 from ..models import VeederTicket, VeederReading
 from .auto_mapper import AutoMapperService
 from .reading_preflight import ReadingPreflightService
+from tankgauge.logic.veeder_source_policy import VeederSourcePolicy
 from .reading_quality import validate_readings_for_store
 
 logger = logging.getLogger("webnexus")
@@ -67,6 +68,7 @@ class VeederUploadService:
 
         try:
             with transaction.atomic():
+                store_was_veeder_active = VeederSourcePolicy.store_has_readings(store)
                 # 1. Create the Ticket (The Evidence)
                 ticket = VeederTicket.objects.create(
                     store=store,
@@ -141,6 +143,16 @@ class VeederUploadService:
                         )
 
                     VeederReading.objects.bulk_create(readings_to_create)
+
+                    if not store_was_veeder_active:
+                        logger.info(
+                            "VEEDER_SOURCE_ACTIVATED",
+                            extra={
+                                "store_num": store.store_num,
+                                "reading_count": len(readings_to_create),
+                                "reason_code": "first_accepted_veeder_ticket",
+                            },
+                        )
 
                     # 3. Auto-Map Tanks (after successful commit)
                     mapping_targets = {

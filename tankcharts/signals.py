@@ -5,7 +5,12 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 
 from tankcharts.services.chart_service import TankChartService
-from tankgauge.models import Store, TankEstimation, VirtualTankEstimation
+from tankgauge.models import (
+    Store,
+    StoreTankMapping,
+    TankEstimation,
+    VirtualTankEstimation,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -112,6 +117,20 @@ def auto_regenerate_on_virtual_estimation(
             extra={
                 "store_id": instance.store_id,
                 "reason_code": "inactive_virtual_tank_estimation",
+                "estimation_id": instance.id,
+            },
+        )
+        return
+    if not StoreTankMapping.objects.filter(
+        store=instance.store,
+        fuel_type__iexact=instance.fuel_type,
+        tank_index=instance.tank_index,
+    ).exists():
+        logger.info(
+            "VEEDER_TICKET_AUTO_REGENERATE_SKIPPED",
+            extra={
+                "store_id": instance.store_id,
+                "reason_code": "virtual_estimation_mapping_pending",
                 "estimation_id": instance.id,
             },
         )

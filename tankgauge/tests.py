@@ -271,7 +271,7 @@ class EstimationAndApiTests(APITestCase):
         self.assertEqual(response.data["data"]["status"], "SUCCESS")
         self.assertEqual(response.data["data"]["preferred_mode"], "MATHEMATICAL")
         self.assertIsNotNone(response.data["data"]["profiles"]["MATHEMATICAL"])
-        self.assertIsNotNone(response.data["data"]["profiles"]["OFFICIAL"])
+        self.assertIsNone(response.data["data"]["profiles"]["OFFICIAL"])
         self.assertEqual(response.data["data"]["display_mode"], "AUTO")
         self.assertIn("active_profile", response.data["data"])
         self.assertNotIn("confidence", response.data["data"])
@@ -291,8 +291,10 @@ class EstimationAndApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["status"], "success")
         self.assertEqual(response.data["data"]["status"], "SUCCESS")
-        self.assertEqual(response.data["data"]["mode"], "OFFICIAL")
-        self.assertEqual(response.data["data"]["active_profile"]["mode"], "OFFICIAL")
+        self.assertEqual(response.data["data"]["mode"], "MATHEMATICAL")
+        self.assertEqual(
+            response.data["data"]["active_profile"]["mode"], "MATHEMATICAL"
+        )
 
     def test_api_calc_success_without_auth(self):
         url = reverse("tankgauge:calculate_tank_api")
@@ -499,20 +501,18 @@ class SyncCommandTests(TestCase):
             )
             VeederReading.objects.create(
                 ticket=ticket,
-                tank_index=2,
+                tank_index=1,
                 fuel_type=self.fuel_type,
                 height=11.0 + (i * 3.0),
                 volume=1100 + (i * 120),
                 ullage=8900,
             )
 
-    def test_sync_tank_estimates_creates_virtual_estimations(self):
+    def test_sync_tank_estimates_creates_mapped_estimations(self):
         call_command("sync_tank_estimates", "--store", str(self.store.store_num))
         self.assertTrue(
-            VirtualTankEstimation.objects.filter(
-                store=self.store,
-                fuel_type="diesel",
-                tank_index=2,
+            TankEstimation.objects.filter(
+                tank_mapping=self.mapped,
                 is_active=True,
             ).exists()
         )
@@ -656,6 +656,33 @@ class StoreChartApiTests(TestCase):
         self.assertNotIn("confidence", first_tank["limits"])
         for mode in first_tank["available_modes"]:
             self.assertNotIn("confidence", mode)
+
+    def test_store_tanks_api_hides_official_only_mapping_after_veeder_activation(self):
+        ticket = VeederTicket.objects.create(store=self.store)
+        VeederReading.objects.create(
+            ticket=ticket,
+            tank_index=2,
+            fuel_type=self.fuel_type,
+            volume=7000,
+            ullage=3000,
+            height=50.0,
+        )
+        StoreTankMapping.objects.create(
+            store=self.store,
+            tank_type=self.tank_type,
+            fuel_type="regular",
+            tank_index=1,
+        )
+
+        response = self.client.get(
+            reverse(
+                "tankgauge:store_tanks_api", kwargs={"store_num": self.store.store_num}
+            )
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        tanks = response.json()["data"]["tanks"]
+        self.assertEqual([tank["tank_index"] for tank in tanks], [2])
 
     def test_store_tanks_api_not_found_uses_error_contract(self):
         response = self.client.get(
@@ -822,9 +849,10 @@ class StoreChartApiTests(TestCase):
         self.assertEqual(payload["status"], "success")
         data = payload["data"]
         self.assertEqual(data["tank"]["id"], self.mapping.id)
-        self.assertGreater(len(data["series"]["official_chart"]), 0)
+        self.assertEqual(len(data["series"]["official_chart"]), 0)
         self.assertGreater(len(data["series"]["generated_curve"]), 0)
         self.assertGreater(len(data["series"]["scatter_points"]), 0)
+        self.assertEqual(data["tank"]["source_policy"], "VEEDER_ONLY")
 
     def test_api_calc_success_envelope_shape(self):
         url = reverse("tankgauge:calculate_tank_api")
@@ -977,6 +1005,28 @@ class ClosestStoreApiTests(TestCase):
         payload = response.json()
         store_result = payload["data"]["results"][0]
         self.assertIs(store_result["vapor_manifold"], True)
+        self.assertIs(store_result["veeder_readings"], False)
+
+    def test_closest_store_api_reports_veeder_readings(self):
+        fuel_type = FuelType.objects.create(name="Regular")
+        ticket = VeederTicket.objects.create(store=self.store)
+        VeederReading.objects.create(
+            ticket=ticket,
+            tank_index=1,
+            fuel_type=fuel_type,
+            volume=5000,
+            ullage=5000,
+            height=48.0,
+        )
+
+        response = self.client.get(
+            reverse("tankgauge:closest_store_api"),
+            {"lat": "40.001", "lon": "-89.001"},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        store_result = response.json()["data"]["results"][0]
+        self.assertIs(store_result["veeder_readings"], True)
 
     def test_closest_store_api_includes_vapor_manifold_false(self):
         self._attach_location("No")

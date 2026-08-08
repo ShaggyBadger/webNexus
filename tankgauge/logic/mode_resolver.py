@@ -6,6 +6,7 @@ from django.conf import settings
 from tankgauge.models import TankChart, TankEstimation
 
 from .estimation_service import EstimationService
+from .veeder_source_policy import VeederSourcePolicy
 from .types import CalculationMode, ConfidenceLevel, ModeAvailability, TankLimits
 
 OFFICIAL_UNAVAILABLE_REASON = (
@@ -207,6 +208,17 @@ class ModeResolver:
         )
 
     def _resolve_official_mode(self, mapping) -> tuple[ModeAvailability, dict]:
+        if VeederSourcePolicy.store_has_readings(mapping.store):
+            return (
+                ModeAvailability(
+                    mode=CalculationMode.OFFICIAL,
+                    available=False,
+                    reason="Veeder-Root data is active for this store.",
+                    confidence=ConfidenceLevel.NONE,
+                ),
+                {},
+            )
+
         official_exists = False
         source_name = "OFFICIAL_CHART"
 

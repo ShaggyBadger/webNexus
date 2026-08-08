@@ -6,6 +6,8 @@ from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.views.generic import CreateView, ListView, UpdateView, DeleteView
 from ..models import StoreUpdate, TankUpdate, LocationType, Location
 from tankgauge.models import Store, StoreTankMapping
+from tankgauge.logic.tank_limits import resolve_tank_limits
+from tankgauge.logic.veeder_source_policy import VeederSourcePolicy
 from ..forms import StoreUpdateForm, TankUpdateForm, TankUpdateFormSet
 
 # Configure Tactical Logger for Site Intelligence
@@ -56,10 +58,13 @@ class StoreUpdateFormsetMixin:
                     store = Store.objects.filter(store_num=store_num).first()
 
                 if store:
-                    mappings = StoreTankMapping.objects.filter(store=store).order_by(
-                        "tank_index"
+                    mappings = VeederSourcePolicy.filter_operational_mappings(
+                        StoreTankMapping.objects.filter(store=store).order_by(
+                            "tank_index"
+                        )
                     )
                     for mapping in mappings:
+                        limits = resolve_tank_limits(mapping)
                         initial_tanks.append(
                             {
                                 "tank_index": mapping.tank_index,
@@ -68,11 +73,7 @@ class StoreUpdateFormsetMixin:
                                     if mapping.fuel_type
                                     else ""
                                 ),
-                                "reported_capacity": (
-                                    mapping.tank_type.capacity
-                                    if mapping.tank_type
-                                    else 0
-                                ),
+                                "reported_capacity": limits["capacity_gallons"] or 0,
                                 "tank_type": mapping.tank_type,
                             }
                         )

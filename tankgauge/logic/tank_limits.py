@@ -52,6 +52,24 @@ def _veeder_limits(mapping) -> dict:
         is_active=True,
     ).first()
     if not estimation or not estimation.radius or not estimation.length:
+        from atg.models import VeederReading
+
+        reading_qs = VeederReading.objects.filter(
+            ticket__store_id=mapping.store_id,
+            tank_index=mapping.tank_index,
+        )
+        if mapping.fuel_type:
+            reading_qs = reading_qs.filter(
+                fuel_type__name__iexact=mapping.fuel_type,
+            )
+        latest_reading = reading_qs.order_by("-ticket__uploaded_at", "-id").first()
+        if latest_reading and latest_reading.volume is not None:
+            implied_capacity = latest_reading.volume + (latest_reading.ullage or 0)
+            return {
+                "capacity_gallons": int(implied_capacity),
+                "max_depth_inches": None,
+                "source": "VEEDER",
+            }
         return {
             "capacity_gallons": None,
             "max_depth_inches": None,
@@ -73,10 +91,17 @@ def resolve_tank_limits(mapping) -> dict:
     """
     Resolve max capacity/depth for a mapped tank.
 
-    Priority is controlled by ``TANKGAUGE_DEFAULT_TANK_LIMITS_SOURCE_PRIORITY``:
+    For stores with accepted Veeder readings, only Veeder-derived limits or
+    accepted reading capacity are returned. Otherwise priority is controlled by
+    ``TANKGAUGE_DEFAULT_TANK_LIMITS_SOURCE_PRIORITY``:
     - OFFICIAL_FIRST: use TankType values first, fallback to Veeder-derived estimate.
     - VEEDER_FIRST: use Veeder-derived estimate first, fallback to TankType values.
     """
+    from .veeder_source_policy import VeederSourcePolicy
+
+    if VeederSourcePolicy.store_has_readings(mapping.store):
+        return _veeder_limits(mapping)
+
     official = _official_limits(mapping)
     veeder = _veeder_limits(mapping)
 

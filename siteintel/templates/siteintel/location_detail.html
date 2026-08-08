@@ -337,8 +337,8 @@
                                 data-tank-index="{{ tank.tank_index|default_if_none:'' }}"
                                 data-fuel-type="{{ tank.fuel_type|upper|escapejs }}"
                                 data-store-num="{{ store.store_num|default_if_none:'' }}"
-                                data-capacity="{{ tank.tank_type.capacity|default_if_none:'' }}"
-                                data-max-depth="{{ tank.tank_type.max_depth|default_if_none:'' }}"
+                                data-capacity="{% if not store_veeder_active %}{{ tank.tank_type.capacity|default_if_none:'' }}{% endif %}"
+                                data-max-depth="{% if not store_veeder_active %}{{ tank.tank_type.max_depth|default_if_none:'' }}{% endif %}"
                                 data-model="{{ tank.tank_type.name|default:'UNKNOWN'|escapejs }}"
                                 :class="{ 'active': selectedTank && selectedTank.id === {{ tank.id }} }"
                                 @click="selectTank({
@@ -346,8 +346,8 @@
                                     tankIndex: {{ tank.tank_index|default_if_none:'null' }},
                                     storeNum: {{ store.store_num|default_if_none:'null' }},
                                     fuelType: '{{ tank.fuel_type|upper|escapejs }}',
-                                    capacity: {{ tank.tank_type.capacity|default_if_none:'null' }},
-                                    maxDepth: {{ tank.tank_type.max_depth|default_if_none:'null' }},
+                                    capacity: {% if store_veeder_active %}null{% else %}{{ tank.tank_type.capacity|default_if_none:'null' }}{% endif %},
+                                    maxDepth: {% if store_veeder_active %}null{% else %}{{ tank.tank_type.max_depth|default_if_none:'null' }}{% endif %},
                                     model: '{{ tank.tank_type.name|default:'UNKNOWN'|escapejs }}'
                                 })"
                             >
@@ -355,7 +355,7 @@
                                     <span class="text-primary fw-bold">T{{ tank.tank_index }}</span>
                                     <span class="ms-2">{{ tank.fuel_type|upper }}</span>
                                 </div>
-                                <span class="tank-badge mono">{{ tank.tank_type.capacity|default:'--' }}G</span>
+                                <span class="tank-badge mono">{% if store_veeder_active %}VEEDER{% else %}{{ tank.tank_type.capacity|default:'--' }}G{% endif %}</span>
                             </button>
                         </div>
                         {% endfor %}

@@ -9,6 +9,7 @@ from .mode_resolver import (
     OFFICIAL_UNAVAILABLE_REASON,
     ModeResolver,
 )
+from .veeder_source_policy import VeederSourcePolicy
 from .types import CalculationMode, ConfidenceLevel, ModeAvailability
 
 # Tactical Logger
@@ -412,6 +413,8 @@ def determine_operating_mode(tank_mapping, force_source=None):
 
     def _get_official():
         """Returns (mode, meta) if any official/generated chart is available, else None."""
+        if VeederSourcePolicy.store_has_readings(tank_mapping.store):
+            return None
         if TankChart.objects.filter(
             tank_type=tank_mapping.tank_type, is_official=True
         ).exists():
@@ -547,6 +550,7 @@ def determine_virtual_operating_mode(
     # 4. Fallback to existing generated chart
     if (
         force_source in (None, MODE_OFFICIAL)
+        and not VeederSourcePolicy.store_has_readings(store)
         and _generated_chart_fallback_enabled()
         and TankChart.objects.filter(
             store=store, tank_index=tank_index, is_official=False

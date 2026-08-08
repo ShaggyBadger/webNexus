@@ -156,10 +156,14 @@
         const series = this.tankProfileData && this.tankProfileData.series
           ? this.tankProfileData.series
           : {};
+        const tank = this.tankProfileData && this.tankProfileData.tank
+          ? this.tankProfileData.tank
+          : {};
         const official = series.official_chart || [];
+        const operationalOfficial = tank.source_policy === "VEEDER_ONLY" ? [] : official;
         const generated = series.generated_curve || [];
         const scatter = series.scatter_points || [];
-        const allPoints = official.concat(generated).concat(scatter);
+        const allPoints = operationalOfficial.concat(generated).concat(scatter);
 
         const maxDepthFromData = allPoints.length
           ? Math.max.apply(
@@ -178,21 +182,27 @@
             )
           : null;
 
-        const maxDepth =
-          this.selectedTank && this.selectedTank.maxDepth != null
-            ? this.selectedTank.maxDepth
-            : maxDepthFromData;
-        const maxGallons =
-          this.selectedTank && this.selectedTank.capacity != null
-            ? this.selectedTank.capacity
-            : maxGallonsFromData;
+        const maxDepth = tank.source_policy === "VEEDER_ONLY"
+          ? tank.max_depth
+          : (tank.max_depth != null
+            ? tank.max_depth
+            : (this.selectedTank && this.selectedTank.maxDepth != null
+              ? this.selectedTank.maxDepth
+              : maxDepthFromData));
+        const maxGallons = tank.source_policy === "VEEDER_ONLY"
+          ? tank.capacity
+          : (tank.capacity != null
+            ? tank.capacity
+            : (this.selectedTank && this.selectedTank.capacity != null
+              ? this.selectedTank.capacity
+              : maxGallonsFromData));
 
         return {
           maxDepth: maxDepth,
           maxGallons: maxGallons,
           ninetyPercentGallons: maxGallons != null ? maxGallons * 0.9 : null,
           veederEntries: scatter.length,
-          officialPoints: official.length,
+          officialPoints: operationalOfficial.length,
           generatedPoints: generated.length,
         };
       },
@@ -336,6 +346,9 @@
         const series = this.tankProfileData && this.tankProfileData.series
           ? this.tankProfileData.series
           : {};
+        const tank = this.tankProfileData && this.tankProfileData.tank
+          ? this.tankProfileData.tank
+          : {};
         const official = series.official_chart || [];
         const generated = series.generated_curve || [];
         const scatter = series.scatter_points || [];
@@ -343,7 +356,7 @@
         this.destroyTankChart();
 
         const datasets = [];
-        if (official.length) {
+        if (official.length && tank.source_policy !== "VEEDER_ONLY") {
           datasets.push({
             label: "Official Tank Chart",
             data: official.map(function (point) {
@@ -365,10 +378,9 @@
             data: generated.map(function (point) {
               return { x: point.inches, y: point.gallons };
             }),
-            borderColor: "#ffb86c",
+            borderColor: "#8da35d",
             backgroundColor: "transparent",
             borderWidth: 2,
-            borderDash: [8, 4],
             fill: false,
             showLine: true,
             pointRadius: 0,

@@ -61,6 +61,7 @@ class PDFRendererTests(TestCase):
         self.assertGreaterEqual(pdf_bytes.count(b"/Type /Page"), 2)
 
     def test_render_store_returns_multi_page_pdf(self):
+        FuelType.objects.create(name="Regular", abbreviation="RUL")
         fuel_type = FuelType.objects.create(name="Diesel", abbreviation="DSL")
         store = Store.objects.create(
             store_num=7001, store_name="Store 7001", state="NC"
@@ -92,6 +93,14 @@ class PDFRendererTests(TestCase):
         VeederReading.objects.create(
             ticket=ticket,
             tank_index=1,
+            fuel_type=FuelType.objects.get(name="Regular"),
+            volume=2200,
+            ullage=9800,
+            height=20.0,
+        )
+        VeederReading.objects.create(
+            ticket=ticket,
+            tank_index=2,
             fuel_type=fuel_type,
             volume=2200,
             ullage=9800,

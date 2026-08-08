@@ -5,6 +5,8 @@ from django.conf import settings
 
 from atg.models import VeederReading
 from tankgauge.logic.curve_generator import generate_inch_gallon_curve
+from tankgauge.logic.tank_limits import resolve_tank_limits
+from tankgauge.logic.veeder_source_policy import VeederSourcePolicy
 from tankgauge.models import StoreTankMapping, TankEstimation
 
 from tankcharts.domain import (
@@ -143,6 +145,19 @@ class TankFieldChartService:
                 )
                 continue
 
+            if VeederSourcePolicy.store_has_readings(
+                store
+            ) and not VeederSourcePolicy.mapping_has_readings(mapping):
+                omitted_tanks.append(
+                    StoreTankOmission(
+                        tank_index=mapping.tank_index,
+                        fuel_type=(mapping.fuel_type or "unknown").lower(),
+                        reason_code="no_veeder_readings",
+                        veeder_observation_count=0,
+                    )
+                )
+                continue
+
             veeder_points = self._get_veeder_points(mapping=mapping)
             estimation = (
                 TankEstimation.objects.filter(tank_mapping=mapping, is_active=True)
@@ -225,10 +240,9 @@ class TankFieldChartService:
                 }
             )
 
-            capacity_gallons = (
-                int(mapping.tank_type.capacity)
-                if mapping.tank_type and mapping.tank_type.capacity
-                else int(round(table_rows[-1]["gallons"]))
+            limits = resolve_tank_limits(mapping)
+            capacity_gallons = int(
+                limits["capacity_gallons"] or round(table_rows[-1]["gallons"])
             )
             total_veeder_observation_count += veeder_count
             summaries.append(
@@ -299,6 +313,13 @@ class TankFieldChartService:
                 f"Store {store_num} has no tank index {tank_index}."
             )
 
+        if VeederSourcePolicy.store_has_readings(
+            mapping.store
+        ) and not VeederSourcePolicy.mapping_has_readings(mapping):
+            raise ValueError(
+                "Cannot generate chart: tank has no accepted Veeder readings."
+            )
+
         veeder_points = self._get_veeder_points(mapping=mapping)
         estimation = (
             TankEstimation.objects.filter(tank_mapping=mapping, is_active=True)
@@ -323,14 +344,15 @@ class TankFieldChartService:
         *,
         mapping: StoreTankMapping,
         estimation: TankEstimation | None,
-    ) -> int:
-        if mapping.tank_type and mapping.tank_type.max_depth:
-            return int(mapping.tank_type.max_depth)
+    ) -> int | None:
+        limits = resolve_tank_limits(mapping)
+        if limits["max_depth_inches"] is not None:
+            return int(round(limits["max_depth_inches"]))
 
         if estimation:
             return max(1, int(round(2 * estimation.radius)))
 
-        return 120
+        return None
 
     def _get_veeder_points(self, *, mapping: StoreTankMapping) -> list[dict]:
         readings = VeederReading.objects.filter(
@@ -356,9 +378,9 @@ class TankFieldChartService:
         self,
         *,
         estimation: TankEstimation | None,
-        max_depth_inches: int,
+        max_depth_inches: int | None,
     ) -> list[dict]:
-        if not estimation:
+        if not estimation or max_depth_inches is None:
             return []
         if not estimation.radius or not estimation.length:
             return []

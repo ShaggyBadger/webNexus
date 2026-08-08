@@ -194,6 +194,41 @@
   border-color: rgba(255, 184, 108, 0.9);
 }
 
+/* Veeder-Root reading feed status */
+.veeder-reading-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+  padding: 0.34rem 0.68rem;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1;
+  border: 1px solid;
+}
+
+.veeder-reading-tag::before {
+  content: "";
+  width: 0.46rem;
+  height: 0.46rem;
+  border-radius: 999px;
+  background-color: currentColor;
+  box-shadow: 0 0 10px color-mix(in srgb, currentColor 65%, transparent);
+}
+
+.veeder-readings-active {
+  background-color: rgba(80, 250, 123, 0.14);
+  color: #50fa7b;
+  border-color: rgba(80, 250, 123, 0.9);
+}
+
+.veeder-readings-none {
+  background-color: rgba(233, 69, 96, 0.16);
+  color: #ff758c;
+  border-color: rgba(233, 69, 96, 0.9);
+}
+
 @media (max-width: 576px) {
   .display-5 {
     font-size: 1.75rem;

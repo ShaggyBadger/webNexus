@@ -11,6 +11,7 @@ from ..models import (
     HandDrawnMap,
 )
 from tankgauge.models import StoreTankMapping
+from tankgauge.logic.veeder_source_policy import VeederSourcePolicy
 from ..forms import SiteIntelligenceForm
 from ..logic import rack_ops
 
@@ -58,9 +59,17 @@ class LocationDetailView(DetailView):
 
         # Tank Mappings (Digital Twin) - Only for Stores
         if context["store"]:
-            context["tanks"] = StoreTankMapping.objects.filter(
+            tank_mappings = StoreTankMapping.objects.filter(
                 store=context["store"]
             ).order_by("tank_index")
+            context["store_veeder_active"] = VeederSourcePolicy.store_has_readings(
+                context["store"]
+            )
+            context["tanks"] = VeederSourcePolicy.filter_operational_mappings(
+                tank_mappings
+            )
+        else:
+            context["store_veeder_active"] = False
 
         # Intelligence Layer (Dual-Layer Sync)
         personal_intel = None

@@ -8,6 +8,8 @@ from django.http import JsonResponse
 from django.db.models import Q
 from ..models import FuelRack
 from tankgauge.models import Store, TankType
+from tankgauge.logic.tank_limits import resolve_tank_limits
+from tankgauge.logic.veeder_source_policy import VeederSourcePolicy
 from tankgauge.logic.utils import haversine
 from ..logic import rack_ops
 
@@ -269,15 +271,18 @@ def store_lookup_api(request):
         logger.info(f"STORE_LOOKUP_HIT: Found Store #{store.store_num}")
         from tankgauge.models import StoreTankMapping
 
-        mappings = StoreTankMapping.objects.filter(store=store).order_by("tank_index")
+        mappings = VeederSourcePolicy.filter_operational_mappings(
+            StoreTankMapping.objects.filter(store=store).order_by("tank_index")
+        )
         tanks = []
         for m in mappings:
+            limits = resolve_tank_limits(m)
             tanks.append(
                 {
                     "tank_index": m.tank_index,
                     "fuel_type": m.fuel_type,
-                    "capacity": m.tank_type.capacity if m.tank_type else 0,
-                    "max_depth": m.tank_type.max_depth if m.tank_type else 0,
+                    "capacity": limits["capacity_gallons"] or 0,
+                    "max_depth": limits["max_depth_inches"] or 0,
                     "tank_type_id": m.tank_type.id if m.tank_type else None,
                     "tank_type_name": m.tank_type.name if m.tank_type else "UNKNOWN",
                 }

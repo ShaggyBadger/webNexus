@@ -10,6 +10,7 @@ function homepageHub() {
     state: null,
     distanceDisplay: null,
     vaporManifold: null,
+    veederReadings: false,
 
     init() {
       console.log('[homepageHub] init() called');
@@ -23,9 +24,9 @@ function homepageHub() {
         this.storeName = e.detail.store_name;
         this.city = e.detail.city;
         this.state = e.detail.state;
-        this.distanceDisplay = e.detail.distance_display;
-        this.vaporManifold = e.detail.vapor_manifold;
-        console.log('[homepageHub] vaporManifold set to:', this.vaporManifold, typeof this.vaporManifold);
+         this.distanceDisplay = e.detail.distance_display;
+         this.vaporManifold = e.detail.vapor_manifold;
+         this.veederReadings = e.detail.veeder_readings === true;
       });
     },
 
@@ -39,6 +40,14 @@ function homepageHub() {
       if (this.vaporManifold === true) return "vapor-manifold-yes";
       if (this.vaporManifold === false) return "vapor-manifold-no";
       return "vapor-manifold-unknown";
+    },
+
+    get veederReadingsLabel() {
+      return this.veederReadings ? "VRR FEED: ACTIVE" : "VRR FEED: NONE";
+    },
+
+    get veederReadingsCssClass() {
+      return this.veederReadings ? "veeder-readings-active" : "veeder-readings-none";
     },
 
     updateClock() {

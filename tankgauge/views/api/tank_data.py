@@ -10,6 +10,7 @@ from ...logic.mode_resolver import ModeResolver
 from ...logic.curve_generator import generate_inch_gallon_curve
 from ...logic.store_lookup import get_store_by_any_id
 from ...logic.tank_limits import resolve_tank_limits
+from ...logic.veeder_source_policy import VeederSourcePolicy
 from ...models import StoreTankMapping, TankChart, TankEstimation
 from .error_contract import drf_error_response, drf_success_response
 
@@ -139,6 +140,7 @@ class StoreTanksAPIView(APIView):
             .select_related("tank_type")
             .order_by("tank_index", "id")
         )
+        mappings = VeederSourcePolicy.filter_operational_mappings(mappings)
         tanks = [self._serialize_mapping(mapping) for mapping in mappings]
 
         logger.info(
@@ -155,6 +157,7 @@ class StoreTanksAPIView(APIView):
                     "city": store.city,
                     "state": store.state,
                     "vapor_manifold": _resolve_vapor_manifold(store),
+                    "source_policy": VeederSourcePolicy.resolve_store(store).source,
                 },
                 "tanks": tanks,
             }
@@ -167,6 +170,9 @@ class TankChartDataAPIView(APIView):
     permission_classes = [AllowAny]
 
     def _get_official_chart(self, mapping):
+        if VeederSourcePolicy.store_has_readings(mapping.store):
+            return []
+
         official_chart = list(
             TankChart.objects.filter(
                 store=mapping.store,
@@ -189,6 +195,9 @@ class TankChartDataAPIView(APIView):
         )
 
     def _get_generated_curve(self, mapping, max_depth):
+        if max_depth is None:
+            return []
+
         estimation = TankEstimation.objects.filter(
             tank_mapping=mapping,
             is_active=True,
@@ -279,11 +288,34 @@ class TankChartDataAPIView(APIView):
                 status_code=status.HTTP_404_NOT_FOUND,
             )
 
-        limits = resolve_tank_limits(mapping)
-        max_depth = limits["max_depth_inches"] or 120
-        official_chart = self._get_official_chart(mapping)
-        generated_curve = self._get_generated_curve(mapping, max_depth)
-        scatter_points = self._get_scatter_points(mapping)
+        store_decision = VeederSourcePolicy.resolve_store(mapping.store)
+        has_veeder_identity = VeederSourcePolicy.mapping_has_readings(mapping)
+        if (
+            store_decision.source == VeederSourcePolicy.VEEDER_ONLY
+            and not has_veeder_identity
+        ):
+            limits = {
+                "capacity_gallons": None,
+                "max_depth_inches": None,
+                "source": "VEEDER",
+            }
+            official_chart = []
+            generated_curve = []
+            scatter_points = []
+        else:
+            limits = resolve_tank_limits(mapping)
+            max_depth = limits["max_depth_inches"]
+            official_chart = self._get_official_chart(mapping)
+            generated_curve = self._get_generated_curve(mapping, max_depth)
+            scatter_points = self._get_scatter_points(mapping)
+        readiness = (
+            VeederSourcePolicy.READY
+            if store_decision.source == VeederSourcePolicy.OFFICIAL
+            else VeederSourcePolicy.mapping_readiness(
+                mapping,
+                has_geometry=bool(generated_curve),
+            )
+        )
 
         logger.info(
             "TANK_CHART_DATA_FETCHED",
@@ -305,6 +337,8 @@ class TankChartDataAPIView(APIView):
                     "max_depth": limits["max_depth_inches"],
                     "limits_source": limits["source"],
                     "tank_index": mapping.tank_index,
+                    "source_policy": store_decision.source,
+                    "readiness": readiness,
                 },
                 "series": {
                     "official_chart": official_chart,

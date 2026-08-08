@@ -165,9 +165,10 @@ const TacticalGPS = {
               store_name: data.store_name,
               city: data.city,
               state: data.state,
-              distance_display: data.distance_display,
-              vapor_manifold: data.vapor_manifold
-            }
+               distance_display: data.distance_display,
+               vapor_manifold: data.vapor_manifold,
+               veeder_readings: data.veeder_readings
+             }
           }));
         }
 

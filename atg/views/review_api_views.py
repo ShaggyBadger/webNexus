@@ -1,4 +1,5 @@
 import json
+import logging
 from uuid import uuid4
 
 from django.db import transaction
@@ -11,12 +12,15 @@ from rest_framework.views import APIView
 
 from missionlog.models import FuelType
 from tankgauge.models import Store
+from tankgauge.logic.veeder_source_policy import VeederSourcePolicy
 
 from ..models import VeederReading, VeederTicket
 from ..serializers.reading_serializers import VeederReadingSerializer
 from ..services.auto_mapper import AutoMapperService
 from ..services.reading_preflight import ReadingPreflightService
 from ..services.reading_quality import validate_readings_for_store
+
+logger = logging.getLogger("webnexus")
 
 
 class VeederReviewQueueListAPIView(APIView):
@@ -207,6 +211,10 @@ class VeederReviewQueueFinalizeAPIView(APIView):
                     message="Store assignment is required before finalize.",
                 )
 
+            store_was_veeder_active = VeederSourcePolicy.store_has_readings(
+                ticket.store
+            )
+
             ticket_timestamp_raw = f"{request.data.get('ticket_timestamp', '')}".strip()
             if ticket_timestamp_raw:
                 parsed_timestamp = parse_datetime(ticket_timestamp_raw)
@@ -317,6 +325,17 @@ class VeederReviewQueueFinalizeAPIView(APIView):
                 is_user_corrected=True,
             )
             mappings.add((validated.get("tank_index"), validated.get("fuel_type").name))
+
+        if not store_was_veeder_active:
+            logger.info(
+                "VEEDER_SOURCE_ACTIVATED",
+                extra={
+                    "store_num": ticket.store.store_num,
+                    "reading_count": len(serializer.validated_data),
+                    "tank_indices": sorted(tank_indices),
+                    "reason_code": "first_accepted_veeder_ticket",
+                },
+            )
 
         def run_auto_mapping() -> None:
             for tank_index, fuel_name in sorted(mappings):
