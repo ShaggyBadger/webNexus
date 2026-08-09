@@ -10,6 +10,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const latInput = document.getElementById("id_lat");
   const lonInput = document.getElementById("id_lon");
+  const addressGeocodeBtn = document.getElementById("address-geocode-btn");
+  const addressGeocodeStatus = document.getElementById("address-geocode-status");
 
   let map;
   let marker;
@@ -196,6 +198,53 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   document.getElementById("geocode-btn").addEventListener("click", decodeCoordinates);
+
+  const setAddressGeocodeStatus = (message, state = "error") => {
+    addressGeocodeStatus.textContent = message;
+    addressGeocodeStatus.classList.remove("d-none", "text-danger", "text-success");
+    addressGeocodeStatus.classList.add(state === "success" ? "text-success" : "text-danger");
+  };
+
+  const locateAddress = async () => {
+    const addressParts = [
+      document.getElementById("id_address").value,
+      document.getElementById("id_city").value,
+      document.getElementById("id_state").value,
+      document.getElementById("id_zip_code").value,
+    ].map((value) => value.trim()).filter(Boolean);
+
+    if (addressParts.length === 0) {
+      setAddressGeocodeStatus("Enter an address before searching.");
+      return;
+    }
+
+    const originalText = addressGeocodeBtn.innerText;
+    addressGeocodeBtn.innerText = "LOOKING UP...";
+    addressGeocodeBtn.disabled = true;
+    addressGeocodeStatus.classList.add("d-none");
+
+    try {
+      const params = new URLSearchParams({ q: addressParts.join(", ") });
+      const response = await fetch(`/siteintel/api/forward-geocode/?${params}`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        setAddressGeocodeStatus(data.message || "Address lookup failed.");
+        return;
+      }
+
+      updateLocation(data.lat, data.lon, 18);
+      setAddressGeocodeStatus("Location found. Adjust the marker if needed.", "success");
+    } catch (error) {
+      console.error("PROPOSAL_FORWARD_GEOCODE_FAILED", error);
+      setAddressGeocodeStatus("Address lookup is temporarily unavailable.");
+    } finally {
+      addressGeocodeBtn.innerText = originalText;
+      addressGeocodeBtn.disabled = false;
+    }
+  };
+
+  addressGeocodeBtn.addEventListener("click", locateAddress);
 
   const typeSelector = document.getElementById("store-type-selector");
   const customTypeInput = document.getElementById("custom-store-type");

@@ -1,7 +1,5 @@
 import logging
 import json
-import urllib.request
-from urllib.error import URLError
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
@@ -12,6 +10,12 @@ from tankgauge.logic.tank_limits import resolve_tank_limits
 from tankgauge.logic.veeder_source_policy import VeederSourcePolicy
 from tankgauge.logic.utils import haversine
 from ..logic import rack_ops
+from ..services.geocoding_service import (
+    GeocodingNoResultError,
+    GeocodingServiceError,
+    forward_geocode,
+    reverse_geocode,
+)
 
 # Configure Tactical Logger for Site Intelligence
 logger = logging.getLogger("webnexus")
@@ -35,44 +39,69 @@ def reverse_geocode_api(request):
         f"GEOCODE_REQUEST: Lat {lat}, Lon {lon} triggered by user {request.user}",
         extra={"lat": lat, "lon": lon},
     )
-    url = (
-        f"https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat={lat}&lon={lon}"
-    )
-
     try:
-        req = urllib.request.Request(
-            url, headers={"User-Agent": "webNexus-Tactical-Agent/1.0"}
+        result = reverse_geocode(lat, lon)
+        logger.info(
+            f"GEOCODE_SUCCESS: Decoded to {result.get('address')}, {result.get('city')}",
+            extra={"lat": lat, "lon": lon},
         )
-        with urllib.request.urlopen(req) as response:
-            data = json.loads(response.read().decode())
+        return JsonResponse(result)
 
-            address = data.get("address", {})
-            # Tactical normalization of address components
-            result = {
-                "address": (
-                    address.get("house_number", "") + " " + address.get("road", "")
-                    if address.get("road")
-                    else address.get("pedestrian", "")
-                ),
-                "city": address.get("city")
-                or address.get("town")
-                or address.get("village")
-                or address.get("suburb", ""),
-                "state": address.get("state", ""),
-                "zip_code": address.get("postcode", ""),
-            }
-            logger.info(
-                f"GEOCODE_SUCCESS: Decoded to {result.get('address')}, {result.get('city')}",
-                extra={"lat": lat, "lon": lon},
-            )
-            return JsonResponse(result)
-
-    except URLError as e:
+    except GeocodingNoResultError:
+        logger.warning("GEOCODE_NO_RESULT: No address found for coordinates")
+        return JsonResponse(
+            {
+                "code": "geocode_no_result",
+                "message": "No address found for these coordinates.",
+            },
+            status=404,
+        )
+    except GeocodingServiceError as e:
         logger.error(f"GEOCODE_SERVICE_UNAVAILABLE: {str(e)}")
         return JsonResponse({"error": "Service unavailable"}, status=503)
-    except Exception as e:
-        logger.error(f"GEOCODE_UNEXPECTED_FAILURE: {str(e)}")
-        return JsonResponse({"error": "Internal error"}, status=500)
+
+
+@login_required
+def forward_geocode_api(request):
+    """Resolve the first Nominatim match for an entered proposal address."""
+    address_query = request.GET.get("q", "").strip()
+    if not address_query:
+        return JsonResponse(
+            {
+                "code": "address_required",
+                "message": "An address is required.",
+            },
+            status=400,
+        )
+
+    logger.info(
+        "FORWARD_GEOCODE_REQUEST: Address lookup by user %s",
+        request.user,
+        extra={"address_query": address_query},
+    )
+    try:
+        result = forward_geocode(address_query)
+    except GeocodingNoResultError:
+        return JsonResponse(
+            {
+                "code": "address_not_found",
+                "message": "No matching address was found.",
+            },
+            status=404,
+        )
+    except GeocodingServiceError as exc:
+        logger.error("FORWARD_GEOCODE_SERVICE_UNAVAILABLE: %s", exc)
+        return JsonResponse(
+            {
+                "code": "geocoding_unavailable",
+                "message": "Address lookup is temporarily unavailable.",
+            },
+            status=503,
+        )
+
+    return JsonResponse(
+        {"lat": result.latitude, "lon": result.longitude},
+    )
 
 
 @login_required

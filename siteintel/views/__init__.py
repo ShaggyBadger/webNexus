@@ -1,6 +1,7 @@
 from .admin_views import TacticalOversightView, tactical_telemetry_api
 from .api_views import (
     proximity_check_api,
+    forward_geocode_api,
     rack_checkin_api,
     rack_status_api,
     reverse_geocode_api,
@@ -42,6 +43,7 @@ __all__ = [
     "hand_drawn_map_save_api",
     "initialize_location_for_store",
     "proximity_check_api",
+    "forward_geocode_api",
     "rack_checkin_api",
     "rack_status_api",
     "reverse_geocode_api",

@@ -1,7 +1,18 @@
-from django.test import SimpleTestCase
+import json
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
-from siteintel.logic.rack_ops import get_rack_status
 from datetime import datetime, timezone
+
+from django.test import RequestFactory, SimpleTestCase
+
+from siteintel.logic.rack_ops import get_rack_status
+from siteintel.services.geocoding_service import (
+    GeocodingNoResultError,
+    GeocodingResult,
+    GeocodingServiceError,
+    forward_geocode,
+)
+from siteintel.views.api_views import forward_geocode_api
 
 
 class RackOpsUnitTests(SimpleTestCase):
@@ -80,3 +91,87 @@ class RackOpsUnitTests(SimpleTestCase):
             self.assertFalse(
                 kwargs["is_verified"], "Check-in should NOT be verified outside 500m"
             )
+
+
+class ForwardGeocodeApiTests(SimpleTestCase):
+    """Verify proposal address lookup responses without calling Nominatim."""
+
+    def setUp(self):
+        self.factory = RequestFactory()
+        self.user = SimpleNamespace(username="testuser", is_authenticated=True)
+
+    def test_returns_first_match_coordinates(self):
+        request = self.factory.get("/siteintel/api/forward-geocode/?q=123+Main+St")
+        request.user = self.user
+
+        with patch(
+            "siteintel.views.api_views.forward_geocode",
+            return_value=GeocodingResult(latitude=35.123456, longitude=-79.654321),
+        ) as geocode:
+            response = forward_geocode_api(request)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            json.loads(response.content), {"lat": 35.123456, "lon": -79.654321}
+        )
+        geocode.assert_called_once_with("123 Main St")
+
+    def test_rejects_missing_address(self):
+        request = self.factory.get("/siteintel/api/forward-geocode/")
+        request.user = self.user
+
+        response = forward_geocode_api(request)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(json.loads(response.content)["code"], "address_required")
+
+    def test_returns_not_found_when_geocoder_has_no_match(self):
+        request = self.factory.get("/siteintel/api/forward-geocode/?q=unknown")
+        request.user = self.user
+
+        with patch(
+            "siteintel.views.api_views.forward_geocode",
+            side_effect=GeocodingNoResultError,
+        ):
+            response = forward_geocode_api(request)
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(json.loads(response.content)["code"], "address_not_found")
+
+    def test_returns_service_unavailable_when_geocoder_fails(self):
+        request = self.factory.get("/siteintel/api/forward-geocode/?q=123+Main+St")
+        request.user = self.user
+
+        with patch(
+            "siteintel.views.api_views.forward_geocode",
+            side_effect=GeocodingServiceError,
+        ):
+            response = forward_geocode_api(request)
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(json.loads(response.content)["code"], "geocoding_unavailable")
+
+    def test_requires_authentication(self):
+        request = self.factory.get("/siteintel/api/forward-geocode/?q=123+Main+St")
+        request.user = SimpleNamespace(is_authenticated=False)
+
+        response = forward_geocode_api(request)
+
+        self.assertEqual(response.status_code, 302)
+
+
+class GeocodingServiceTests(SimpleTestCase):
+    """Verify Nominatim response normalization without making network calls."""
+
+    @patch("siteintel.services.geocoding_service.urllib.request.urlopen")
+    def test_forward_geocode_uses_first_result(self, urlopen):
+        response = MagicMock()
+        response.read.return_value = b'[{"lat": "35.1", "lon": "-79.2"}]'
+        urlopen.return_value.__enter__.return_value = response
+
+        result = forward_geocode("123 Main St, Raleigh, NC")
+
+        self.assertEqual(result, GeocodingResult(latitude=35.1, longitude=-79.2))
+        request = urlopen.call_args.args[0]
+        self.assertIn("limit=1", request.full_url)
+        self.assertIn("q=123+Main+St%2C+Raleigh%2C+NC", request.full_url)

@@ -219,6 +219,9 @@
                                         <button type="button" class="btn btn-tactical-secondary btn-sm mono" id="geocode-btn" style="font-size: 0.7rem;">
                                             DECODE COORDINATES
                                         </button>
+                                        <button type="button" class="btn btn-tactical-amber btn-sm mono text-dark" id="address-geocode-btn" style="font-size: 0.7rem;">
+                                            LOCATE ADDRESS
+                                        </button>
                                         <button type="button" class="btn btn-primary btn-sm mono text-dark" id="gps-capture-btn" style="font-size: 0.7rem;">
                                             RE-CAPTURE GPS
                                         </button>
@@ -252,6 +255,9 @@
                                             <span class="input-group-text mono bg-dark text-muted-custom" style="font-size: 0.65rem;">LON</span>
                                             {{ form.lon }}
                                         </div>
+                                    </div>
+                                    <div class="col-12">
+                                        <div id="address-geocode-status" class="field-error d-none mono" role="status" aria-live="polite" style="font-size: 0.7rem;"></div>
                                     </div>
 
                                     <!-- Proximity Warning Container -->
