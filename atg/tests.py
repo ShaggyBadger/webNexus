@@ -556,6 +556,49 @@ class VeederAPITestCase(APITestCase):
             "veeder_estimation",
         )
 
+    def test_store_tank_profile_does_not_resurrect_removed_tanks_from_history(self):
+        tank_type = TankType.objects.create(name="10k96", capacity=10003, max_depth=96)
+        StoreTankMapping.objects.create(
+            store=self.store,
+            tank_type=tank_type,
+            fuel_type="regular",
+            tank_index=1,
+        )
+        ticket = VeederTicket.objects.create(store=self.store, uploaded_by=self.user)
+        VeederReading.objects.create(
+            ticket=ticket,
+            tank_index=1,
+            fuel_type=self.fuel_type,
+            volume=5000,
+            ullage=5003,
+            height=50.0,
+        )
+        # Tank 2 is historical data only, as it would be after its mapping was
+        # removed from the current Site Intelligence configuration.
+        VeederReading.objects.create(
+            ticket=ticket,
+            tank_index=2,
+            fuel_type=self.fuel_type,
+            volume=4000,
+            ullage=6000,
+            height=40.0,
+        )
+
+        url = reverse(
+            "atg:store_tank_profile_api",
+            kwargs={"store_num": self.store.store_num},
+        )
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            [
+                (tank["tank_index"], tank["fuel_type_name"])
+                for tank in response.json()["known_tanks"]
+            ],
+            [(1, "Regular")],
+        )
+
     def test_ticket_list_and_retrieve(self):
         ticket = VeederTicket.objects.create(
             store=self.store, image=self.image, uploaded_by=self.user

@@ -357,6 +357,7 @@ class StoreTankProfileAPIView(APIView):
             .select_related("tank_type")
             .order_by("tank_index", "fuel_type", "id")
         )
+        has_canonical_mappings = mappings.filter(tank_index__isnull=False).exists()
 
         for mapping in mappings:
             if mapping.tank_index is None:
@@ -436,20 +437,24 @@ class StoreTankProfileAPIView(APIView):
             )
             covered_keys.add((fuel_key, mapping.tank_index))
 
-        history_only_groups = (
-            VeederReading.objects.filter(ticket__store=store)
-            .values("fuel_type__name", "tank_index")
-            .annotate(
-                reading_count=Count("id"),
-                avg_capacity=Avg(
-                    ExpressionWrapper(
-                        F("volume") + F("ullage"),
-                        output_field=FloatField(),
-                    )
-                ),
+        # Historical readings can outlive a removed canonical mapping. Only
+        # discover tanks from history when the store has no explicit profile.
+        history_only_groups = []
+        if not has_canonical_mappings:
+            history_only_groups = (
+                VeederReading.objects.filter(ticket__store=store)
+                .values("fuel_type__name", "tank_index")
+                .annotate(
+                    reading_count=Count("id"),
+                    avg_capacity=Avg(
+                        ExpressionWrapper(
+                            F("volume") + F("ullage"),
+                            output_field=FloatField(),
+                        )
+                    ),
+                )
+                .order_by("tank_index", "fuel_type__name")
             )
-            .order_by("tank_index", "fuel_type__name")
-        )
 
         for group in history_only_groups:
             tank_index = group["tank_index"]
