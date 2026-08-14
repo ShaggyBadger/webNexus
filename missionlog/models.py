@@ -2,6 +2,38 @@ from django.db import models
 from django.conf import settings
 
 
+class MissionLogConfig(models.Model):
+    """Singleton configuration for MissionLog production metrics."""
+
+    production_gph_target = models.DecimalField(
+        max_digits=10,
+        decimal_places=1,
+        default=7000,
+        help_text="Production target used by MissionLog charts and reports (GPH).",
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "MissionLog Configuration"
+        verbose_name_plural = "MissionLog Configuration"
+
+    def __str__(self):
+        return f"MissionLog Config - Target: {self.production_gph_target} GPH"
+
+    @classmethod
+    def get_solo(cls):
+        """Return the only configuration row, creating it with defaults."""
+        obj, _ = cls.objects.get_or_create(
+            pk=1,
+            defaults={
+                "production_gph_target": getattr(
+                    settings, "MISSIONLOG_PRODUCTION_GPH_TARGET", 7000
+                )
+            },
+        )
+        return obj
+
+
 class FuelType(models.Model):
     """
     OPERATIONAL STANDARDIZATION:

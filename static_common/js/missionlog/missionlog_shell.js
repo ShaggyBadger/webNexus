@@ -25,6 +25,8 @@ function missionlogApp() {
     telemetryLoading: true,
     telemetryError: "",
     telemetryNoData: false,
+    telemetryTargetGph: 7000,
+    telemetryRollingAverageGph: null,
     telemetryChart: null,
     form: {
       shift_start: "",
@@ -699,6 +701,10 @@ function missionlogApp() {
       this.telemetryNoData = false;
       try {
         const data = await this.fetchJson("/missionlog/api/missions/production-gph/?window=30");
+        this.telemetryTargetGph = Number(data.target_gph ?? 7000);
+        this.telemetryRollingAverageGph = data.rolling_average_gph == null
+          ? null
+          : Number(data.rolling_average_gph);
         const series = data.series || [];
         if (!series.length) {
           this.destroyTelemetryChart();
@@ -729,7 +735,7 @@ function missionlogApp() {
       const series = data.series || [];
       const labels = series.map((row) => this.formatTelemetryDate(row.local_date));
       const points = series.map((row) => row.gph);
-      const targetGph = Number(data.target_gph || 5000);
+      const targetGph = Number(data.target_gph ?? 7000);
       const targetSeries = new Array(labels.length).fill(targetGph);
 
       const pointColors = points.map((value) => {

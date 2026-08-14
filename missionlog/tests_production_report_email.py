@@ -10,7 +10,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from accounts.models import Profile
-from missionlog.models import Mission, ProductionReportEmailAudit
+from missionlog.models import Mission, MissionLogConfig, ProductionReportEmailAudit
 from missionlog.services.production_report_service import ProductionReportService
 
 
@@ -188,6 +188,18 @@ class ProductionReportServiceTests(TestCase):
         )
         self.assertEqual(point["gph"], 100.0)
         self.assertEqual(point["included_missions"], 2)
+        self.assertEqual(telemetry["rolling_average_gph"], 100.0)
+
+    def test_telemetry_uses_admin_configured_target(self):
+        MissionLogConfig.objects.create(pk=1, production_gph_target=7350)
+
+        telemetry = ProductionReportService.build_daily_gph_telemetry(
+            user=self.user,
+            window_days=30,
+            now_utc=timezone.make_aware(datetime(2026, 8, 4, 12, 0, 0)),
+        )
+
+        self.assertEqual(telemetry["target_gph"], 7350.0)
 
     def test_daily_gph_telemetry_preserves_internal_gaps_and_trims_trailing_no_data(
         self,
@@ -258,6 +270,7 @@ class ProductionReportServiceTests(TestCase):
         )
 
         self.assertEqual(telemetry["series"], [])
+        self.assertIsNone(telemetry["rolling_average_gph"])
 
 
 class ProductionReportEmailServiceTests(TestCase):
@@ -328,7 +341,9 @@ class ProductionReportEmailAPITests(TestCase):
         self.url = reverse("missionlog:production_report_email")
 
     @staticmethod
-    def _request_payload(*, report_range="month", recipient_email="api_user@example.com"):
+    def _request_payload(
+        *, report_range="month", recipient_email="api_user@example.com"
+    ):
         return {
             "range": report_range,
             "recipient_email": recipient_email,
@@ -456,7 +471,9 @@ class ProductionReportEmailAPITests(TestCase):
 
         response = client.post(
             self.url,
-            data=json.dumps(self._request_payload(recipient_email="manager@example.com")),
+            data=json.dumps(
+                self._request_payload(recipient_email="manager@example.com")
+            ),
             content_type="application/json",
             HTTP_X_CSRFTOKEN=csrf_token,
         )
@@ -476,7 +493,9 @@ class ProductionReportEmailAPITests(TestCase):
 
         response = client.post(
             self.url,
-            data=json.dumps(self._request_payload(recipient_email="manual@example.com")),
+            data=json.dumps(
+                self._request_payload(recipient_email="manual@example.com")
+            ),
             content_type="application/json",
             HTTP_X_CSRFTOKEN=csrf_token,
         )
@@ -619,8 +638,12 @@ class ProductionReportEmailWorkerTests(TestCase):
             password="pass12345",
         )
 
-    @patch("missionlog.services.production_report_worker.ProductionReportEmailService.send_report")
-    @patch("missionlog.services.production_report_worker.ProductionReportService.build_report")
+    @patch(
+        "missionlog.services.production_report_worker.ProductionReportEmailService.send_report"
+    )
+    @patch(
+        "missionlog.services.production_report_worker.ProductionReportService.build_report"
+    )
     def test_worker_uses_audited_recipient(self, mock_build_report, mock_send_report):
         mock_build_report.return_value = {"report": "payload"}
         mock_send_report.return_value = {"status": "success", "smtp_duration_ms": 4}

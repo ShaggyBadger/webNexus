@@ -2,12 +2,41 @@ from django.contrib import admin
 from .models import (
     FuelType,
     Mission,
+    MissionLogConfig,
     OrderNumber,
     PurchaseOrder,
     LoadDelivery,
     ProductionReportEmailAudit,
     TruckFuelLog,
 )
+
+
+@admin.register(MissionLogConfig)
+class MissionLogConfigAdmin(admin.ModelAdmin):
+    """Admin interface for the singleton MissionLog configuration."""
+
+    fields = ("production_gph_target", "updated_at")
+    readonly_fields = ("updated_at",)
+
+    def has_add_permission(self, request):
+        return not MissionLogConfig.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def changelist_view(self, request, extra_context=None):
+        from django.shortcuts import redirect
+
+        config = MissionLogConfig.get_solo()
+        return redirect(f"missionlogconfig/{config.pk}/change/")
+
+    def change_view(self, request, object_id, form_url="", extra_context=None):
+        extra_context = extra_context or {}
+        extra_context["show_save_and_add_another"] = False
+        extra_context["show_save_and_continue"] = False
+        return super().change_view(
+            request, object_id, form_url, extra_context=extra_context
+        )
 
 
 @admin.register(FuelType)

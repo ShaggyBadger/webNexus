@@ -490,6 +490,8 @@ class MissionGphTelemetryEndpointTests(TestCase):
         non_null_points = [row for row in payload["series"] if row["gph"] is not None]
         self.assertEqual(len(non_null_points), 1)
         self.assertEqual(non_null_points[0]["gph"], 100.0)
+        self.assertEqual(payload["rolling_average_gph"], 100.0)
+        self.assertEqual(payload["target_gph"], 7000.0)
 
 
 class MissionLogShellAccessTests(TestCase):

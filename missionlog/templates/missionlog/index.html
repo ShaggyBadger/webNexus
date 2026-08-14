@@ -65,7 +65,10 @@
                     <div class="ml-card p-2 px-3 mono" style="width:100%;max-width:300px;min-height:84px;">
                         <div class="d-flex justify-content-between align-items-center mb-1">
                             <div class="small text-primary">30-DAY GPH</div>
-                            <div class="small text-muted-custom">TARGET 5000</div>
+                            <div class="small text-muted-custom">TARGET <span x-text="telemetryTargetGph.toFixed(0)"></span></div>
+                        </div>
+                        <div class="small text-muted-custom mb-1">
+                            ROLLING AVG: <span x-text="telemetryRollingAverageGph === null ? 'N/A' : telemetryRollingAverageGph.toFixed(1) + ' GPH'"></span>
                         </div>
                         <div x-show="telemetryLoading" x-cloak class="small text-muted-custom">SYNCING GPH...</div>
                         <div x-show="!telemetryLoading && telemetryError" x-cloak class="small text-tactical-danger" x-text="telemetryError"></div>

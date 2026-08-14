@@ -15,7 +15,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Prefetch
 from django.utils import timezone
 
-from missionlog.models import LoadDelivery, Mission
+from missionlog.models import LoadDelivery, Mission, MissionLogConfig
 
 _MIN_VALID_HOURS = Decimal("0.25")
 
@@ -51,6 +51,11 @@ class ProductionReportService:
     Produces deterministic production metrics so operators can track true
     gallons-per-hour performance over a defined period without guesswork.
     """
+
+    @staticmethod
+    def production_gph_target() -> float:
+        """Return the admin-configured target for charts and reports."""
+        return float(MissionLogConfig.get_solo().production_gph_target)
 
     @staticmethod
     def resolve_user_timezone(user: AbstractBaseUser) -> ZoneInfo:
@@ -260,9 +265,8 @@ class ProductionReportService:
             return {
                 "window_days": window_days,
                 "timezone": str(user_tz),
-                "target_gph": float(
-                    getattr(settings, "MISSIONLOG_PRODUCTION_GPH_TARGET", 5000)
-                ),
+                "target_gph": ProductionReportService.production_gph_target(),
+                "rolling_average_gph": None,
                 "window_start_date": start_date.isoformat(),
                 "window_end_date": end_date.isoformat(),
                 "latest_data_date": None,
@@ -270,6 +274,15 @@ class ProductionReportService:
             }
 
         latest_data_date = max(daily_totals.keys())
+        total_gallons = sum(
+            (entry["gallons"] for entry in daily_totals.values()), Decimal("0")
+        )
+        total_hours = sum(
+            (entry["hours"] for entry in daily_totals.values()), Decimal("0")
+        )
+        rolling_average_gph = float(
+            (total_gallons / total_hours).quantize(Decimal("0.1"))
+        )
         series = []
         current_date = start_date
         while current_date <= latest_data_date:
@@ -302,9 +315,8 @@ class ProductionReportService:
         return {
             "window_days": window_days,
             "timezone": str(user_tz),
-            "target_gph": float(
-                getattr(settings, "MISSIONLOG_PRODUCTION_GPH_TARGET", 5000)
-            ),
+            "target_gph": ProductionReportService.production_gph_target(),
+            "rolling_average_gph": rolling_average_gph,
             "window_start_date": start_date.isoformat(),
             "window_end_date": end_date.isoformat(),
             "latest_data_date": latest_data_date.isoformat(),
@@ -536,7 +548,7 @@ class ProductionReportService:
             markersize=4,
         )
         axis.axhline(
-            float(getattr(settings, "MISSIONLOG_PRODUCTION_GPH_TARGET", 5000)),
+            ProductionReportService.production_gph_target(),
             color="#d4943a",
             linestyle="--",
             linewidth=1.5,
