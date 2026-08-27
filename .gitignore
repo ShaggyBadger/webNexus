@@ -146,7 +146,6 @@ GitHub.sublime-settings
 .history
 
 # vibe code stuff
-GEMINI.md
 .antigravitycli/*
 .antigravitycli
 
@@ -191,7 +190,6 @@ frontend-missionlog/node_modules/
 temp_thoughts.txt
 frontend-missionlog/build_log.txt
 temp_thoughts.md
-MIGRATION_PLAN.md
 .gemini/
 instructions/
 graphify-out/

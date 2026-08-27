@@ -1,10 +1,12 @@
 import json
 import os
 
+from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db import models as db_models
 
 from tankgauge.logic.curve_generator import generate_inch_gallon_curve
+from tankgauge.logic.utils import canonicalize_fuel
 from tankgauge.models import (
     Store,
     StoreTankMapping,
@@ -13,16 +15,30 @@ from tankgauge.models import (
     VirtualTankEstimation,
 )
 
+DEFAULT_OUTPUT_DIR = os.path.join(
+    str(settings.BASE_DIR), "instructions", "tank_data_exports"
+)
+
 
 class Command(BaseCommand):
-    help = "Export tank data to 3 JSON files for offline analysis."
+    help = (
+        "Export tank data to 4 JSON files for offline analysis "
+        f"(default output: {DEFAULT_OUTPUT_DIR})."
+    )
+
+    @staticmethod
+    def _clean_tank_type_name(name):
+        """Hide abandoned auto-mapper placeholder names (AUTO_*) as unnamed."""
+        if name and name.startswith("AUTO_"):
+            return None
+        return name
 
     def add_arguments(self, parser):
         parser.add_argument(
             "--output",
             type=str,
-            default=".",
-            help="Output directory (default: current directory).",
+            default=DEFAULT_OUTPUT_DIR,
+            help=f"Output directory (default: {DEFAULT_OUTPUT_DIR}).",
         )
         parser.add_argument(
             "--store",
@@ -49,6 +65,7 @@ class Command(BaseCommand):
         self._export_store_map(stores, output_dir, indent)
         self._export_official_charts(stores, output_dir, indent)
         self._export_generated_charts(stores, output_dir, indent)
+        self._export_tank_assignments(stores, output_dir, indent)
 
     def _export_store_map(self, stores, output_dir, indent):
         store_map = {}
@@ -57,6 +74,7 @@ class Command(BaseCommand):
                 "store_num": store.store_num,
                 "riso_num": store.riso_num,
                 "store_name": store.store_name,
+                "store_type": store.store_type,
                 "address": store.address,
                 "city": store.city,
                 "state": store.state,
@@ -118,8 +136,26 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(f"official_tank_charts: {len(rows)} rows"))
 
     def _export_generated_charts(self, stores, output_dir, indent):
+        """Export one generated chart per physical tank (store_id, tank_index).
+
+        A tank can have both a mapped TankEstimation and a VirtualTankEstimation
+        (the auto-mapper creates a virtual estimate before linking the mapping).
+        Candidates are deduped preferring the mapped record; ties break by
+        confidence, then sample_count.
+        """
         store_ids = list(stores.values_list("id", flat=True))
-        generated = []
+        candidates = {}
+
+        def add_candidate(record, source_priority):
+            key = (record["store_id"], record["tank_index"])
+            rank = (
+                source_priority,
+                -(record["confidence"] or 0.0),
+                -(record["sample_count"] or 0),
+            )
+            existing = candidates.get(key)
+            if existing is None or rank < existing[0]:
+                candidates[key] = (rank, record)
 
         mappings = (
             StoreTankMapping.objects.filter(store_id__in=store_ids)
@@ -148,7 +184,7 @@ class Command(BaseCommand):
             except ValueError:
                 continue
 
-            generated.append(
+            add_candidate(
                 {
                     "store_id": mapping.store_id,
                     "store_num": mapping.store.store_num,
@@ -158,7 +194,9 @@ class Command(BaseCommand):
                         mapping.tank_type_id if mapping.tank_type else None
                     ),
                     "tank_type_name": (
-                        mapping.tank_type.name if mapping.tank_type else None
+                        self._clean_tank_type_name(mapping.tank_type.name)
+                        if mapping.tank_type
+                        else None
                     ),
                     "radius": radius,
                     "length": length,
@@ -168,7 +206,8 @@ class Command(BaseCommand):
                     "estimation_method": estimation.estimation_method,
                     "algorithm_version": estimation.algorithm_version,
                     "chart": chart,
-                }
+                },
+                source_priority=0,
             )
 
         virtual_estimators = (
@@ -190,7 +229,7 @@ class Command(BaseCommand):
             except ValueError:
                 continue
 
-            generated.append(
+            add_candidate(
                 {
                     "store_id": ve.store_id,
                     "store_num": ve.store.store_num,
@@ -206,14 +245,108 @@ class Command(BaseCommand):
                     "estimation_method": ve.estimation_method,
                     "algorithm_version": ve.algorithm_version,
                     "chart": chart,
-                }
+                },
+                source_priority=1,
             )
+
+        generated = [
+            record
+            for _, record in sorted(
+                candidates.values(),
+                key=lambda item: (
+                    item[1]["store_num"] is None,
+                    item[1]["store_num"] or 0,
+                    item[1]["tank_index"] is None,
+                    item[1]["tank_index"] or 0,
+                ),
+            )
+        ]
 
         path = os.path.join(output_dir, "generated_tank_charts.json")
         self._write_json(path, generated, indent)
         self.stdout.write(
             self.style.SUCCESS(f"generated_tank_charts: {len(generated)} tanks")
         )
+
+    def _export_tank_assignments(self, stores, output_dir, indent):
+        """Export one row per physical tank slot at every store.
+
+        Rows come from StoreTankMapping (the store -> tank -> TankType
+        assignment table) plus virtual-only tanks that were estimated but never
+        mapped (tank_type_name: null). Abandoned auto-mapper placeholder types
+        (AUTO_*) are exported as unnamed. Stores with no tank data simply
+        produce no rows. Mappings are the current assignment, so they export
+        as active; a virtual-only slot is active only if any estimate is.
+        """
+        stores_by_id = {store.id: store for store in stores}
+        store_ids = list(stores_by_id)
+        rows_by_key = {}
+
+        mappings = (
+            StoreTankMapping.objects.filter(store_id__in=store_ids)
+            .select_related("store", "tank_type")
+            .order_by("store__store_num", "tank_index")
+        )
+
+        for mapping in mappings:
+            key = (
+                mapping.store_id,
+                canonicalize_fuel(mapping.fuel_type),
+                mapping.tank_index,
+            )
+            rows_by_key[key] = {
+                "store_num": mapping.store.store_num,
+                "tank_index": mapping.tank_index,
+                "tank_type_name": (
+                    self._clean_tank_type_name(mapping.tank_type.name)
+                    if mapping.tank_type
+                    else None
+                ),
+                "fuel_type": mapping.fuel_type,
+                "is_active": True,
+            }
+
+        virtual_groups = {}
+        virtuals = VirtualTankEstimation.objects.filter(store_id__in=store_ids).only(
+            "store_id", "fuel_type", "tank_index", "is_active"
+        )
+
+        for ve in virtuals:
+            key = (
+                ve.store_id,
+                canonicalize_fuel(ve.fuel_type),
+                ve.tank_index,
+            )
+            group = virtual_groups.setdefault(
+                key, {"fuel_type": ve.fuel_type, "is_active": False}
+            )
+            group["is_active"] = group["is_active"] or ve.is_active
+
+        for key, group in virtual_groups.items():
+            if key in rows_by_key:
+                continue
+            store_id, _, tank_index = key
+            rows_by_key[key] = {
+                "store_num": stores_by_id[store_id].store_num,
+                "tank_index": tank_index,
+                "tank_type_name": None,
+                "fuel_type": group["fuel_type"],
+                "is_active": group["is_active"],
+            }
+
+        rows = sorted(
+            rows_by_key.values(),
+            key=lambda row: (
+                row["store_num"] is None,
+                row["store_num"] or 0,
+                row["tank_index"] is None,
+                row["tank_index"] or 0,
+            ),
+        )
+
+        path = os.path.join(output_dir, "tank_assignments.json")
+        self._write_json(path, rows, indent)
+        self.stdout.write(self.style.SUCCESS(f"tank_assignments: {len(rows)} tanks"))
 
     def _write_json(self, path, data, indent):
         with open(path, "w") as f:

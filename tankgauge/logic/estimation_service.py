@@ -139,6 +139,35 @@ class EstimationService:
                 is_active=True,
             )
 
+            # Supersede any active virtual estimation for the same physical tank.
+            # The mapped estimation is authoritative; the virtual was written
+            # earlier while this tank was still unmapped (see auto_mapper).
+            fuel_key = canonicalize_fuel(tank_mapping.fuel_type)
+            stale_virtual_ids = list(
+                VirtualTankEstimation.objects.filter(
+                    store=tank_mapping.store,
+                    fuel_type=fuel_key,
+                    tank_index=tank_mapping.tank_index,
+                    is_active=True,
+                ).values_list("id", flat=True)
+            )
+            if stale_virtual_ids:
+                VirtualTankEstimation.objects.filter(id__in=stale_virtual_ids).update(
+                    is_active=False
+                )
+                logger.info(
+                    "STALE_VIRTUAL_SUPERSEDED",
+                    extra={
+                        "store_id": tank_mapping.store_id,
+                        "store_num": tank_mapping.store.store_num,
+                        "tank_index": tank_mapping.tank_index,
+                        "fuel_type": fuel_key,
+                        "virtual_ids": stale_virtual_ids,
+                        "estimation_id": estimation.id,
+                        "reason_code": "stale_virtual_superseded_by_mapped",
+                    },
+                )
+
             # 7. Optional generated chart materialization (legacy compatibility)
             self.generate_tank_chart_from_estimation(
                 estimation,
@@ -183,6 +212,40 @@ class EstimationService:
 
         if existing and self._virtual_signature_matches(existing, signature):
             return existing
+
+        # 1a. If the tank already has an active mapped estimation, the mapped
+        # geometry is authoritative. Deactivate any lingering active virtual for
+        # the same key so exports never double-count a physical tank.
+        if TankEstimation.objects.filter(
+            tank_mapping__store=store,
+            tank_mapping__tank_index=tank_index,
+            tank_mapping__fuel_type__iexact=fuel_key,
+            is_active=True,
+        ).exists():
+            superseded_ids = list(
+                VirtualTankEstimation.objects.filter(
+                    store=store,
+                    fuel_type=fuel_key,
+                    tank_index=tank_index,
+                    is_active=True,
+                ).values_list("id", flat=True)
+            )
+            if superseded_ids:
+                VirtualTankEstimation.objects.filter(id__in=superseded_ids).update(
+                    is_active=False
+                )
+                logger.info(
+                    "STALE_VIRTUAL_SUPERSEDED",
+                    extra={
+                        "store_id": store.id,
+                        "store_num": store.store_num if store.store_num else None,
+                        "tank_index": tank_index,
+                        "fuel_type": fuel_key,
+                        "virtual_ids": superseded_ids,
+                        "reason_code": "virtual_superseded_by_mapped",
+                    },
+                )
+            return None
 
         # 2. EVALUATE CONFIDENCE GATES
         if not self._passes_confidence_gates(observations):

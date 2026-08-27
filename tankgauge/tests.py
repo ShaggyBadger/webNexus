@@ -1,3 +1,6 @@
+import json
+import os
+import tempfile
 from datetime import timedelta
 from unittest.mock import patch
 
@@ -160,6 +163,225 @@ class ConfidenceGateTests(TestCase):
     def test_gate_accepts_single_reading(self):
         obs = [(10.0, 1000.0)]
         self.assertTrue(self.service._passes_confidence_gates(obs))
+
+
+class StaleVirtualEstimationTests(TestCase):
+    """A mapped estimation must supersede an active virtual for the same tank."""
+
+    def setUp(self):
+        self.store = Store.objects.create(
+            store_num=36073,
+            riso_num=936073,
+            store_name="Test Store",
+        )
+        self.tank_type = TankType.objects.create(
+            name="10K", capacity=10000, max_depth=120
+        )
+        self.mapping = StoreTankMapping.objects.create(
+            store=self.store,
+            tank_type=self.tank_type,
+            fuel_type="diesel",
+            tank_index=1,
+        )
+        self.fuel_type = FuelType.objects.create(name="Diesel")
+
+        ticket = VeederTicket.objects.create(store=self.store)
+        for i in range(3):
+            VeederReading.objects.create(
+                ticket=ticket,
+                tank_index=1,
+                fuel_type=self.fuel_type,
+                height=10.0 + (i * 3.0),
+                volume=1000 + (i * 100),
+                ullage=9000,
+            )
+
+    def _create_active_virtual(self, tank_index, fuel_type="diesel"):
+        return VirtualTankEstimation.objects.create(
+            store=self.store,
+            fuel_type=fuel_type,
+            tank_index=tank_index,
+            radius=50.0,
+            length=200.0,
+            confidence=0.5,
+            sample_count=5,
+            algorithm_version="TEST",
+            is_active=True,
+        )
+
+    def test_mapped_estimation_deactivates_stale_virtual(self):
+        virtual = self._create_active_virtual(tank_index=1)
+        service = EstimationService()
+
+        estimation = service.run_estimation_for_tank(self.mapping)
+
+        self.assertIsNotNone(estimation)
+        self.assertTrue(TankEstimation.objects.get(id=estimation.id).is_active)
+        self.assertFalse(VirtualTankEstimation.objects.get(id=virtual.id).is_active)
+
+    def test_mapped_estimation_leaves_unrelated_virtual_active(self):
+        virtual = self._create_active_virtual(tank_index=2)
+        service = EstimationService()
+
+        estimation = service.run_estimation_for_tank(self.mapping)
+
+        self.assertIsNotNone(estimation)
+        self.assertTrue(VirtualTankEstimation.objects.get(id=virtual.id).is_active)
+
+    def test_mapped_estimation_failure_keeps_virtual_fallback(self):
+        # A mapping with no Veeder readings cannot produce an estimation, so the
+        # active virtual remains as the fallback geometry source.
+        empty_store = Store.objects.create(store_num=99991)
+        empty_mapping = StoreTankMapping.objects.create(
+            store=empty_store,
+            tank_type=self.tank_type,
+            fuel_type="regular",
+            tank_index=3,
+        )
+        virtual = VirtualTankEstimation.objects.create(
+            store=empty_store,
+            fuel_type="regular",
+            tank_index=3,
+            radius=50.0,
+            length=200.0,
+            confidence=0.5,
+            sample_count=5,
+            algorithm_version="TEST",
+            is_active=True,
+        )
+        service = EstimationService()
+
+        estimation = service.run_estimation_for_tank(empty_mapping)
+
+        self.assertIsNone(estimation)
+        self.assertTrue(VirtualTankEstimation.objects.get(id=virtual.id).is_active)
+
+    def test_virtual_estimation_superseded_when_mapped_active(self):
+        self._create_active_virtual(tank_index=1)
+        service = EstimationService()
+        service.run_estimation_for_tank(self.mapping)
+
+        result = service.run_virtual_estimation(
+            self.store,
+            "diesel",
+            1,
+            10000,
+            [(10.0, 1000.0), (13.0, 1100.0), (16.0, 1200.0)],
+            latest_uploaded_at=timezone.now(),
+        )
+
+        self.assertIsNone(result)
+        self.assertFalse(
+            VirtualTankEstimation.objects.filter(
+                store=self.store, tank_index=1, is_active=True
+            ).exists()
+        )
+
+
+class DeactivateStaleVirtualEstimationsCommandTests(TestCase):
+    def setUp(self):
+        self.store = Store.objects.create(store_num=36073)
+        self.tank_type = TankType.objects.create(name="10K", capacity=10000)
+        self.mapping = StoreTankMapping.objects.create(
+            store=self.store,
+            tank_type=self.tank_type,
+            fuel_type="diesel",
+            tank_index=1,
+        )
+        TankEstimation.objects.create(
+            tank_mapping=self.mapping,
+            radius=50.0,
+            length=200.0,
+            confidence=0.5,
+            sample_count=5,
+            algorithm_version="TEST",
+            is_active=True,
+        )
+        self.stale_virtual = VirtualTankEstimation.objects.create(
+            store=self.store,
+            fuel_type="diesel",
+            tank_index=1,
+            radius=50.0,
+            length=200.0,
+            confidence=0.5,
+            sample_count=5,
+            algorithm_version="TEST",
+            is_active=True,
+        )
+        self.unmapped_virtual = VirtualTankEstimation.objects.create(
+            store=self.store,
+            fuel_type="diesel",
+            tank_index=7,
+            radius=50.0,
+            length=200.0,
+            confidence=0.5,
+            sample_count=5,
+            algorithm_version="TEST",
+            is_active=True,
+        )
+
+    def test_dry_run_reports_without_writing(self):
+        call_command("deactivate_stale_virtual_estimations")
+
+        self.assertTrue(
+            VirtualTankEstimation.objects.get(id=self.stale_virtual.id).is_active
+        )
+        self.assertTrue(
+            VirtualTankEstimation.objects.get(id=self.unmapped_virtual.id).is_active
+        )
+
+    def test_apply_deactivates_only_stale(self):
+        call_command("deactivate_stale_virtual_estimations", "--apply")
+
+        self.assertFalse(
+            VirtualTankEstimation.objects.get(id=self.stale_virtual.id).is_active
+        )
+        self.assertTrue(
+            VirtualTankEstimation.objects.get(id=self.unmapped_virtual.id).is_active
+        )
+
+    def test_store_filter_limits_scope(self):
+        other_store = Store.objects.create(store_num=99992)
+        other_mapping = StoreTankMapping.objects.create(
+            store=other_store,
+            tank_type=self.tank_type,
+            fuel_type="regular",
+            tank_index=2,
+        )
+        TankEstimation.objects.create(
+            tank_mapping=other_mapping,
+            radius=50.0,
+            length=200.0,
+            confidence=0.5,
+            sample_count=5,
+            algorithm_version="TEST",
+            is_active=True,
+        )
+        other_virtual = VirtualTankEstimation.objects.create(
+            store=other_store,
+            fuel_type="regular",
+            tank_index=2,
+            radius=50.0,
+            length=200.0,
+            confidence=0.5,
+            sample_count=5,
+            algorithm_version="TEST",
+            is_active=True,
+        )
+
+        call_command(
+            "deactivate_stale_virtual_estimations",
+            "--apply",
+            "--store",
+            str(self.store.store_num),
+        )
+
+        self.assertFalse(
+            VirtualTankEstimation.objects.get(id=self.stale_virtual.id).is_active
+        )
+        self.assertTrue(
+            VirtualTankEstimation.objects.get(id=other_virtual.id).is_active
+        )
 
 
 class EstimationAndApiTests(APITestCase):
@@ -1073,3 +1295,197 @@ class TankTypeAdminTests(TestCase):
         self.assertIn("model", admin_instance.search_fields)
         self.assertIn("=capacity", admin_instance.search_fields)
         self.assertIn("=max_depth", admin_instance.search_fields)
+
+
+class ExportTankDataCommandTests(TestCase):
+    def setUp(self):
+        self.store = Store.objects.create(
+            store_num=100, store_name="Mapped Store", store_type="Travel Center"
+        )
+        self.tank_type = TankType.objects.create(name="12k96", capacity=12000)
+        self.mapping = StoreTankMapping.objects.create(
+            store=self.store,
+            tank_type=self.tank_type,
+            fuel_type="regular",
+            tank_index=1,
+        )
+        TankEstimation.objects.create(
+            tank_mapping=self.mapping,
+            radius=48.0,
+            length=192.0,
+            confidence=0.9,
+            sample_count=40,
+            algorithm_version="TEST",
+            is_active=True,
+        )
+        VirtualTankEstimation.objects.create(
+            store=self.store,
+            fuel_type="regular",
+            tank_index=1,
+            radius=48.0,
+            length=192.0,
+            confidence=0.7,
+            sample_count=20,
+            algorithm_version="TEST",
+            is_active=True,
+        )
+        self.unmapped_store = Store.objects.create(store_num=200, store_name="Bare")
+
+    def test_store_map_includes_store_type_for_all_stores(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            call_command("export_tank_data", "--output", tmpdir)
+            with open(os.path.join(tmpdir, "store_map.json")) as f:
+                store_map = json.load(f)
+
+        self.assertEqual(
+            set(store_map), {str(self.store.id), str(self.unmapped_store.id)}
+        )
+        self.assertEqual(store_map[str(self.store.id)]["store_num"], 100)
+        self.assertEqual(store_map[str(self.store.id)]["store_type"], "Travel Center")
+        self.assertEqual(store_map[str(self.unmapped_store.id)]["store_num"], 200)
+        self.assertIsNone(store_map[str(self.unmapped_store.id)]["store_type"])
+
+    def _run_export(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            call_command("export_tank_data", "--output", tmpdir)
+            with open(os.path.join(tmpdir, "generated_tank_charts.json")) as f:
+                generated = json.load(f)
+            with open(os.path.join(tmpdir, "tank_assignments.json")) as f:
+                assignments = json.load(f)
+        return generated, assignments
+
+    def test_generated_charts_emit_one_record_per_physical_tank(self):
+        generated, _ = self._run_export()
+
+        keys = [(r["store_id"], r["tank_index"]) for r in generated]
+        self.assertEqual(len(keys), len(set(keys)))
+        record = next(r for r in generated if r["store_id"] == self.store.id)
+        self.assertEqual(record["tank_index"], 1)
+        self.assertEqual(record["tank_type_name"], "12k96")
+        self.assertEqual(record["confidence"], 0.9)
+
+    def test_generated_charts_fall_back_to_virtual_when_mapped_geometry_fails(self):
+        TankEstimation.objects.create(
+            tank_mapping=self.mapping,
+            radius=0.0,
+            length=192.0,
+            confidence=0.99,
+            sample_count=99,
+            algorithm_version="TEST",
+            is_active=True,
+        )
+
+        generated, _ = self._run_export()
+
+        record = next(r for r in generated if r["store_id"] == self.store.id)
+        self.assertIsNone(record["tank_type_name"])
+        self.assertEqual(record["confidence"], 0.7)
+
+    def test_tank_assignments_cover_every_slot_including_unmapped(self):
+        VirtualTankEstimation.objects.create(
+            store=self.store,
+            fuel_type="diesel",
+            tank_index=2,
+            radius=48.0,
+            length=192.0,
+            confidence=0.5,
+            sample_count=10,
+            algorithm_version="TEST",
+            is_active=True,
+        )
+
+        _, assignments = self._run_export()
+
+        store_rows = [r for r in assignments if r["store_num"] == 100]
+        self.assertEqual(
+            [(r["tank_index"], r["tank_type_name"]) for r in store_rows],
+            [(1, "12k96"), (2, None)],
+        )
+        self.assertTrue(all(r["is_active"] for r in store_rows))
+        self.assertEqual(store_rows[1]["fuel_type"], "diesel")
+
+    def test_tank_assignments_skip_virtual_slots_already_mapped(self):
+        _, assignments = self._run_export()
+
+        store_rows = [r for r in assignments if r["store_num"] == 100]
+        self.assertEqual(len(store_rows), 1)
+        self.assertEqual(store_rows[0]["tank_type_name"], "12k96")
+
+    def test_auto_mapper_placeholder_names_export_as_unnamed(self):
+        auto_type = TankType.objects.create(name="AUTO_100_T2_REGULAR")
+        StoreTankMapping.objects.create(
+            store=self.store,
+            tank_type=auto_type,
+            fuel_type="premium",
+            tank_index=2,
+        )
+        TankEstimation.objects.create(
+            tank_mapping=StoreTankMapping.objects.get(
+                store=self.store, fuel_type="premium", tank_index=2
+            ),
+            radius=48.0,
+            length=192.0,
+            confidence=0.8,
+            sample_count=30,
+            algorithm_version="TEST",
+            is_active=True,
+        )
+
+        generated, assignments = self._run_export()
+
+        assignment_row = next(
+            r for r in assignments if r["store_num"] == 100 and r["tank_index"] == 2
+        )
+        self.assertIsNone(assignment_row["tank_type_name"])
+        self.assertTrue(assignment_row["is_active"])
+        generated_row = next(
+            r
+            for r in generated
+            if r["store_id"] == self.store.id and r["tank_index"] == 2
+        )
+        self.assertIsNone(generated_row["tank_type_name"])
+
+    def test_tank_assignments_mark_inactive_virtual_only_slots(self):
+        VirtualTankEstimation.objects.create(
+            store=self.store,
+            fuel_type="diesel",
+            tank_index=3,
+            radius=48.0,
+            length=192.0,
+            confidence=0.5,
+            sample_count=10,
+            algorithm_version="TEST",
+            is_active=False,
+        )
+
+        _, assignments = self._run_export()
+
+        row = next(
+            r for r in assignments if r["store_num"] == 100 and r["tank_index"] == 3
+        )
+        self.assertFalse(row["is_active"])
+        self.assertIsNone(row["tank_type_name"])
+
+    def test_tank_assignments_match_generated_chart_numbering(self):
+        VirtualTankEstimation.objects.create(
+            store=self.store,
+            fuel_type="diesel",
+            tank_index=2,
+            radius=48.0,
+            length=192.0,
+            confidence=0.5,
+            sample_count=10,
+            algorithm_version="TEST",
+            is_active=True,
+        )
+
+        generated, assignments = self._run_export()
+
+        generated_keys = {(r["store_num"], r["tank_index"]) for r in generated}
+        assignment_keys = {
+            (r["store_num"], r["tank_index"])
+            for r in assignments
+            if r["store_num"] == 100
+        }
+        self.assertEqual(generated_keys, {(100, 1), (100, 2)})
+        self.assertTrue(assignment_keys >= generated_keys)
