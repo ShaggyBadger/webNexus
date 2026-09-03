@@ -135,6 +135,7 @@
       tankProfileLoading: false,
       tankProfileError: "",
       tankChartInstance: null,
+      tankChartRequestGeneration: 0,
 
       get intelHint() {
         if (this.intelLayer === "PERSONAL") {
@@ -201,7 +202,7 @@
           maxDepth: maxDepth,
           maxGallons: maxGallons,
           ninetyPercentGallons: maxGallons != null ? maxGallons * 0.9 : null,
-          veederEntries: scatter.length,
+          veederEntries: tank.veeder_reading_count ?? scatter.length,
           officialPoints: operationalOfficial.length,
           generatedPoints: generated.length,
         };
@@ -278,6 +279,7 @@
       },
 
       selectTank: async function (tank) {
+        this.tankChartRequestGeneration += 1;
         this.selectedTank = tank;
         this.tankProfileData = null;
         this.tankProfileError = "";
@@ -300,10 +302,14 @@
 
         this.tankProfileLoading = true;
         this.tankProfileError = "";
+        const requestGeneration = this.tankChartRequestGeneration;
         try {
           const data = await this.fetchJson(
             `/tankgauge/api/tanks/${this.selectedTank.id}/chart-data/`,
           );
+          if (requestGeneration !== this.tankChartRequestGeneration) {
+            return;
+          }
           this.tankProfileData = data;
           this.tankProfileLoading = false;
           const self = this;
@@ -313,8 +319,14 @@
             });
           });
         } catch (error) {
-          this.tankProfileError = error.message;
-          this.tankProfileLoading = false;
+          if (requestGeneration === this.tankChartRequestGeneration) {
+            this.tankProfileError = error.message;
+            this.tankProfileLoading = false;
+          }
+        } finally {
+          if (requestGeneration === this.tankChartRequestGeneration) {
+            this.tankProfileLoading = false;
+          }
         }
       },
 
@@ -331,111 +343,25 @@
 
       renderTankChart: function () {
         const canvas = this.$refs.tankProfileChart;
-        if (
-          typeof Chart === "undefined" ||
-          !canvas ||
-          typeof canvas.getContext !== "function"
-        ) {
+        if (!canvas || !window.TankChartRenderer || !this.tankProfileData) {
           return;
         }
-        const ctx = canvas.getContext("2d");
-        if (!ctx) {
-          return;
-        }
-
-        const series = this.tankProfileData && this.tankProfileData.series
-          ? this.tankProfileData.series
-          : {};
-        const tank = this.tankProfileData && this.tankProfileData.tank
-          ? this.tankProfileData.tank
-          : {};
-        const official = series.official_chart || [];
-        const generated = series.generated_curve || [];
-        const scatter = series.scatter_points || [];
-
         this.destroyTankChart();
-
-        const datasets = [];
-        if (official.length && tank.source_policy !== "VEEDER_ONLY") {
-          datasets.push({
-            label: "Official Tank Chart",
-            data: official.map(function (point) {
-              return { x: point.inches, y: point.gallons };
-            }),
-            borderColor: "#a0aec0",
-            backgroundColor: "transparent",
-            borderWidth: 4,
-            fill: false,
-            showLine: true,
-            pointRadius: 0,
-            tension: 0.25,
-            order: 3,
-          });
-        }
-        if (generated.length) {
-          datasets.push({
-            label: "Generated Curve",
-            data: generated.map(function (point) {
-              return { x: point.inches, y: point.gallons };
-            }),
-            borderColor: "#8da35d",
-            backgroundColor: "transparent",
-            borderWidth: 2,
-            fill: false,
-            showLine: true,
-            pointRadius: 0,
-            tension: 0.25,
-            order: 2,
-          });
-        }
-        if (scatter.length) {
-          datasets.push({
-            label: "Veeder-Root Readings",
-            data: scatter.map(function (point) {
-              return { x: point.inches, y: point.gallons };
-            }),
-            backgroundColor: "#e94560",
-            borderColor: "#ffffff",
-            borderWidth: 1,
-            pointRadius: 5,
-            pointHoverRadius: 7,
-            showLine: false,
-            order: 1,
-          });
-        }
-
-        if (!datasets.length) {
-          this.tankProfileError = "No chart data available for this tank.";
-          return;
-        }
-
-        this.tankChartInstance = new Chart(ctx, {
-          type: "scatter",
-          data: { datasets: datasets },
-          options: {
-            animation: false,
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-              x: {
-                type: "linear",
-                title: { display: true, text: "Depth (Inches)", color: "#a0aec0" },
-                grid: { color: "#2a2e33" },
-                ticks: { color: "#a0aec0" },
-              },
-              y: {
-                title: { display: true, text: "Volume (Gallons)", color: "#a0aec0" },
-                grid: { color: "#2a2e33" },
-                ticks: { color: "#a0aec0" },
-              },
-            },
-            plugins: {
-              legend: {
-                labels: { color: "#d9dce3", boxWidth: 14 },
-              },
-            },
+        const controller = window.TankChartRenderer.render(
+          canvas,
+          this.tankProfileData,
+          {
+            overlays: [],
           },
-        });
+        );
+        this.tankChartInstance = controller;
+        if (controller.state.empty) {
+          this.tankProfileError = "No chart data available for this tank.";
+        } else if (controller.state.pointsOnly) {
+          this.tankProfileError = "Observed readings available; curve pending.";
+        } else {
+          this.tankProfileError = "";
+        }
       },
 
       formatMetric: function (value, unit) {

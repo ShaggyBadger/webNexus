@@ -1,5 +1,6 @@
 (() => {
   function destroyCharts(host) {
+    host.chartRenderGeneration = (host.chartRenderGeneration || 0) + 1;
     Object.values(host.preflightCharts || {}).forEach((chart) => {
       if (chart && typeof chart.destroy === "function") {
         chart.destroy();
@@ -8,14 +9,8 @@
     host.preflightCharts = {};
   }
 
-  async function renderChartForRow(host, row) {
-    const canvas = document.getElementById(`preflight-chart-${row.preflight_token}`);
-    if (!canvas || typeof Chart !== "function") {
-      return;
-    }
-
-    let officialSeries = [];
-    let generatedSeries = [];
+  async function renderChartForRow(host, row, generation) {
+    let chartData = { series: {}, tank: {} };
     let scatterSeries = [];
 
     if (row.tank_mapping_id) {
@@ -23,125 +18,61 @@
         const response = await fetch(`/tankgauge/api/tanks/${row.tank_mapping_id}/chart-data/`);
         if (response.ok) {
           const payload = await response.json();
-          const chartData = payload?.status === "success" ? payload.data : payload;
-          const series = chartData?.series || {};
-
-          officialSeries = (series.official_chart || []).map((point) => ({
-            x: Number(point.inches),
-            y: Number(point.gallons),
-          }));
-          generatedSeries = (series.generated_curve || []).map((point) => ({
-            x: Number(point.inches),
-            y: Number(point.gallons),
-          }));
-          scatterSeries = (series.scatter_points || []).map((point) => ({
-            x: Number(point.inches),
-            y: Number(point.gallons),
-          }));
+          chartData = (payload?.status === "success" ? payload.data : payload) || chartData;
+          scatterSeries = chartData?.series?.scatter_points || [];
         }
       } catch (error) {
         scatterSeries = [];
       }
     }
 
+    if (generation !== host.chartRenderGeneration) return;
     if (scatterSeries.length === 0) {
-      scatterSeries = (row.graph?.historical_points || []).map((point) => ({
-        x: Number(point.inches),
-        y: Number(point.gallons),
-      }));
+      scatterSeries = row.graph?.historical_points || [];
     }
 
     const candidate = row.graph?.candidate_point || {};
-    const datasets = [];
-
-    if (officialSeries.length > 0) {
-      datasets.push({
-        type: "line",
-        label: "Official Chart",
-        data: officialSeries,
-        borderColor: "#ffb86c",
-        backgroundColor: "rgba(255, 184, 108, 0.2)",
-        borderWidth: 2,
-        pointRadius: 0,
-        tension: 0.1,
-      });
-    }
-
-    if (generatedSeries.length > 0) {
-      datasets.push({
-        type: "line",
-        label: "Generated Curve",
-        data: generatedSeries,
-        borderColor: "#8da35d",
-        backgroundColor: "rgba(141, 163, 93, 0.18)",
-        borderWidth: 2,
-        borderDash: [6, 4],
-        pointRadius: 0,
-        tension: 0.12,
-      });
-    }
-
-    if (scatterSeries.length > 0) {
-      datasets.push({
-        type: "scatter",
-        label: "Recent Veeder Points",
-        data: scatterSeries,
-        backgroundColor: "#e94560",
-        pointRadius: 4,
-      });
-    }
-
-    datasets.push({
-      type: "scatter",
-      label: "Current Entry",
-      data: [{ x: Number(candidate.inches), y: Number(candidate.gallons) }],
-      backgroundColor: "#50fa7b",
-      pointRadius: 7,
+    const candidatePoint = Number.isFinite(Number(candidate.inches)) &&
+      Number.isFinite(Number(candidate.gallons))
+      ? [{ x: Number(candidate.inches), y: Number(candidate.gallons) }]
+      : [];
+    chartData.series = Object.assign({}, chartData.series, {
+      scatter_points: scatterSeries,
     });
 
-    host.preflightCharts[row.preflight_token] = new Chart(canvas, {
-      type: "scatter",
-      data: { datasets },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            labels: { color: "#f8f9fa" },
-          },
+    const canvas = document.getElementById(`preflight-chart-${row.preflight_token}`);
+    if (
+      generation !== host.chartRenderGeneration ||
+      !canvas ||
+      !window.TankChartRenderer
+    ) {
+      return;
+    }
+
+    const controller = window.TankChartRenderer.render(canvas, chartData, {
+      overlays: [
+        {
+          label: "Current Entry",
+          data: candidatePoint,
+          backgroundColor: "#50fa7b",
+          pointRadius: 7,
+          order: 0,
         },
-        scales: {
-          x: {
-            title: {
-              display: true,
-              text: "Height (in)",
-              color: "#a0aec0",
-            },
-            ticks: { color: "#a0aec0" },
-            grid: { color: "#2a2e33" },
-          },
-          y: {
-            title: {
-              display: true,
-              text: "Volume (gal)",
-              color: "#a0aec0",
-            },
-            ticks: { color: "#a0aec0" },
-            grid: { color: "#2a2e33" },
-          },
-        },
-      },
+      ],
     });
+    if (generation !== host.chartRenderGeneration) {
+      controller.destroy();
+      return;
+    }
+    host.preflightCharts[row.preflight_token] = controller;
   }
 
   function renderCharts(host) {
     destroyCharts(host);
-    if (typeof Chart !== "function") {
-      return;
-    }
-
+    if (!window.TankChartRenderer) return;
+    const generation = host.chartRenderGeneration;
     (host.preflightRows || []).forEach((row) => {
-      renderChartForRow(host, row);
+      renderChartForRow(host, row, generation);
     });
   }
 

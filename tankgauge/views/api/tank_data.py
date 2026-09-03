@@ -270,6 +270,16 @@ class TankChartDataAPIView(APIView):
             )
         return scatter_points
 
+    def _get_veeder_reading_count(self, mapping):
+        """Return the full count represented by the sampled chart points."""
+        return VeederReading.objects.filter(
+            ticket__store=mapping.store,
+            tank_index=mapping.tank_index,
+            fuel_type__name__iexact=mapping.fuel_type,
+            height__isnull=False,
+            volume__isnull=False,
+        ).count()
+
     def get(self, request, tank_id):
         try:
             mapping = StoreTankMapping.objects.select_related("tank_type", "store").get(
@@ -308,6 +318,12 @@ class TankChartDataAPIView(APIView):
             official_chart = self._get_official_chart(mapping)
             generated_curve = self._get_generated_curve(mapping, max_depth)
             scatter_points = self._get_scatter_points(mapping)
+            veeder_reading_count = self._get_veeder_reading_count(mapping)
+        if (
+            store_decision.source == VeederSourcePolicy.VEEDER_ONLY
+            and not has_veeder_identity
+        ):
+            veeder_reading_count = 0
         readiness = (
             VeederSourcePolicy.READY
             if store_decision.source == VeederSourcePolicy.OFFICIAL
@@ -339,6 +355,7 @@ class TankChartDataAPIView(APIView):
                     "tank_index": mapping.tank_index,
                     "source_policy": store_decision.source,
                     "readiness": readiness,
+                    "veeder_reading_count": veeder_reading_count,
                 },
                 "series": {
                     "official_chart": official_chart,

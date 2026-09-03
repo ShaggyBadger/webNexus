@@ -28,7 +28,7 @@ class GraphRenderer:
                 label=str(curve["label"]),
                 color=curve["color"],
                 linewidth=GraphConfig.GENERATED_LINE_WIDTH,
-                linestyle=(0, GraphConfig.GENERATED_LINE_DASH),
+                linestyle="-",
             )
 
         veeder_points = getattr(chart, "veeder_points", [])

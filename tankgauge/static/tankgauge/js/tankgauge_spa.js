@@ -14,6 +14,7 @@ function tankGaugeApp() {
     activeProfileKey: null,
     chartData: null,
     chartInstance: null,
+    chartRequestGeneration: 0,
     loading: {
       store: false,
       calculate: false,
@@ -401,8 +402,8 @@ function tankGaugeApp() {
     destroyChart() {
       if (this.chartInstance) {
         this.chartInstance.destroy();
-        this.chartInstance = null;
       }
+      this.chartInstance = null;
     },
 
     buildReadingDotDataset() {
@@ -607,6 +608,7 @@ function tankGaugeApp() {
     },
 
     async selectTank(tank) {
+      this.chartRequestGeneration += 1;
       const switchingTanks = this.selectedTank && this.selectedTank.id !== tank.id;
       if (switchingTanks) {
         this.inputs.deliveryGallons = "";
@@ -615,6 +617,8 @@ function tankGaugeApp() {
         this.activeProfileKey = null;
       }
       this.selectedTank = tank;
+      this.destroyChart();
+      this.chartData = null;
       this.selectedDisplayMode = this.preferredModeForTank(tank);
       this.activeProfileKey = this.resolvedDisplayMode;
       this.step = 3;
@@ -667,131 +671,43 @@ function tankGaugeApp() {
     },
 
     async fetchChartData() {
-      if (!this.selectedTank || this.loading.chart) {
+      if (!this.selectedTank) {
         return;
       }
 
       this.loading.chart = true;
       this.error = null;
+      const requestGeneration = this.chartRequestGeneration;
 
       try {
-        this.chartData = await this.apiGet(
+        const chartData = await this.apiGet(
           `/tankgauge/api/tanks/${this.selectedTank.id}/chart-data/`,
           "Failed to fetch chart data.",
         );
+        if (requestGeneration !== this.chartRequestGeneration) {
+          return;
+        }
+        this.chartData = chartData;
         this.renderChart();
       } catch (error) {
         this.error = error.message;
       } finally {
-        this.loading.chart = false;
+        if (requestGeneration === this.chartRequestGeneration) {
+          this.loading.chart = false;
+        }
       }
     },
 
     renderChart() {
       const canvas = document.getElementById("tankChart");
-      if (!canvas || !this.chartData?.series) {
+      if (!canvas || !this.chartData?.series || !window.TankChartRenderer) {
         return;
       }
 
       this.destroyChart();
-
-      const datasets = [];
-      const officialChart = this.chartData.series.official_chart || [];
-      const generatedCurve = this.chartData.series.generated_curve || [];
-      const scatterPoints = this.chartData.series.scatter_points || [];
-
-      if (officialChart.length > 0) {
-        datasets.push({
-          label: "Official Tank Chart",
-          data: officialChart.map((point) => ({
-            x: point.inches,
-            y: point.gallons,
-          })),
-          borderColor: "#a0aec0",
-          backgroundColor: "transparent",
-          borderWidth: 4,
-          fill: false,
-          showLine: true,
-          pointRadius: 0,
-          tension: 0.3,
-          order: 3,
-        });
-      }
-
-      if (generatedCurve.length > 0) {
-        datasets.push({
-          label: "Generated Curve (Math)",
-          data: generatedCurve.map((point) => ({
-            x: point.inches,
-            y: point.gallons,
-          })),
-          borderColor: "#ffb86c",
-          backgroundColor: "transparent",
-          borderWidth: 2,
-          borderDash: [8, 4],
-          fill: false,
-          showLine: true,
-          pointRadius: 0,
-          tension: 0.3,
-          order: 2,
-        });
-      }
-
-      if (scatterPoints.length > 0) {
-        datasets.push({
-          label: "Veeder-Root Readings",
-          data: scatterPoints.map((point) => ({
-            x: point.inches,
-            y: point.gallons,
-          })),
-          backgroundColor: "#e94560",
-          borderColor: "#ffffff",
-          borderWidth: 1.5,
-          showLine: false,
-          pointRadius: 4,
-          pointHoverRadius: 6,
-          order: 1,
-        });
-      }
-
       const readingDataset = this.buildReadingDotDataset();
-      if (readingDataset) {
-        datasets.push(readingDataset);
-      }
-
-      this.chartInstance = new Chart(canvas, {
-        type: "scatter",
-        data: { datasets },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: {
-            x: {
-              type: "linear",
-              title: { display: true, text: "Depth (Inches)", color: "#a0aec0" },
-              grid: { color: "#2a2e33" },
-              ticks: { color: "#a0aec0" },
-            },
-            y: {
-              title: {
-                display: true,
-                text: "Volume (Gallons)",
-                color: "#a0aec0",
-              },
-              grid: { color: "#2a2e33" },
-              ticks: { color: "#a0aec0" },
-            },
-          },
-          plugins: {
-            legend: { labels: { color: "#f8f9fa" } },
-            tooltip: {
-              callbacks: {
-                label: (ctx) =>
-                  `${ctx.dataset.label}: ${ctx.parsed.x}" / ${ctx.parsed.y} Gal`,
-              },
-            },
-          },
-        },
+      this.chartInstance = window.TankChartRenderer.render(canvas, this.chartData, {
+        overlays: readingDataset ? [readingDataset] : [],
       });
     },
   };

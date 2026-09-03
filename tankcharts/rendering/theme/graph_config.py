@@ -3,7 +3,6 @@ class GraphConfig:
     GRID_COLOR = "#cccccc"
     OFFICIAL_LINE_WIDTH = 2.5
     GENERATED_LINE_WIDTH = 1.8
-    GENERATED_LINE_DASH = (8, 4)
     VEEDER_MARKER_SIZE = 40
     VEEDER_EDGE_COLOR = "#ffffff"
     VEEDER_EDGE_WIDTH = 1.0

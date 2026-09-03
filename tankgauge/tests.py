@@ -1148,8 +1148,10 @@ class StoreChartApiTests(TestCase):
             )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        scatter_points = response.json()["data"]["series"]["scatter_points"]
+        payload = response.json()["data"]
+        scatter_points = payload["series"]["scatter_points"]
         self.assertEqual(len(scatter_points), 10)
+        self.assertEqual(payload["tank"]["veeder_reading_count"], 12)
         self.assertEqual(
             [point["inches"] for point in scatter_points[:5]], [1, 2, 3, 4, 5]
         )
