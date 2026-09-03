@@ -9,7 +9,12 @@ from .api_views import (
     store_lookup_api,
     tank_type_search_api,
 )
-from .dashboard_views import FuelRackListView, SiteIntelDashboardView, SiteSelectorView
+from .dashboard_views import (
+    FuelRackListView,
+    SiteIntelDashboardView,
+    SiteSelectorView,
+    StoreDirectorySearchView,
+)
 from .intel_views import (
     LocationDetailView,
     MapOverlayUpdateView,
@@ -33,6 +38,7 @@ __all__ = [
     "SiteIntelDashboardView",
     "SiteIntelligenceUpdateView",
     "SiteSelectorView",
+    "StoreDirectorySearchView",
     "StoreUpdateCreateView",
     "StoreUpdateDeleteView",
     "StoreUpdateListView",

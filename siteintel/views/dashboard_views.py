@@ -74,6 +74,32 @@ class SiteIntelDashboardView(LoginRequiredMixin, ListView):
         return queryset
 
 
+class StoreDirectorySearchView(ListView):
+    """Provide public broad search across canonical store identity fields."""
+
+    model = Store
+    template_name = "siteintel/store_search.html"
+    context_object_name = "stores"
+    paginate_by = 25
+
+    def get_queryset(self):
+        """Search store identity and address fields when a query is supplied."""
+        query = self.request.GET.get("q", "").strip()
+        if not query:
+            return Store.objects.none()
+
+        return Store.objects.select_related("location").filter(
+            Q(store_num__icontains=query)
+            | Q(riso_num__icontains=query)
+            | Q(store_name__icontains=query)
+            | Q(address__icontains=query)
+            | Q(city__icontains=query)
+            | Q(state__icontains=query)
+            | Q(zip_code__icontains=query)
+            | Q(county__icontains=query)
+        ).order_by("store_num")
+
+
 class SiteSelectorView(TemplateView):
     """
     OPERATIONAL FLOW:

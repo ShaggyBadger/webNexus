@@ -287,14 +287,6 @@
         await this.loadTankProfile();
       },
 
-      openTankChart: function () {
-        if (!this.selectedTank || !this.selectedTank.storeNum || !this.selectedTank.tankIndex) {
-          return;
-        }
-        const url = `/tankcharts/chart/${this.selectedTank.storeNum}/${this.selectedTank.tankIndex}/`;
-        window.open(url, "_blank", "noopener");
-      },
-
       loadTankProfile: async function () {
         if (!this.selectedTank || !this.selectedTank.id) {
           return;

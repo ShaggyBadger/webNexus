@@ -3,7 +3,10 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 from datetime import datetime, timezone
 
-from django.test import RequestFactory, SimpleTestCase
+from django.test import RequestFactory, SimpleTestCase, TestCase
+from django.urls import reverse
+
+from tankgauge.models import Store
 
 from siteintel.logic.rack_ops import get_rack_status
 from siteintel.services.geocoding_service import (
@@ -13,6 +16,37 @@ from siteintel.services.geocoding_service import (
     forward_geocode,
 )
 from siteintel.views.api_views import forward_geocode_api
+
+
+class StoreDirectorySearchTests(TestCase):
+    """Verify anonymous users can search the broad store directory."""
+
+    def setUp(self):
+        Store.objects.create(
+            store_num=42695,
+            riso_num=142695,
+            store_name="Hamlet SEI",
+            address="100 Main Street",
+            city="Hamlet",
+            state="North Carolina",
+            zip_code="28379",
+            county="Richmond",
+        )
+
+    def test_search_is_public_and_matches_address_fields(self):
+        response = self.client.get(
+            reverse("siteintel:store_search"), {"q": "Richmond"}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "42695")
+        self.assertContains(response, "Hamlet SEI")
+
+    def test_empty_search_prompts_for_query(self):
+        response = self.client.get(reverse("siteintel:store_search"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "SEARCH REQUIRED")
 
 
 class RackOpsUnitTests(SimpleTestCase):

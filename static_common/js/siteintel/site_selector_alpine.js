@@ -9,7 +9,11 @@ function siteSelectorApp() {
     panelLabel: "",
     showResultsPanel: false,
     canPropose: false,
-    proposalHref: "",
+     proposalHref: "",
+
+     init() {
+       this.scanNearbyStores();
+     },
 
     get lookupUrl() {
       return this.$root.dataset.lookupUrl;

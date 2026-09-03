@@ -607,6 +607,44 @@ class EstimationAndApiTests(APITestCase):
             0,
         )
 
+    def test_api_calc_uses_estimation_capacity_when_tank_type_capacity_is_null(self):
+        tank_type = TankType.objects.create(name="15k120-site-7986")
+        mapping = StoreTankMapping.objects.create(
+            store=self.store,
+            tank_type=tank_type,
+            fuel_type="regular",
+            tank_index=7,
+        )
+        TankEstimation.objects.create(
+            tank_mapping=mapping,
+            radius=59.98,
+            length=306.73,
+            confidence=0.77,
+            mean_error=12.0,
+            max_error=24.0,
+            sample_count=4,
+            algorithm_version="v1",
+            is_active=True,
+        )
+
+        response = self.client.post(
+            reverse("tankgauge:calculate_tank_api"),
+            {
+                "store_id": str(self.store.store_num),
+                "fuel_type": "regular",
+                "tank_id": str(mapping.id),
+                "current_inches": 100.75,
+                "delivery_gallons": 0,
+                "display_mode": "AUTO",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.data["data"]
+        self.assertGreater(data["ninety_limit"], 0)
+        self.assertGreater(data["avail_90"], 0)
+
     def test_estimation_health_api_for_mapped_tank(self):
         TankEstimation.objects.create(
             tank_mapping=self.mapping,

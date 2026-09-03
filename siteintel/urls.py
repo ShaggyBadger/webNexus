@@ -5,6 +5,7 @@ app_name = "siteintel"
 
 urlpatterns = [
     path("", views.SiteIntelDashboardView.as_view(), name="dashboard"),
+    path("search/", views.StoreDirectorySearchView.as_view(), name="store_search"),
     path("propose/", views.StoreUpdateCreateView.as_view(), name="proposal_create"),
     path("proposals/", views.StoreUpdateListView.as_view(), name="proposal_list"),
     path(

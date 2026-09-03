@@ -157,7 +157,25 @@ Advanced mapping features (drawing tools, path overlays) are explicitly deferred
 * Creating or editing data requires authentication
 * Approval capabilities are restricted to administrative users
 
-### 4.6 Audit and Logging
+### 4.6 Store Discovery Flow
+
+Store discovery uses three complementary entry points:
+
+* The field selector automatically attempts a nearby-store lookup on entry,
+  then remains optimized for numeric store/RISO lookup when GPS is unavailable.
+  It links to the dedicated broad search instead of requiring a separate scan
+  button.
+* The main directory keeps its lightweight existing search and may display
+  nearby stores when the browser grants location permission.
+* The public dedicated directory search at `/siteintel/search/` searches store
+  number, RISO, name, address, city, state, ZIP code, and county. It uses a
+  normal GET form with pagination so anonymous users can locate a store without
+  authentication.
+
+Nearby results never silently redirect or select a store. If GPS is denied,
+unavailable, or the lookup fails, manual directory search remains available.
+
+### 4.7 Audit and Logging
 
 * All proposed updates must be tracked with:
   * submitting user

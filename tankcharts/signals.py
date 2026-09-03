@@ -104,6 +104,19 @@ def auto_regenerate_on_tank_estimation(
     )
 
 
+@receiver(post_save, sender=StoreTankMapping)
+def auto_regenerate_on_mapping_created(
+    sender, instance: StoreTankMapping, created: bool, **kwargs
+) -> None:
+    """Retry a missing store chart when auto-mapping creates a tank mapping."""
+    if not created:
+        return
+    regenerate_store_chart_for_store_id(
+        store_id=instance.store_id,
+        reason_code="tank_mapping_created",
+    )
+
+
 @receiver(post_save, sender=VirtualTankEstimation)
 def auto_regenerate_on_virtual_estimation(
     sender, instance: VirtualTankEstimation, created: bool, **kwargs
