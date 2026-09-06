@@ -1343,6 +1343,7 @@ class ExportTankDataCommandTests(TestCase):
             store_num=100, store_name="Mapped Store", store_type="Travel Center"
         )
         self.tank_type = TankType.objects.create(name="12k96", capacity=12000)
+        self.regular_fuel = FuelType.objects.create(name="Regular", abbreviation="R")
         self.mapping = StoreTankMapping.objects.create(
             store=self.store,
             tank_type=self.tank_type,
@@ -1370,6 +1371,17 @@ class ExportTankDataCommandTests(TestCase):
             is_active=True,
         )
         self.unmapped_store = Store.objects.create(store_num=200, store_name="Bare")
+
+    def _create_reading(self, store, tank_index=1, volume=1000, ullage=7000):
+        ticket = VeederTicket.objects.create(store=store)
+        return VeederReading.objects.create(
+            ticket=ticket,
+            tank_index=tank_index,
+            fuel_type=self.regular_fuel,
+            volume=volume,
+            ullage=ullage,
+            height=20.0,
+        )
 
     def test_store_map_includes_store_type_for_all_stores(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1420,6 +1432,79 @@ class ExportTankDataCommandTests(TestCase):
         record = next(r for r in generated if r["store_id"] == self.store.id)
         self.assertIsNone(record["tank_type_name"])
         self.assertEqual(record["confidence"], 0.7)
+
+    def test_generated_charts_recover_geometry_from_current_readings(self):
+        recovery_store = Store.objects.create(store_num=300)
+        recovery_mapping = StoreTankMapping.objects.create(
+            store=recovery_store,
+            tank_type=TankType.objects.create(name="AUTO_300_T1_REGULAR"),
+            fuel_type="regular",
+            tank_index=1,
+        )
+        self._create_reading(recovery_store)
+
+        generated, _ = self._run_export()
+
+        record = next(r for r in generated if r["store_id"] == recovery_store.id)
+        self.assertEqual(record["tank_index"], recovery_mapping.tank_index)
+        self.assertIsNone(record["tank_type_name"])
+        self.assertGreater(record["radius"], 0)
+        self.assertEqual(record["sample_count"], 1)
+
+    def test_recovery_report_lists_recovered_tanks(self):
+        recovery_store = Store.objects.create(store_num=300)
+        StoreTankMapping.objects.create(
+            store=recovery_store,
+            tank_type=TankType.objects.create(name="AUTO_300_T1_REGULAR"),
+            fuel_type="regular",
+            tank_index=1,
+        )
+        reading = self._create_reading(recovery_store)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            call_command("export_tank_data", "--output", tmpdir)
+            with open(os.path.join(tmpdir, "tank_recovery_report.json")) as f:
+                report = json.load(f)
+
+        self.assertEqual(len(report["recovered_tanks"]), 1)
+        self.assertEqual(report["recovered_tanks"][0]["latest_reading_id"], reading.id)
+
+    def test_inactive_mapped_estimation_does_not_block_recovery(self):
+        recovery_store = Store.objects.create(store_num=300)
+        recovery_mapping = StoreTankMapping.objects.create(
+            store=recovery_store,
+            tank_type=TankType.objects.create(name="AUTO_300_T1_REGULAR"),
+            fuel_type="regular",
+            tank_index=1,
+        )
+        TankEstimation.objects.create(
+            tank_mapping=recovery_mapping,
+            radius=48.0,
+            length=192.0,
+            confidence=0.9,
+            sample_count=10,
+            algorithm_version="OLD",
+            is_active=False,
+        )
+        self._create_reading(recovery_store)
+
+        generated, _ = self._run_export()
+
+        record = next(r for r in generated if r["store_id"] == recovery_store.id)
+        self.assertEqual(record["algorithm_version"], "1.0.0")
+
+    def test_no_usable_readings_are_not_recovered(self):
+        empty_store = Store.objects.create(store_num=300)
+        StoreTankMapping.objects.create(
+            store=empty_store,
+            tank_type=TankType.objects.create(name="AUTO_300_T1_REGULAR"),
+            fuel_type="regular",
+            tank_index=1,
+        )
+
+        generated, report = self._run_export()
+
+        self.assertFalse(any(r["store_id"] == empty_store.id for r in generated))
 
     def test_tank_assignments_cover_every_slot_including_unmapped(self):
         VirtualTankEstimation.objects.create(

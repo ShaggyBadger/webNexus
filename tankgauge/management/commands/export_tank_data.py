@@ -5,7 +5,9 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db import models as db_models
 
+from atg.models import VeederReading
 from tankgauge.logic.curve_generator import generate_inch_gallon_curve
+from tankgauge.logic.geometry import GeometryEngine
 from tankgauge.logic.utils import canonicalize_fuel
 from tankgauge.models import (
     Store,
@@ -22,7 +24,7 @@ DEFAULT_OUTPUT_DIR = os.path.join(
 
 class Command(BaseCommand):
     help = (
-        "Export tank data to 4 JSON files for offline analysis "
+        "Export tank data to 5 JSON files for offline analysis "
         f"(default output: {DEFAULT_OUTPUT_DIR})."
     )
 
@@ -64,8 +66,21 @@ class Command(BaseCommand):
 
         self._export_store_map(stores, output_dir, indent)
         self._export_official_charts(stores, output_dir, indent)
-        self._export_generated_charts(stores, output_dir, indent)
+        recovery_report = self._export_generated_charts(stores, output_dir, indent)
         self._export_tank_assignments(stores, output_dir, indent)
+        self._write_json(
+            os.path.join(output_dir, "tank_recovery_report.json"),
+            recovery_report,
+            indent,
+        )
+        if recovery_report["recovered_tanks"]:
+            self.stdout.write(
+                self.style.WARNING(
+                    "Recovered geometry for "
+                    f"{len(recovery_report['recovered_tanks'])} tank(s); "
+                    "see tank_recovery_report.json."
+                )
+            )
 
     def _export_store_map(self, stores, output_dir, indent):
         store_map = {}
@@ -145,6 +160,7 @@ class Command(BaseCommand):
         """
         store_ids = list(stores.values_list("id", flat=True))
         candidates = {}
+        recovered_tanks = []
 
         def add_candidate(record, source_priority):
             key = (record["store_id"], record["tank_index"])
@@ -249,6 +265,94 @@ class Command(BaseCommand):
                 source_priority=1,
             )
 
+        mappings_by_key = {
+            (mapping.store_id, mapping.tank_index): mapping for mapping in mappings
+        }
+        readings = (
+            VeederReading.objects.filter(ticket__store_id__in=store_ids)
+            .select_related("ticket", "fuel_type")
+            .order_by("ticket__uploaded_at", "id")
+        )
+        readings_by_key = {}
+        for reading in readings:
+            if (
+                reading.volume is None
+                or reading.ullage is None
+                or reading.height is None
+            ):
+                continue
+            try:
+                total_capacity = float(reading.volume + reading.ullage)
+                height = float(reading.height)
+                volume = float(reading.volume)
+            except (TypeError, ValueError):
+                continue
+            if total_capacity <= 0:
+                continue
+            key = (
+                reading.ticket.store_id,
+                reading.tank_index,
+                canonicalize_fuel(reading.fuel_type.name),
+            )
+            readings_by_key.setdefault(key, []).append(
+                (reading, total_capacity, height, volume)
+            )
+
+        geometry_engine = GeometryEngine()
+        for reading_key, reading_group in readings_by_key.items():
+            store_id, tank_index, fuel_type = reading_key
+            candidate_key = (store_id, tank_index)
+            if candidate_key in candidates:
+                continue
+
+            latest_reading, total_capacity, _, _ = reading_group[-1]
+            observations = [(height, volume) for _, _, height, volume in reading_group]
+            result = geometry_engine.calculate_best_fit(total_capacity, observations)
+            if result.get("status") != "SUCCESS":
+                continue
+
+            radius = float(result["radius"])
+            length = float(result["length"])
+            max_depth = int(radius * 2)
+            try:
+                chart = generate_inch_gallon_curve(radius, length, max_depth)
+            except ValueError:
+                continue
+
+            mapping = mappings_by_key.get(candidate_key)
+            recovered_record = {
+                "store_id": store_id,
+                "store_num": latest_reading.ticket.store.store_num,
+                "tank_index": tank_index,
+                "fuel_type": fuel_type,
+                "tank_type_id": mapping.tank_type_id if mapping else None,
+                "tank_type_name": (
+                    self._clean_tank_type_name(mapping.tank_type.name)
+                    if mapping and mapping.tank_type
+                    else None
+                ),
+                "radius": radius,
+                "length": length,
+                "max_depth": max_depth,
+                "confidence": result["confidence"],
+                "sample_count": result["diagnostics"].get("sample_count"),
+                "estimation_method": "HORIZONTAL_CYLINDER",
+                "algorithm_version": result["algorithm_version"],
+                "chart": chart,
+            }
+            candidates[candidate_key] = ((2, 0, 0), recovered_record)
+            recovered_tanks.append(
+                {
+                    "store_id": store_id,
+                    "store_num": latest_reading.ticket.store.store_num,
+                    "tank_index": tank_index,
+                    "fuel_type": fuel_type,
+                    "reading_count": len(reading_group),
+                    "latest_reading_id": latest_reading.id,
+                    "reason": "no_active_estimation",
+                }
+            )
+
         generated = [
             record
             for _, record in sorted(
@@ -267,6 +371,7 @@ class Command(BaseCommand):
         self.stdout.write(
             self.style.SUCCESS(f"generated_tank_charts: {len(generated)} tanks")
         )
+        return {"recovered_tanks": recovered_tanks}
 
     def _export_tank_assignments(self, stores, output_dir, indent):
         """Export one row per physical tank slot at every store.

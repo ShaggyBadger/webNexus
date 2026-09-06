@@ -248,7 +248,6 @@
       gtag('config', 'G-TVNRDTK05X');
     </script>
     {% block extra_head %}{% endblock %}
-    {% include 'feedback/includes/feedback_styles.html' %}
 </head>
 <body>
     {% include 'components/navbar.html' %}
@@ -262,7 +261,6 @@
     </main>
 
     {% include 'components/footer.html' %}
-    {% include 'feedback/includes/feedback_modal.html' %}
 
     <!-- Bootstrap JS Bundle -->
     <script src="{% static 'css/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
@@ -292,7 +290,6 @@
             });
         };
     </script>
-    <script type="module" src="{% static 'js/feedback/feedback_widget.js' %}"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     {% block extra_scripts %}{% endblock %}
 </body>
