@@ -5,6 +5,8 @@
         
         <nav class="d-flex align-items-center command-nav">
             <span class="command-bracket">[</span>
+            {% include 'feedback/includes/feedback_button.html' %}
+            <span class="command-separator">/</span>
             {% if user.is_authenticated %}
                 <a href="{% url 'accounts:profile' %}" class="command-link-compact">PROFILE</a>
                 <span class="command-separator">/</span>
