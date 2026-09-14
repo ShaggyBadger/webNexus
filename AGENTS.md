@@ -1,5 +1,18 @@
 # Agent Instructions
 
+## Environment Boundary
+
+- This workspace is the laptop development environment for `webNexus`.
+- The deployed production instance is hosted on a Linode server.
+- Treat local commands, database changes, migrations, test data, and generated
+  files as development-only unless the user explicitly requests a production
+  operation.
+- Do not infer, store, or request production credentials, private hostnames,
+  tokens, or connection details from this file.
+- Before recommending or performing a production deployment, migration, or
+  destructive data operation, confirm the target environment and obtain
+  explicit user direction.
+
 Before working:
 
 1. Read `README.md`.

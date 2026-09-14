@@ -32,10 +32,7 @@
                         <p class="small" style="margin-bottom: 10px;">
                             Run background batch intelligence now to refresh mapped and virtual tank estimate cache.
                         </p>
-                        <form method="post" action="{% url 'admin_sync_tank_estimates' %}">
-                            {% csrf_token %}
-                            <button type="submit" class="button default">RUN TANK ESTIMATE SYNC</button>
-                        </form>
+                        <a href="{% url 'admin_sync_tank_estimates' %}" class="button default">RUN TANK ESTIMATE SYNC</a>
                     </td>
                 </tr>
             </table>

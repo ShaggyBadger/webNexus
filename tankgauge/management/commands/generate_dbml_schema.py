@@ -14,6 +14,7 @@ PROJECT_APP_LABELS = {
     "siteintel",
     "tankcharts",
     "tankgauge",
+    "genericcharts",
 }
 
 
@@ -59,7 +60,7 @@ class Command(BaseCommand):
         lines = [
             "// Master database schema for project-owned Django models.",
             "// Format: DBML",
-            "// Scope: accounts, atg, dms, missionlog, siteintel, tankcharts, tankgauge",
+            "// Scope: accounts, atg, dms, genericcharts, missionlog, siteintel, tankcharts, tankgauge",
             "// Note: auth_user and django_content_type are included as external dependency stubs.",
             "",
         ]

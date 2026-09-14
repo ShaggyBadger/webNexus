@@ -112,6 +112,7 @@ INSTALLED_APPS = [
     "atg",
     "feedback",
     "tankcharts",
+    "genericcharts",
 ]
 
 

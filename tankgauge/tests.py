@@ -16,6 +16,7 @@ from rest_framework.test import APITestCase
 from atg.models import VeederReading, VeederTicket
 from missionlog.models import FuelType
 from siteintel.models import Location, LocationType
+from genericcharts.models import TankEstimateSyncRun
 from tankgauge.admin.hardware_admin import TankTypeAdmin
 from tankgauge.admin.store_admin import StoreTankMappingAdmin
 from tankgauge.logic.curve_generator import generate_inch_gallon_curve
@@ -786,15 +787,36 @@ class AdminSyncButtonTests(TestCase):
             password="password",
         )
 
-    def test_admin_sync_endpoint_triggers_command(self):
+    @patch("genericcharts.admin.launch_tank_estimate_sync")
+    def test_admin_sync_endpoint_creates_all_store_run(self, launch):
         self.client.force_login(self.user)
 
-        with patch("tankgauge.admin_views.call_command") as call_command_mock:
-            response = self.client.post(reverse("admin_sync_tank_estimates"))
+        response = self.client.post(
+            reverse("admin_sync_tank_estimates"),
+            {"scope": "all", "mapped_only": "on"},
+        )
 
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response.url, reverse("admin:index"))
-        call_command_mock.assert_called_once_with("sync_tank_estimates")
+        self.assertEqual(response.url, reverse("admin_sync_tank_estimates"))
+        run = TankEstimateSyncRun.objects.get()
+        self.assertIsNone(run.store_number)
+        self.assertTrue(run.mapped_only)
+        launch.assert_called_once_with(run)
+
+    @patch("genericcharts.admin.launch_tank_estimate_sync")
+    def test_admin_sync_endpoint_creates_targeted_run(self, launch):
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("admin_sync_tank_estimates"),
+            {"scope": "store", "store_number": "6947"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        run = TankEstimateSyncRun.objects.get()
+        self.assertEqual(run.store_number, 6947)
+        self.assertFalse(run.mapped_only)
+        launch.assert_called_once_with(run)
 
     def test_admin_conflict_resolver_endpoint_dry_run(self):
         self.client.force_login(self.user)

@@ -1,0 +1,38 @@
+{% extends "admin/base_site.html" %}
+
+{% block title %}Tank Estimate Sync{% endblock %}
+
+{% block content %}
+<h1>Tank Estimate Sync</h1>
+<p>Re-run Veeder-derived geometry for mapped tanks and persist active estimates.</p>
+<form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit" class="button default">START ESTIMATE SYNC</button>
+</form>
+
+<h2>Recent Runs</h2>
+<table>
+    <thead>
+        <tr>
+            <th>ID</th><th>Scope</th><th>Mode</th><th>Status</th>
+            <th>Requested by</th><th>Created</th><th>Completed</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for run in runs %}
+        <tr>
+            <td><a href="{% url 'admin:genericcharts_tankestimatesyncrun_change' run.id %}">{{ run.id }}</a></td>
+            <td>{{ run.store_number|default:"All stores" }}</td>
+            <td>{% if run.mapped_only %}Mapped only{% else %}Mapped and virtual{% endif %}</td>
+            <td>{{ run.get_status_display }}</td>
+            <td>{{ run.requested_by }}</td>
+            <td>{{ run.created_at }}</td>
+            <td>{{ run.completed_at|default:"-" }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7">No estimate sync runs yet.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

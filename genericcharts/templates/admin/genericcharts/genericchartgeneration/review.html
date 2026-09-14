@@ -1,0 +1,154 @@
+{% extends "admin/base_site.html" %}
+
+{% block title %}CoreStarterPack Review{% endblock %}
+
+{% block content %}
+<h1>CoreStarterPack Package Review</h1>
+<form method="post">
+    {% csrf_token %}
+    <p>{{ form.state.errors }}{{ form.state.label_tag }} {{ form.state }}</p>
+    <p>{{ form.store_numbers.errors }}{{ form.store_numbers.label_tag }} {{ form.store_numbers }}</p>
+    {{ form.store_type_ids }}
+    <fieldset style="margin: 16px 0; max-width: 720px;">
+        <legend>Store Types / Brands</legend>
+        <p>Select the store types to include. All available types start selected.</p>
+        <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+            <label>
+                Available
+                <select id="store-types-available" multiple size="6" style="min-width: 220px;">
+                    {% for value, label in form.store_type_options %}
+                    {% if value not in form.selected_store_type_ids %}
+                    <option value="{{ value }}">{{ label }}</option>
+                    {% endif %}
+                    {% endfor %}
+                </select>
+            </label>
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+                <button type="button" class="button" id="store-types-add">ADD &gt;</button>
+                <button type="button" class="button" id="store-types-remove">&lt; REMOVE</button>
+            </div>
+            <label>
+                Selected
+                <select id="store-types-selected" multiple size="6" style="min-width: 220px;">
+                    {% for value, label in form.store_type_options %}
+                    {% if value in form.selected_store_type_ids %}
+                    <option value="{{ value }}">{{ label }}</option>
+                    {% endif %}
+                    {% endfor %}
+                </select>
+            </label>
+        </div>
+    </fieldset>
+    <div style="margin-bottom: 16px;">
+        {{ form.volume_gap_percent.errors }}{{ form.volume_gap_percent.label_tag }}<br>
+        {{ form.volume_gap_percent }}
+        <small style="display: block; margin-top: 4px; max-width: 720px;">
+            {{ form.volume_gap_percent.help_text }}
+        </small>
+    </div>
+    <div style="margin-bottom: 16px;">
+        {{ form.near_duplicate_tolerance_percent.errors }}{{ form.near_duplicate_tolerance_percent.label_tag }}<br>
+        {{ form.near_duplicate_tolerance_percent }}
+        <small style="display: block; margin-top: 4px; max-width: 720px;">
+            {{ form.near_duplicate_tolerance_percent.help_text }}
+        </small>
+    </div>
+    <div style="margin-bottom: 16px;">
+        {{ form.outlier_multiplier.errors }}{{ form.outlier_multiplier.label_tag }}<br>
+        {{ form.outlier_multiplier }}
+        <small style="display: block; margin-top: 4px; max-width: 720px;">
+            {{ form.outlier_multiplier.help_text }}
+        </small>
+    </div>
+    <button type="submit" class="button default">BUILD REVIEW</button>
+</form>
+
+{% if graphs %}
+<hr>
+<h2>Selection {{ scope_key }}</h2>
+<p>{{ generated_tank_count }} generated tanks across {{ graphs|length }} catalog buckets.</p>
+{% if collisions %}
+<h3>Catalog Collisions</h3>
+<ul>
+    {% for collision in collisions %}
+    <li>{{ collision.base_name }}: {{ collision.names|join:", " }}</li>
+    {% endfor %}
+</ul>
+{% endif %}
+{% for graph in graphs %}
+<details x-data="{ visible: { original: true, envelope: true, standard_deviation: false, median: false, analytic: true } }">
+    <summary>{{ graph.bucket_name }}: {{ graph.tank_count }} tanks</summary>
+    <p>{{ graph.depth_inches }} inches, {{ graph.nominal_volume_gallons }} gallons nominal.</p>
+    <div style="overflow-x: auto; background: #fff; border: 1px solid #cbd5e0; padding: 8px;">
+        <svg viewBox="0 0 760 240" role="img" aria-label="{{ graph.bucket_name }} curve review" style="min-width: 620px; width: 100%;">
+            <line x1="0" y1="220" x2="760" y2="220" stroke="#4a5568" />
+            <line x1="0" y1="30" x2="0" y2="220" stroke="#4a5568" />
+            {% for layer in graph.svg_layers %}
+            <polyline points="{{ layer.points }}" fill="none" stroke-width="2" stroke="{% cycle '#2b6cb0' '#8da35d' '#e94560' '#805ad5' '#d4943a' %}" x-show="visible.{{ layer.key }}" />
+            {% endfor %}
+        </svg>
+    </div>
+    <div style="display: flex; gap: 12px; flex-wrap: wrap; margin: 8px 0;">
+        {% for layer in graph.layers %}
+        <label><input type="checkbox" x-model="visible.{{ layer.key }}"> {{ layer.label }}</label>
+        {% endfor %}
+    </div>
+    <ul>
+        {% for layer in graph.layers %}
+        <li>{{ layer.label }}: {{ layer.points|length }} points{% if layer.visible_by_default %} (visible){% endif %}</li>
+        {% endfor %}
+    </ul>
+</details>
+{% endfor %}
+<form method="post" action="{% url 'admin:genericcharts_genericchartgeneration_generate' %}">
+    {% csrf_token %}
+    {% for field in form.hidden_fields %}{{ field }}{% endfor %}
+    <p>
+        {{ form.document_description.label_tag }}
+        {{ form.document_description }}
+        {{ form.document_description.help_text }}
+    </p>
+    <input type="hidden" name="state" value="{{ form.state.value|default:'FULL' }}">
+    <input type="hidden" name="store_numbers" value="{{ form.store_numbers.value|default:'' }}">
+    <input type="hidden" name="volume_gap_percent" value="{{ form.volume_gap_percent.value|default:'3' }}">
+    <input type="hidden" name="near_duplicate_tolerance_percent" value="{{ form.near_duplicate_tolerance_percent.value|default:'1' }}">
+    <input type="hidden" name="outlier_multiplier" value="{{ form.outlier_multiplier.value|default:'2' }}">
+    <button type="submit" class="button default">START ASYNC GENERATION</button>
+</form>
+{% endif %}
+<script>
+    (() => {
+        const available = document.getElementById("store-types-available");
+        const selected = document.getElementById("store-types-selected");
+        if (!available || !selected) return;
+
+        const moveOptions = (source, destination) => {
+            Array.from(source.selectedOptions).forEach((option) => {
+                destination.appendChild(option);
+                option.selected = false;
+            });
+        };
+
+        const syncHiddenFields = (form) => {
+            form.querySelectorAll('input[name="store_type_ids"]').forEach((input) => input.remove());
+            Array.from(selected.options).forEach((option) => {
+                const input = document.createElement("input");
+                input.type = "hidden";
+                input.name = "store_type_ids";
+                input.value = option.value;
+                form.appendChild(input);
+            });
+        };
+
+        document.getElementById("store-types-add").addEventListener("click", () => {
+            moveOptions(available, selected);
+        });
+        document.getElementById("store-types-remove").addEventListener("click", () => {
+            moveOptions(selected, available);
+        });
+        document.querySelectorAll('form[method="post"]').forEach((form) => {
+            form.addEventListener("submit", () => syncHiddenFields(form));
+        });
+    })();
+</script>
+{% endblock %}
