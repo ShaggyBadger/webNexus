@@ -70,6 +70,9 @@ webNexus data.
 - Tank estimate repair runs are launched from the admin dashboard and retain
   their selected scope, mode, status, and command output in
   `TankEstimateSyncRun`.
+- Repair runs also retain mapping/profile scope, idempotency key, preview mode,
+  result counters, and structured output. Workers claim only pending runs and
+  report partial failures without hiding successful repairs.
 
 ## Maintenance
 

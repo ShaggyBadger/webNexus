@@ -10,6 +10,7 @@ from .mode_resolver import (
     ModeResolver,
 )
 from .veeder_source_policy import VeederSourcePolicy
+from .capacity_resolution import CapacityResolutionService
 from .types import CalculationMode, ConfidenceLevel, ModeAvailability
 
 # Tactical Logger
@@ -403,11 +404,14 @@ def determine_operating_mode(tank_mapping, force_source=None):
         service = EstimationService()
         est = service.run_estimation_for_tank(tank_mapping)
         if est:
+            resolution = CapacityResolutionService().resolve_mapping(tank_mapping)
             return MODE_MATHEMATICAL, {
                 "name": "MATHEMATICAL_ESTIMATE",
                 "confidence": est.confidence,
                 "estimation": est,
                 "capacity": tank_mapping.tank_type.capacity or 0,
+                "capacity_status": resolution.status,
+                "capacity_warning_codes": list(resolution.warning_codes),
             }
         return None
 
@@ -477,6 +481,7 @@ def determine_virtual_operating_mode(
         ticket__store_id=store_id,
         tank_index=tank_index,
         fuel_type__name__iexact=fuel_type,
+        acceptance_status="ACCEPTED",
     )
 
     if not readings.exists():
@@ -485,6 +490,21 @@ def determine_virtual_operating_mode(
         }
 
     latest = readings.order_by("-ticket__uploaded_at").first()
+    if latest.volume is None or latest.ullage is None:
+        return MODE_UNAVAILABLE, {
+            "message": "Latest accepted Veeder reading has no capacity values.",
+            "capacity_status": "UNRESOLVED",
+        }
+    capacity_resolution = CapacityResolutionService().resolve_virtual(
+        total_capacity_gallons=latest.volume + latest.ullage,
+        evidence_ids=(str(latest.id),),
+        basis_percent_exact=latest.ullage_endpoint_percent_exact,
+    )
+    if not capacity_resolution.usable:
+        return MODE_UNAVAILABLE, {
+            "message": "Veeder capacity could not be resolved.",
+            "capacity_status": capacity_resolution.status,
+        }
     store = latest.ticket.store
     fuel_key = canonicalize_fuel(fuel_type)
 
@@ -500,7 +520,9 @@ def determine_virtual_operating_mode(
                 "name": "MATHEMATICAL_ESTIMATE",
                 "confidence": estimation.confidence,
                 "estimation": estimation,
-                "capacity": float(latest.volume + latest.ullage),
+                "capacity": float(capacity_resolution.physical_capacity_gallons),
+                "capacity_status": capacity_resolution.status,
+                "capacity_warning_codes": list(capacity_resolution.warning_codes),
             },
         )
         if force_source in (None, MODE_MATHEMATICAL):
@@ -521,7 +543,7 @@ def determine_virtual_operating_mode(
             "message": f"Insufficient height spread for Mathematical Mode: {spread:.2f}in found, {MIN_HEIGHT_SPREAD:.2f}in required.",
         }
 
-    total_capacity = float(latest.volume + latest.ullage)
+    total_capacity = float(capacity_resolution.physical_capacity_gallons)
 
     service = EstimationService()
     # Attempt to persist/get latest valid estimation
@@ -542,6 +564,8 @@ def determine_virtual_operating_mode(
                 "confidence": estimation.confidence,
                 "estimation": estimation,
                 "capacity": total_capacity,
+                "capacity_status": capacity_resolution.status,
+                "capacity_warning_codes": list(capacity_resolution.warning_codes),
             },
         )
         if force_source in (None, MODE_MATHEMATICAL):

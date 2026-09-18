@@ -8,6 +8,7 @@ from .views.api_views import (
     StoreTankProfileAPIView,
     VeederQuickCaptureAPIView,
     VeederReadingsPreflightAPIView,
+    VerifyTankCapacityAPIView,
 )
 from .views.review_api_views import (
     FuelTypeListAPIView,
@@ -69,6 +70,11 @@ urlpatterns = [
         "api/v1/stores/<int:store_num>/tank-profile/",
         StoreTankProfileAPIView.as_view(),
         name="store_tank_profile_api",
+    ),
+    path(
+        "api/v1/tank-profile/verify/",
+        VerifyTankCapacityAPIView.as_view(),
+        name="verify_tank_capacity",
     ),
     path(
         "api/v1/remote-ocr/instructions/",

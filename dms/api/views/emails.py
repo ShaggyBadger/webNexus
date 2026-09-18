@@ -53,6 +53,15 @@ class DocumentEmailAPIView(APIView, StandardAPIResponseMixin):
                 status_code=status.HTTP_404_NOT_FOUND,
             )
 
+        from dms.services.chart_artifact_safety import chart_document_safety_reason
+
+        if chart_document_safety_reason(document):
+            return self.error_response(
+                message="Document not found.",
+                code="document_not_found",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
         if not request.user.is_authenticated and not document.is_public:
             return self.error_response(
                 message="Document not found.",

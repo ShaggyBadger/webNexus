@@ -149,6 +149,10 @@ class GenericChartSelectorTests(TestCase):
 
         self.assertEqual(len(tanks), 1)
         self.assertEqual(tanks[0].source, "mapped_estimation")
+        self.assertEqual(tanks[0].capacity_status, "LEGACY_UNVERIFIED")
+        self.assertEqual(tanks[0].capacity_source, "OFFICIAL_AVAILABLE")
+        self.assertEqual(tanks[0].estimate_status, "LEGACY_UNVERIFIED")
+        self.assertEqual(tanks[0].profile_version, 1)
         self.assertEqual(tanks[0].radius_inches, 48.0)
         self.assertEqual(tanks[0].curve[-1].depth_inches, 96)
 
@@ -166,6 +170,23 @@ class GenericChartSelectorTests(TestCase):
 
         self.assertEqual(len(tanks), 1)
         self.assertEqual(tanks[0].source, "virtual_estimation")
+
+    def test_conflicting_mapped_profile_blocks_virtual_fallback(self):
+        self.mapping.capacity_source = "CONFLICTING"
+        self.mapping.save(update_fields=["capacity_source"])
+
+        tanks = select_generated_tanks(SelectionSpec(state="NC"))
+
+        self.assertEqual(tanks, ())
+
+    def test_unsafe_mapped_estimate_blocks_virtual_fallback(self):
+        TankEstimation.objects.filter(tank_mapping=self.mapping).update(
+            radius=0, estimate_status="UNSAFE"
+        )
+
+        tanks = select_generated_tanks(SelectionSpec(state="NC"))
+
+        self.assertEqual(tanks, ())
 
     def test_official_charts_follow_selected_tank_types_and_stores(self):
         TankChart.objects.create(

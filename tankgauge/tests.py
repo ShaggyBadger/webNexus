@@ -2,6 +2,7 @@ import json
 import os
 import tempfile
 from datetime import timedelta
+from decimal import Decimal
 from unittest.mock import patch
 
 from django.contrib.admin.sites import AdminSite
@@ -20,6 +21,7 @@ from genericcharts.models import TankEstimateSyncRun
 from tankgauge.admin.hardware_admin import TankTypeAdmin
 from tankgauge.admin.store_admin import StoreTankMappingAdmin
 from tankgauge.logic.curve_generator import generate_inch_gallon_curve
+from tankgauge.logic.capacity_resolution import CapacityResolutionService
 from tankgauge.logic.estimation_service import EstimationService
 from tankgauge.logic.tank_lookup import (
     get_mapping_resolution_metrics,
@@ -35,6 +37,69 @@ from tankgauge.models import (
     TankType,
     VirtualTankEstimation,
 )
+
+
+class CapacityResolutionFixtureTests(TestCase):
+    """Lock the Store 7928 ticket semantics to the canonical resolver."""
+
+    def test_store_7928_printed_capacity_is_physical_capacity(self):
+        store = Store.objects.create(store_num=7928, store_name="Fixture Store")
+        tank_type = TankType.objects.create(name="15K", capacity=15000, max_depth=96)
+        mapping = StoreTankMapping.objects.create(
+            store=store,
+            tank_type=tank_type,
+            fuel_type="PUL",
+            tank_index=1,
+            physical_capacity_gallons=Decimal("14981.700"),
+            ullage_endpoint_percent_exact=Decimal("95.0000"),
+            capacity_source="VEEDER_EXPLICIT_SELECTED",
+            capacity_verified=True,
+            profile_status="READY",
+        )
+
+        resolution = CapacityResolutionService().resolve_mapping(mapping)
+
+        self.assertEqual(resolution.status, "READY")
+        self.assertEqual(resolution.physical_capacity_gallons, Decimal("14981.700"))
+        self.assertEqual(resolution.ullage_endpoint_percent_exact, Decimal("95.0000"))
+        self.assertEqual(resolution.authority, "VEEDER_EXPLICIT_SELECTED")
+
+    def test_legacy_backfill_is_preview_then_explicit_apply(self):
+        store = Store.objects.create(store_num=7929, store_name="Backfill Store")
+        tank_type = TankType.objects.create(name="15K", capacity=15000, max_depth=96)
+        mapping = StoreTankMapping.objects.create(
+            store=store, tank_type=tank_type, fuel_type="PUL", tank_index=1
+        )
+        fuel = FuelType.objects.create(name="PUL")
+        ticket = VeederTicket.objects.create(store=store)
+        reading = VeederReading.objects.create(
+            ticket=ticket,
+            tank_index=1,
+            fuel_type=fuel,
+            volume=Decimal("5856.3"),
+            ullage=Decimal("8376.3"),
+            height=Decimal("49.67"),
+            acceptance_status="ACCEPTED",
+        )
+
+        from io import StringIO
+
+        preview = StringIO()
+        call_command("backfill_tank_capacities", stdout=preview)
+        mapping.refresh_from_db()
+        self.assertIsNone(mapping.physical_capacity_gallons)
+        self.assertIn("PREVIEW", preview.getvalue())
+
+        call_command("backfill_tank_capacities", "--apply", stdout=StringIO())
+        mapping.refresh_from_db()
+        self.assertEqual(mapping.physical_capacity_gallons, Decimal("14232.600"))
+        self.assertEqual(mapping.capacity_source, "LEGACY_ASSUMED")
+        self.assertEqual(mapping.profile_status, "LEGACY_UNVERIFIED")
+        self.assertEqual(mapping.profile_version, 2)
+        self.assertEqual(mapping.capacity_history.count(), 1)
+        self.assertEqual(
+            mapping.capacity_history.first().source_evidence_ids, [str(reading.id)]
+        )
 
 
 class TankLookupTests(TestCase):
@@ -445,6 +510,9 @@ class EstimationAndApiTests(APITestCase):
 
         self.assertIsNotNone(est_1)
         self.assertEqual(est_1.id, est_2.id)
+        self.assertEqual(est_1.diagnostics["snapshot_schema_version"], 1)
+        self.assertEqual(len(est_1.diagnostics["included_readings"]), 3)
+        self.assertTrue(est_1.diagnostics["observation_set_hash"])
 
     def test_virtual_persistence_recomputes_when_signature_changes(self):
         service = EstimationService()
@@ -1347,6 +1415,13 @@ class StoreTankMappingAdminTests(TestCase):
     def test_store_tank_mapping_admin_uses_tank_type_autocomplete(self):
         admin_instance = StoreTankMappingAdmin(StoreTankMapping, AdminSite())
         self.assertIn("tank_type", admin_instance.autocomplete_fields)
+
+    def test_store_tank_mapping_admin_uses_geometry_changelist_template(self):
+        admin_instance = StoreTankMappingAdmin(StoreTankMapping, AdminSite())
+        self.assertEqual(
+            admin_instance.change_list_template,
+            "admin/tankgauge/storetankmapping/change_list.html",
+        )
 
 
 class TankTypeAdminTests(TestCase):

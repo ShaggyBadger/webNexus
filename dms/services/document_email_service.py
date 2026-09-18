@@ -10,6 +10,7 @@ from django.db import transaction
 from django.template.loader import render_to_string
 
 from dms.models import Document
+from dms.services.chart_artifact_safety import chart_document_safety_reason
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,17 @@ class DocumentEmailService:
         recipient_email: str,
     ) -> dict[str, str]:
         """Send one DMS document via SMTP with retry/backoff."""
+        safety_reason = chart_document_safety_reason(document)
+        if safety_reason:
+            logger.warning(
+                "DMS_DOCUMENT_EMAIL_BLOCKED_UNSAFE_CHART",
+                extra={"document_id": document.id, "reason_code": safety_reason},
+            )
+            return {
+                "status": "error",
+                "code": "document_not_current",
+                "message": "This chart is no longer current and was not emailed.",
+            }
         download_url = f"/dms/documents/{document.id}/download/"
         site_url = getattr(settings, "SITE_URL", "https://thejoshproject.xyz")
         context = {

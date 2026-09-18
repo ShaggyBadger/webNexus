@@ -35,9 +35,58 @@ class VeederReading(models.Model):
     )
 
     # Core Metrics
-    volume = models.IntegerField(help_text="Current gallons (VOL).")
-    ullage = models.IntegerField(help_text="Remaining empty space (ULLAGE).")
-    height = models.FloatField(help_text="Physical fuel depth in inches (HEIGHT).")
+    volume = models.DecimalField(
+        max_digits=12,
+        decimal_places=3,
+        help_text="Gross product volume in gallons (VOL). NET is not stored.",
+    )
+    ullage = models.DecimalField(
+        max_digits=12,
+        decimal_places=3,
+        help_text="Remaining empty space in gallons (ULLAGE).",
+    )
+    height = models.DecimalField(
+        max_digits=8,
+        decimal_places=3,
+        help_text="Physical fuel depth in inches (LEVEL/HEIGHT).",
+    )
+    printed_physical_capacity_gallons = models.DecimalField(
+        max_digits=12,
+        decimal_places=3,
+        null=True,
+        blank=True,
+        help_text="Printed Capacity/Tank Max when identified as physical 100% capacity.",
+    )
+    printed_capacity_text = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Original printed capacity text before normalization.",
+    )
+    ullage_endpoint_gallons = models.DecimalField(
+        max_digits=12,
+        decimal_places=3,
+        null=True,
+        blank=True,
+        help_text="Gross plus ullage endpoint in gallons.",
+    )
+    ullage_endpoint_percent_exact = models.DecimalField(
+        max_digits=7,
+        decimal_places=4,
+        null=True,
+        blank=True,
+        help_text="Exact endpoint percentage of printed physical capacity.",
+    )
+    basis_status = models.CharField(
+        max_length=20,
+        choices=(
+            ("UNKNOWN", "Unknown"),
+            ("SUGGESTED", "Suggested"),
+            ("CONFIRMED", "Confirmed"),
+            ("AMBIGUOUS", "Ambiguous"),
+            ("CONFLICTING", "Conflicting"),
+        ),
+        default="UNKNOWN",
+    )
     temp = models.FloatField(
         null=True, blank=True, help_text="Product temperature (TEMP)."
     )
@@ -58,6 +107,23 @@ class VeederReading(models.Model):
     is_user_corrected = models.BooleanField(
         default=False,
         help_text="True if a human field agent corrected or verified this entry.",
+    )
+    acceptance_status = models.CharField(
+        max_length=20,
+        choices=(
+            ("ACCEPTED", "Accepted"),
+            ("PENDING_REVIEW", "Pending review"),
+            ("REJECTED", "Rejected"),
+        ),
+        default="ACCEPTED",
+    )
+    accepted_at = models.DateTimeField(null=True, blank=True)
+    accepted_by = models.ForeignKey(
+        "auth.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="accepted_veeder_readings",
     )
     created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
 

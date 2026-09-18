@@ -11,6 +11,7 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 
 from dms.models import Document
+from dms.services.chart_artifact_safety import chart_document_safety_reason
 from tankgauge.models import Store
 
 logger = logging.getLogger(__name__)
@@ -50,6 +51,17 @@ class EmailChartService:
             {"status": "error", "code": "...", "message": "...",
              "download_url": "..."} on permanent failure.
         """
+        safety_reason = chart_document_safety_reason(document)
+        if safety_reason:
+            logger.warning(
+                "EMAIL_CHART_BLOCKED_UNSAFE_DOCUMENT",
+                extra={"store_num": store.store_num, "reason_code": safety_reason},
+            )
+            return {
+                "status": "error",
+                "code": "chart_not_current",
+                "message": "This chart is no longer current and was not emailed.",
+            }
         download_url = f"/tankcharts/store/{store.store_num}/"
 
         generated_at = timezone.now().strftime("%Y-%m-%d %H:%M UTC")

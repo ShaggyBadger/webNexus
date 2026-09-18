@@ -1,0 +1,12 @@
+{% extends "admin/change_list.html" %}
+
+{% block object-tools-items %}
+    {{ block.super }}
+    {% if geometry_store_number %}
+        <li>
+            <a href="{% url 'admin_sync_tank_estimates' %}?scope=store&amp;store_number={{ geometry_store_number }}&amp;mapped_only=on" class="addlink">
+                RERUN STORE GEOMETRY
+            </a>
+        </li>
+    {% endif %}
+{% endblock %}

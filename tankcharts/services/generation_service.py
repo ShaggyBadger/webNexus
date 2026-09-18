@@ -55,7 +55,11 @@ class ChartGenerationService:
         """
         if not force:
             existing = self.cache_service.find_existing_store(store)
-            if existing and not self.cache_service.is_store_stale(store, existing):
+            if (
+                existing
+                and not self.cache_service.is_store_stale(store, existing)
+                and self.cache_service.get_store_download_url(store)
+            ):
                 url = self.cache_service.get_store_download_url(store)
                 return {
                     "source": "cached",
@@ -103,13 +107,16 @@ class ChartGenerationService:
                     if now < gen_record.retry_after:
                         # Return existing document if available despite failure
                         existing = self.cache_service.find_existing_store(store)
-                        if existing:
+                        fallback_url = (
+                            self.cache_service.get_store_download_url(store)
+                            if existing
+                            else None
+                        )
+                        if existing and fallback_url:
                             return {
                                 "source": "cached_fallback",
                                 "document": existing,
-                                "download_url": self.cache_service.get_store_download_url(
-                                    store
-                                ),
+                                "download_url": fallback_url,
                             }
                         raise ValueError(
                             f"Chart generation in backoff window until {gen_record.retry_after}. Reason: {gen_record.failure_reason}"
@@ -130,11 +137,14 @@ class ChartGenerationService:
         if not acquired:
             # Fallback check after waiting
             existing = self.cache_service.find_existing_store(store)
-            if existing:
+            fallback_url = (
+                self.cache_service.get_store_download_url(store) if existing else None
+            )
+            if existing and fallback_url:
                 return {
                     "source": "cached_wait_fallback",
                     "document": existing,
-                    "download_url": self.cache_service.get_store_download_url(store),
+                    "download_url": fallback_url,
                 }
             raise RuntimeError("Could not acquire generation lock for store chart.")
 

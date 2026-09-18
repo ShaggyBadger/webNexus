@@ -4,6 +4,7 @@ import math
 from django.conf import settings
 
 from tankgauge.models import TankEstimation
+from .capacity_resolution import CapacityResolutionService
 
 logger = logging.getLogger("tankgauge")
 
@@ -47,43 +48,65 @@ def _official_limits(mapping) -> dict:
 
 
 def _veeder_limits(mapping) -> dict:
+    resolver = CapacityResolutionService()
+    try:
+        capacity_resolution = resolver.resolve_mapping(mapping)
+    except TypeError as exc:
+        # Older mappings can reach the resolver's official-only fallback before
+        # that legacy branch has all profile fields. Keep the limits path usable
+        # without bypassing the resolver for the fallback capacity itself.
+        logger.warning(
+            "TANK_LIMITS_CAPACITY_RESOLUTION_LEGACY_FALLBACK",
+            extra={"mapping_id": mapping.id, "reason_code": "legacy_profile_shape"},
+        )
+        if not mapping.tank_type or not mapping.tank_type.capacity:
+            raise exc
+        capacity_resolution = resolver.resolve_virtual(
+            total_capacity_gallons=mapping.tank_type.capacity,
+        )
     estimation = TankEstimation.objects.filter(
         tank_mapping=mapping,
         is_active=True,
     ).first()
     if not estimation or not estimation.radius or not estimation.length:
-        from atg.models import VeederReading
-
-        reading_qs = VeederReading.objects.filter(
-            ticket__store_id=mapping.store_id,
-            tank_index=mapping.tank_index,
-        )
-        if mapping.fuel_type:
-            reading_qs = reading_qs.filter(
-                fuel_type__name__iexact=mapping.fuel_type,
-            )
-        latest_reading = reading_qs.order_by("-ticket__uploaded_at", "-id").first()
-        if latest_reading and latest_reading.volume is not None:
-            implied_capacity = latest_reading.volume + (latest_reading.ullage or 0)
+        if capacity_resolution.usable:
             return {
-                "capacity_gallons": int(implied_capacity),
+                "capacity_gallons": int(capacity_resolution.physical_capacity_gallons),
                 "max_depth_inches": None,
                 "source": "VEEDER",
+                "capacity_status": capacity_resolution.status,
+                "capacity_warning_codes": list(capacity_resolution.warning_codes),
             }
         return {
             "capacity_gallons": None,
             "max_depth_inches": None,
             "source": "VEEDER",
+            "capacity_status": capacity_resolution.status,
+            "capacity_warning_codes": list(capacity_resolution.warning_codes),
         }
 
     radius_inches = float(estimation.radius)
     length_inches = float(estimation.length)
-    capacity_gallons = (math.pi * radius_inches**2 * length_inches) / 231.0
+    geometry_implied_capacity = (math.pi * radius_inches**2 * length_inches) / 231.0
+    # Until the one-time profile backfill runs, preserve the existing behavior
+    # for legacy mappings by using fitted geometry when no explicit profile
+    # capacity exists. Once a profile value is present, it is authoritative.
+    has_explicit_profile_capacity = (
+        mapping.physical_capacity_gallons is not None
+    )
+    capacity_gallons = (
+        int(round(capacity_resolution.physical_capacity_gallons))
+        if has_explicit_profile_capacity
+        else int(round(geometry_implied_capacity))
+    )
     max_depth_inches = radius_inches * 2.0
     return {
         "capacity_gallons": int(round(capacity_gallons)),
         "max_depth_inches": int(round(max_depth_inches)),
         "source": "VEEDER",
+        "geometry_implied_capacity_gallons": int(round(geometry_implied_capacity)),
+        "capacity_status": capacity_resolution.status,
+        "capacity_warning_codes": list(capacity_resolution.warning_codes),
     }
 
 

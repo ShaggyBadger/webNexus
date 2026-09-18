@@ -66,10 +66,36 @@ class TankEstimateSyncRun(models.Model):
         PENDING = "pending", "Pending"
         RUNNING = "running", "Running"
         COMPLETED = "completed", "Completed"
+        PARTIAL_FAILURE = "partial_failure", "Partial failure"
         FAILED = "failed", "Failed"
+        CANCELLED = "cancelled", "Cancelled"
+
+    class ScopeType(models.TextChoices):
+        MAPPING = "mapping", "One mapping"
+        STORE = "store", "One store"
+        ALL = "all", "All stores"
 
     store_number = models.IntegerField(null=True, blank=True)
     mapped_only = models.BooleanField(default=False)
+    scope_type = models.CharField(
+        max_length=20, choices=ScopeType.choices, default=ScopeType.ALL
+    )
+    mapping = models.ForeignKey(
+        "tankgauge.StoreTankMapping",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="estimate_sync_runs",
+    )
+    requested_profile_version = models.PositiveIntegerField(null=True, blank=True)
+    idempotency_key = models.CharField(max_length=100, null=True, blank=True)
+    affected_count = models.PositiveIntegerField(default=0)
+    succeeded_count = models.PositiveIntegerField(default=0)
+    skipped_count = models.PositiveIntegerField(default=0)
+    failed_count = models.PositiveIntegerField(default=0)
+    warning_count = models.PositiveIntegerField(default=0)
+    preview = models.BooleanField(default=False)
+    result_summary = models.JSONField(default=dict, blank=True)
     status = models.CharField(
         max_length=20,
         choices=Status.choices,
@@ -88,6 +114,13 @@ class TankEstimateSyncRun(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["idempotency_key"],
+                name="uniq_tank_sync_idempotency_key",
+            )
+        ]
+        permissions = (("run_tank_estimate_sync", "Run tank estimate sync"),)
 
     def __str__(self) -> str:
         scope = self.store_number or "all stores"

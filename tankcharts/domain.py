@@ -20,7 +20,10 @@ class TankFieldChart:
     tank_index: int
     fuel_type: str
     tank_type_name: str
-    capacity_gallons: int
+    capacity_gallons: int | None
+    capacity_source: str
+    capacity_status: str
+    geometry_implied_capacity_gallons: int | None
     max_depth_inches: int
 
     table_rows: list[dict]
@@ -49,7 +52,10 @@ class StoreTankSummary:
     tank_index: int | None
     fuel_type: str
     tank_type_name: str
-    capacity_gallons: int
+    capacity_gallons: int | None
+    capacity_source: str
+    capacity_status: str
+    geometry_implied_capacity_gallons: int | None
     max_depth_inches: int
     veeder_observation_count: int
     sample_count: int

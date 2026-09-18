@@ -5,6 +5,7 @@ from django.core.files.storage import default_storage
 from django.db import transaction
 
 from dms.models import Document
+from dms.services.chart_artifact_safety import chart_document_safety_reason
 
 
 logger = logging.getLogger(__name__)
@@ -42,6 +43,15 @@ class DocumentDownloadService:
                     document.status,
                 )
                 raise ValueError("Document not found or is inactive.")
+
+            safety_reason = chart_document_safety_reason(document)
+            if safety_reason:
+                logger.warning(
+                    "dms.download.unsafe_chart document_id=%s reason_code=%s",
+                    document_id,
+                    safety_reason,
+                )
+                raise ValueError("Document not found or is no longer current.")
 
             if (
                 not is_staff_user

@@ -11,6 +11,11 @@ from rest_framework.response import Response
 from missionlog.models import FuelType
 from tankgauge.logic.utils import canonicalize_fuel
 from tankgauge.logic.veeder_source_policy import VeederSourcePolicy
+from tankgauge.logic.capacity_resolution import CapacityResolutionService
+from tankgauge.logic.capacity_profile_service import (
+    CapacityProfileError,
+    CapacityProfileService,
+)
 from tankgauge.models import (
     Store,
     StoreTankMapping,
@@ -376,19 +381,32 @@ class StoreTankProfileAPIView(APIView):
                 ticket__store=store,
                 tank_index=mapping.tank_index,
                 fuel_type__name__iexact=fuel_key,
+                acceptance_status="ACCEPTED",
             )
             implied_caps = [
                 float(volume + ullage)
                 for volume, ullage in readings_qs.values_list("volume", "ullage")
                 if volume is not None and ullage is not None
             ]
-
-            mapped_capacity = (
-                float(mapping.tank_type.capacity)
-                if mapping.tank_type and mapping.tank_type.capacity
+            history_resolution = (
+                CapacityResolutionService().resolve_virtual(
+                    total_capacity_gallons=median(implied_caps)
+                )
+                if implied_caps
                 else None
             )
-            history_capacity = median(implied_caps) if implied_caps else None
+
+            capacity_resolution = CapacityResolutionService().resolve_mapping(mapping)
+            mapped_capacity = (
+                float(capacity_resolution.physical_capacity_gallons)
+                if mapping.physical_capacity_gallons is not None
+                else None
+            )
+            history_capacity = (
+                float(history_resolution.physical_capacity_gallons)
+                if history_resolution and history_resolution.usable
+                else None
+            )
             active_estimation = TankEstimation.objects.filter(
                 tank_mapping=mapping,
                 is_active=True,
@@ -396,9 +414,11 @@ class StoreTankProfileAPIView(APIView):
             estimation_capacity = self._capacity_from_estimation(active_estimation)
 
             baseline_capacity = (
-                estimation_capacity or history_capacity or mapped_capacity
+                mapped_capacity or estimation_capacity or history_capacity
             )
-            if estimation_capacity:
+            if mapped_capacity:
+                baseline_source = "tank_profile"
+            elif estimation_capacity:
                 baseline_source = "veeder_estimation"
             elif history_capacity:
                 baseline_source = "veeder_history"
@@ -408,6 +428,12 @@ class StoreTankProfileAPIView(APIView):
                 baseline_source = None
             fuel_obj = fuel_lookup.get(fuel_key)
 
+            exact_capacity = (
+                str(capacity_resolution.physical_capacity_gallons)
+                if capacity_resolution.physical_capacity_gallons is not None
+                else None
+            )
+            warning_codes = list(capacity_resolution.warning_codes)
             known_tanks.append(
                 {
                     "mapping_id": mapping.id,
@@ -427,10 +453,34 @@ class StoreTankProfileAPIView(APIView):
                         int(round(baseline_capacity)) if baseline_capacity else None
                     ),
                     "baseline_source": baseline_source,
+                    "capacity_status": capacity_resolution.status,
+                    "capacity_warning_codes": list(capacity_resolution.warning_codes),
+                    "capacity_gallons_exact": (
+                        str(mapping.physical_capacity_gallons)
+                        if mapping.physical_capacity_gallons is not None
+                        else None
+                    ),
+                    "capacity_verified": mapping.capacity_verified,
+                    "profile_version": mapping.profile_version,
+                    "physical_capacity_gallons_exact": exact_capacity,
+                    "capacity_source": capacity_resolution.authority,
+                    "verification_warning": (
+                        "Capacity requires admin verification."
+                        if not mapping.capacity_verified
+                        else ("; ".join(warning_codes) if warning_codes else None)
+                    ),
+                    "ullage_endpoint_percent_exact": (
+                        str(capacity_resolution.ullage_endpoint_percent_exact)
+                        if capacity_resolution.ullage_endpoint_percent_exact is not None
+                        else None
+                    ),
+                    "basis_display_percent": self._basis_display_percent(
+                        capacity_resolution.ullage_endpoint_percent_exact
+                    ),
                     "readings_count": len(implied_caps),
                     "locked_identity": len(implied_caps) > 0,
                     "verification_status": (
-                        "confirmed" if len(implied_caps) > 0 else "unverified_mapping"
+                        "verified" if mapping.capacity_verified else "needs_review"
                     ),
                     "source": "mapping",
                 }
@@ -442,7 +492,10 @@ class StoreTankProfileAPIView(APIView):
         history_only_groups = []
         if not has_canonical_mappings:
             history_only_groups = (
-                VeederReading.objects.filter(ticket__store=store)
+                VeederReading.objects.filter(
+                    ticket__store=store,
+                    acceptance_status="ACCEPTED",
+                )
                 .values("fuel_type__name", "tank_index")
                 .annotate(
                     reading_count=Count("id"),
@@ -476,7 +529,14 @@ class StoreTankProfileAPIView(APIView):
                 active_virtual_estimation
             )
             history_capacity = group["avg_capacity"]
-            baseline_capacity = estimation_capacity or history_capacity
+            capacity_resolution = CapacityResolutionService().resolve_virtual(
+                total_capacity_gallons=history_capacity,
+            )
+            if not capacity_resolution.usable:
+                continue
+            baseline_capacity = estimation_capacity or float(
+                capacity_resolution.physical_capacity_gallons
+            )
             known_tanks.append(
                 {
                     "mapping_id": None,
@@ -494,6 +554,15 @@ class StoreTankProfileAPIView(APIView):
                     "baseline_source": (
                         "veeder_estimation" if estimation_capacity else "veeder_history"
                     ),
+                    "capacity_status": capacity_resolution.status,
+                    "capacity_warning_codes": list(capacity_resolution.warning_codes),
+                    "physical_capacity_gallons_exact": str(
+                        capacity_resolution.physical_capacity_gallons
+                    ),
+                    "capacity_source": capacity_resolution.authority,
+                    "ullage_endpoint_percent_exact": None,
+                    "basis_display_percent": None,
+                    "verification_warning": "Capacity is provisional historical evidence.",
                     "readings_count": group["reading_count"],
                     "locked_identity": True,
                     "verification_status": "confirmed_from_history",
@@ -519,6 +588,54 @@ class StoreTankProfileAPIView(APIView):
                     "state": store.state,
                 },
                 "known_tanks": known_tanks,
+            }
+        )
+
+    @staticmethod
+    def _basis_display_percent(value):
+        if value is None:
+            return None
+        numeric = float(value)
+        return min((90, 95, 100), key=lambda candidate: abs(candidate - numeric))
+
+
+class VerifyTankCapacityAPIView(APIView):
+    """Confirm one tank's physical capacity and ullage endpoint basis."""
+
+    permission_classes = [permissions.IsAdminUser]
+
+    def post(self, request):
+        try:
+            mapping = CapacityProfileService.verify_mapping(
+                mapping_id=request.data.get("mapping_id"),
+                physical_capacity_gallons=request.data.get(
+                    "physical_capacity_gallons"
+                ),
+                ullage_endpoint_percent_exact=request.data.get(
+                    "ullage_endpoint_percent_exact"
+                ),
+                profile_version=int(request.data.get("profile_version")),
+                reason=request.data.get("reason", ""),
+                user=request.user,
+            )
+        except StoreTankMapping.DoesNotExist:
+            return Response(
+                {"error": {"code": "mapping_not_found", "message": "Tank mapping not found."}},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        except (TypeError, ValueError) as exc:
+            code = getattr(exc, "code", "invalid_capacity_profile")
+            return Response(
+                {"error": {"code": code, "message": str(exc)}},
+                status=status.HTTP_409_CONFLICT if code == "stale_profile_version" else status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response(
+            {
+                "status": "success",
+                "mapping_id": mapping.id,
+                "capacity_verified": mapping.capacity_verified,
+                "profile_version": mapping.profile_version,
             }
         )
 

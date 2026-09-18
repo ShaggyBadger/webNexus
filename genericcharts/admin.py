@@ -134,6 +134,8 @@ class TankEstimateSyncRunAdmin(admin.ModelAdmin):
         "id",
         "store_number",
         "mapped_only",
+        "scope_type",
+        "mapping",
         "status",
         "requested_by",
         "created_at",
@@ -149,12 +151,22 @@ class TankEstimateSyncRunAdmin(admin.ModelAdmin):
         "completed_at",
         "output",
         "failure_reason",
+        "result_summary",
+        "affected_count",
+        "succeeded_count",
+        "skipped_count",
+        "failed_count",
+        "warning_count",
+        "preview",
+        "idempotency_key",
         "created_at",
     )
 
 
 def tank_estimate_sync_view(request):
-    if not request.user.is_staff:
+    if not request.user.is_staff or not request.user.has_perm(
+        "genericcharts.run_tank_estimate_sync"
+    ):
         raise PermissionDenied
     if request.method == "POST":
         form = TankEstimateSyncForm(request.POST)
@@ -162,6 +174,15 @@ def tank_estimate_sync_view(request):
             run = TankEstimateSyncRun.objects.create(
                 store_number=form.cleaned_data["store_number"],
                 mapped_only=form.cleaned_data["mapped_only"],
+                scope_type=form.cleaned_data["scope"],
+                mapping=form.cleaned_data["mapping"],
+                requested_profile_version=(
+                    form.cleaned_data["mapping"].profile_version
+                    if form.cleaned_data["mapping"]
+                    else None
+                ),
+                preview=form.cleaned_data["preview"],
+                idempotency_key=form.cleaned_data["idempotency_key"] or None,
                 requested_by=request.user,
             )
             launch_tank_estimate_sync(run)
@@ -170,7 +191,14 @@ def tank_estimate_sync_view(request):
             messages.success(request, f"Tank estimate sync {run.id} started.")
             return redirect("admin_sync_tank_estimates")
     else:
-        form = TankEstimateSyncForm()
+        initial = {}
+        if request.GET.get("scope") == "store":
+            initial = {
+                "scope": "store",
+                "store_number": request.GET.get("store_number", ""),
+                "mapped_only": request.GET.get("mapped_only") == "on",
+            }
+        form = TankEstimateSyncForm(initial=initial)
     return render(
         request,
         "admin/tankgauge/tank_estimate_sync.html",

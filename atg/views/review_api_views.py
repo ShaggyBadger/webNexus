@@ -318,11 +318,23 @@ class VeederReviewQueueFinalizeAPIView(APIView):
                 volume=validated.get("volume"),
                 ullage=validated.get("ullage"),
                 height=validated.get("height"),
+                printed_physical_capacity_gallons=validated.get(
+                    "printed_physical_capacity_gallons"
+                ),
+                printed_capacity_text=validated.get("printed_capacity_text"),
+                ullage_endpoint_gallons=validated.get("ullage_endpoint_gallons"),
+                ullage_endpoint_percent_exact=validated.get(
+                    "ullage_endpoint_percent_exact"
+                ),
+                basis_status=validated.get("basis_status", "UNKNOWN"),
                 temp=validated.get("temp"),
                 water=validated.get("water"),
                 raw_line_text=validated.get("raw_line_text"),
                 confidence_score=validated.get("confidence_score", 1.0),
                 is_user_corrected=True,
+                acceptance_status="ACCEPTED",
+                accepted_at=timezone.now(),
+                accepted_by=request.user,
             )
             mappings.add((validated.get("tank_index"), validated.get("fuel_type").name))
 

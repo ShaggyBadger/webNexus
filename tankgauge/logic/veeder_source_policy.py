@@ -32,7 +32,10 @@ class VeederSourcePolicy:
         from atg.models import VeederReading
 
         store_id = getattr(store, "pk", store)
-        return VeederReading.objects.filter(ticket__store_id=store_id).exists()
+        return VeederReading.objects.filter(
+            ticket__store_id=store_id,
+            acceptance_status="ACCEPTED",
+        ).exists()
 
     @classmethod
     def resolve_store(cls, store: Any) -> VeederSourceDecision:
@@ -59,6 +62,7 @@ class VeederSourcePolicy:
         readings = VeederReading.objects.filter(
             ticket__store_id=mapping.store_id,
             tank_index=mapping.tank_index,
+            acceptance_status="ACCEPTED",
         )
         if mapping.fuel_type:
             readings = readings.filter(fuel_type__name__iexact=mapping.fuel_type)
@@ -70,11 +74,13 @@ class VeederSourcePolicy:
         from atg.models import VeederReading
 
         active_store = VeederReading.objects.filter(
-            ticket__store_id=OuterRef("store_id")
+            ticket__store_id=OuterRef("store_id"),
+            acceptance_status="ACCEPTED",
         )
         matching_reading = VeederReading.objects.filter(
             ticket__store_id=OuterRef("store_id"),
             tank_index=OuterRef("tank_index"),
+            acceptance_status="ACCEPTED",
         )
         return mappings.annotate(
             _veeder_store_active=Exists(active_store),

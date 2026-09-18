@@ -55,7 +55,8 @@
       host.overrideReasons = {};
 
       host.preflightRows.forEach((row) => {
-        host.confirmedTokens[row.preflight_token] = false;
+        host.confirmedTokens[row.preflight_token] =
+          row.decision === "within_threshold";
         host.overrideReasons[row.preflight_token] = "";
       });
 

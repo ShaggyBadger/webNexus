@@ -1,6 +1,8 @@
 import logging
+from uuid import uuid4
 from django.conf import settings
 from django.db import transaction
+from django.utils import timezone
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -26,6 +28,23 @@ def _remote_ocr_disabled_response():
 
 def _is_remote_ocr_enabled():
     return getattr(settings, "ATG_REMOTE_OCR_ENABLED", False)
+
+
+def _remote_error(*, code: str, message: str, status_code: int, details=None):
+    """Return the canonical error while retaining a transitional string field."""
+
+    return Response(
+        {
+            "error": {
+                "code": code,
+                "message": message,
+                "details": details or {},
+                "trace_id": str(uuid4()),
+            },
+            "legacy_error": message,
+        },
+        status=status_code,
+    )
 
 
 class RemoteOCRInstructionsView(APIView):
@@ -117,8 +136,10 @@ class RemoteOCRResolveJobView(APIView):
         ocr_text = request.data.get("ocr_text", "")
 
         if not ticket_id:
-            return Response(
-                {"error": "ticket_id required"}, status=status.HTTP_400_BAD_REQUEST
+            return _remote_error(
+                code="ticket_id_required",
+                message="ticket_id required",
+                status_code=status.HTTP_400_BAD_REQUEST,
             )
 
         # Enforce tank_index >= 1 and uniqueness within ticket
@@ -126,27 +147,26 @@ class RemoteOCRResolveJobView(APIView):
         for r_data in readings_data:
             t_idx = r_data.get("tank_index")
             if t_idx is None:
-                return Response(
-                    {"error": "tank_index is required for all readings."},
-                    status=status.HTTP_400_BAD_REQUEST,
+                return _remote_error(
+                    code="tank_index_required",
+                    message="tank_index is required for all readings.",
+                    status_code=status.HTTP_400_BAD_REQUEST,
                 )
             try:
                 t_idx_int = int(t_idx)
                 if t_idx_int < 1:
                     raise ValueError()
             except (ValueError, TypeError):
-                return Response(
-                    {
-                        "error": f"tank_index '{t_idx}' must be a positive integer (>= 1)."
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
+                return _remote_error(
+                    code="invalid_tank_index",
+                    message=f"tank_index '{t_idx}' must be a positive integer (>= 1).",
+                    status_code=status.HTTP_400_BAD_REQUEST,
                 )
             if t_idx_int in seen_indices:
-                return Response(
-                    {
-                        "error": f"Duplicate tank_index {t_idx_int} detected in submission."
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
+                return _remote_error(
+                    code="duplicate_tank_index",
+                    message=f"Duplicate tank_index {t_idx_int} detected in submission.",
+                    status_code=status.HTTP_400_BAD_REQUEST,
                 )
             seen_indices.add(t_idx_int)
 
@@ -170,6 +190,10 @@ class RemoteOCRResolveJobView(APIView):
                         "volume": r_data.get("volume"),
                         "ullage": r_data.get("ullage"),
                         "height": r_data.get("height"),
+                        "printed_physical_capacity_gallons": r_data.get(
+                            "printed_physical_capacity_gallons"
+                        ),
+                        "printed_capacity_text": r_data.get("printed_capacity_text"),
                         "temp": r_data.get("temp"),
                         "water": r_data.get("water"),
                         "raw_line_text": r_data.get("raw_line_text"),
@@ -181,9 +205,11 @@ class RemoteOCRResolveJobView(APIView):
 
                 serializer = VeederReadingSerializer(data=serializer_payload, many=True)
                 if not serializer.is_valid():
-                    return Response(
-                        {"error": serializer.errors},
-                        status=status.HTTP_400_BAD_REQUEST,
+                    return _remote_error(
+                        code="reading_validation_error",
+                        message="One or more readings are invalid.",
+                        details=serializer.errors,
+                        status_code=status.HTTP_400_BAD_REQUEST,
                     )
 
                 quality_errors = validate_readings_for_store(
@@ -191,9 +217,11 @@ class RemoteOCRResolveJobView(APIView):
                     serializer.validated_data,
                 )
                 if quality_errors:
-                    return Response(
-                        {"error": " | ".join(quality_errors)},
-                        status=status.HTTP_400_BAD_REQUEST,
+                    return _remote_error(
+                        code="reading_quality_error",
+                        message="Submitted readings failed quality checks.",
+                        details={"errors": quality_errors},
+                        status_code=status.HTTP_400_BAD_REQUEST,
                     )
 
                 mapping_targets = {
@@ -209,11 +237,26 @@ class RemoteOCRResolveJobView(APIView):
                         volume=validated_reading.get("volume"),
                         ullage=validated_reading.get("ullage"),
                         height=validated_reading.get("height"),
+                        printed_physical_capacity_gallons=validated_reading.get(
+                            "printed_physical_capacity_gallons"
+                        ),
+                        printed_capacity_text=validated_reading.get(
+                            "printed_capacity_text"
+                        ),
+                        ullage_endpoint_gallons=validated_reading.get(
+                            "ullage_endpoint_gallons"
+                        ),
+                        ullage_endpoint_percent_exact=validated_reading.get(
+                            "ullage_endpoint_percent_exact"
+                        ),
+                        basis_status=validated_reading.get("basis_status", "UNKNOWN"),
                         temp=validated_reading.get("temp"),
                         water=validated_reading.get("water"),
                         raw_line_text=validated_reading.get("raw_line_text"),
                         confidence_score=validated_reading.get("confidence_score", 1.0),
                         is_user_corrected=True,
+                        acceptance_status="ACCEPTED",
+                        accepted_at=timezone.now(),
                     )
 
                 def run_auto_mapping() -> None:
@@ -241,11 +284,16 @@ class RemoteOCRResolveJobView(APIView):
                 return Response({"status": "success", "ticket_id": ticket_id})
 
         except VeederTicket.DoesNotExist:
-            return Response(
-                {"error": "Ticket not found"}, status=status.HTTP_404_NOT_FOUND
+            return _remote_error(
+                code="ticket_not_found",
+                message="Ticket not found",
+                status_code=status.HTTP_404_NOT_FOUND,
             )
         except Exception as e:
             logger.error(f"REMOTE_OCR_RESOLVE_FAILED: {str(e)}")
-            return Response(
-                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            return _remote_error(
+                code="remote_ocr_resolve_failed",
+                message="Unable to resolve remote OCR ticket.",
+                details={"error": str(e)},
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )

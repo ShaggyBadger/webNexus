@@ -67,6 +67,12 @@ class Document(models.Model):
         ("SUPERSEDED", "Superseded"),
         ("DRAFT", "Draft"),
     ]
+    OPERATIONAL_STATE_CHOICES = [
+        ("USABLE", "Usable"),
+        ("STALE", "Stale"),
+        ("UNSAFE", "Unsafe"),
+        ("SUPERSEDED", "Superseded"),
+    ]
 
     id = models.CharField(
         max_length=26,
@@ -112,6 +118,24 @@ class Document(models.Model):
         choices=STATUS_CHOICES,
         default="ACTIVE",
         help_text="Document lifecycle status",
+    )
+    operational_state = models.CharField(
+        max_length=20,
+        choices=OPERATIONAL_STATE_CHOICES,
+        default="USABLE",
+        db_index=True,
+        help_text="Whether the document is safe to use as the current operational artifact.",
+    )
+    invalidation_reason = models.CharField(max_length=255, blank=True)
+    source_profile_version = models.PositiveIntegerField(null=True, blank=True)
+    source_estimate_version = models.PositiveIntegerField(null=True, blank=True)
+    invalidated_at = models.DateTimeField(null=True, blank=True)
+    invalidated_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="invalidated_documents",
     )
     version = models.IntegerField(default=1, help_text="Version increment number")
     download_count = models.PositiveIntegerField(
@@ -169,6 +193,9 @@ class Document(models.Model):
         indexes = [
             models.Index(fields=["content_type", "object_id"], name="dms_doc_gfk_idx"),
             models.Index(fields=["status"], name="dms_doc_status_idx"),
+            models.Index(
+                fields=["operational_state"], name="dms_doc_operational_state_idx"
+            ),
             models.Index(fields=["title"], name="dms_doc_title_idx"),
         ]
 

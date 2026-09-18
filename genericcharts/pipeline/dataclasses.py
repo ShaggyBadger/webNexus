@@ -96,6 +96,12 @@ class GeneratedTank:
     source: str
     algorithm_version: str
     curve: tuple[CurvePoint, ...]
+    capacity_status: str = "UNRESOLVED"
+    capacity_source: str = "UNRESOLVED"
+    estimate_status: str = "LEGACY_UNVERIFIED"
+    profile_version: int | None = None
+    profile_status: str | None = None
+    estimate_id: int | None = None
 
 
 @dataclass(frozen=True)

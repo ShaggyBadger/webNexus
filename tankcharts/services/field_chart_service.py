@@ -5,7 +5,7 @@ from django.conf import settings
 
 from atg.models import VeederReading
 from tankgauge.logic.curve_generator import generate_inch_gallon_curve
-from tankgauge.logic.tank_limits import resolve_tank_limits
+from tankgauge.logic.capacity_resolution import CapacityResolutionService
 from tankgauge.logic.veeder_source_policy import VeederSourcePolicy
 from tankgauge.models import StoreTankMapping, TankEstimation
 
@@ -30,6 +30,7 @@ class TankFieldChartService:
         veeder_points = collected["veeder_points"]
         estimation = collected["estimation"]
         max_depth_inches = collected["max_depth_inches"]
+        capacity_resolution = CapacityResolutionService().resolve_mapping(mapping)
 
         generated_curve = self._generate_estimated_curve(
             estimation=estimation,
@@ -59,7 +60,9 @@ class TankFieldChartService:
             }
         ]
 
-        fallback_capacity = int(round(table_rows[-1]["gallons"])) if table_rows else 0
+        geometry_implied_capacity = (
+            int(round(table_rows[-1]["gallons"])) if table_rows else None
+        )
 
         return TankFieldChart(
             store_num=mapping.store.store_num,
@@ -76,10 +79,13 @@ class TankFieldChartService:
             fuel_type=(mapping.fuel_type or "unknown").lower(),
             tank_type_name=mapping.tank_type.name if mapping.tank_type else "Unknown",
             capacity_gallons=(
-                int(mapping.tank_type.capacity)
-                if mapping.tank_type and mapping.tank_type.capacity
-                else fallback_capacity
+                int(round(capacity_resolution.physical_capacity_gallons))
+                if capacity_resolution.physical_capacity_gallons is not None
+                else None
             ),
+            capacity_source=capacity_resolution.authority,
+            capacity_status=capacity_resolution.status,
+            geometry_implied_capacity_gallons=geometry_implied_capacity,
             max_depth_inches=max_depth_inches,
             table_rows=table_rows,
             has_official_chart=False,
@@ -240,10 +246,13 @@ class TankFieldChartService:
                 }
             )
 
-            limits = resolve_tank_limits(mapping)
-            capacity_gallons = int(
-                limits["capacity_gallons"] or round(table_rows[-1]["gallons"])
+            capacity_resolution = CapacityResolutionService().resolve_mapping(mapping)
+            capacity_gallons = (
+                int(round(capacity_resolution.physical_capacity_gallons))
+                if capacity_resolution.physical_capacity_gallons is not None
+                else None
             )
+            geometry_implied_capacity = int(round(table_rows[-1]["gallons"]))
             total_veeder_observation_count += veeder_count
             summaries.append(
                 StoreTankSummary(
@@ -253,6 +262,9 @@ class TankFieldChartService:
                         mapping.tank_type.name if mapping.tank_type else "Unknown"
                     ),
                     capacity_gallons=capacity_gallons,
+                    capacity_source=capacity_resolution.authority,
+                    capacity_status=capacity_resolution.status,
+                    geometry_implied_capacity_gallons=geometry_implied_capacity,
                     max_depth_inches=max_depth_inches,
                     veeder_observation_count=veeder_count,
                     sample_count=sample_count,
@@ -345,10 +357,6 @@ class TankFieldChartService:
         mapping: StoreTankMapping,
         estimation: TankEstimation | None,
     ) -> int | None:
-        limits = resolve_tank_limits(mapping)
-        if limits["max_depth_inches"] is not None:
-            return int(round(limits["max_depth_inches"]))
-
         if estimation:
             return max(1, int(round(2 * estimation.radius)))
 

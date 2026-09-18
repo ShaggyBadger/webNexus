@@ -1,7 +1,9 @@
 from django.core.management.base import BaseCommand
+from django.db.models import F
 
 from atg.models import VeederReading
 from tankgauge.logic.estimation_service import EstimationService
+from tankgauge.logic.capacity_resolution import CapacityResolutionService
 from tankgauge.logic.utils import canonicalize_fuel
 from tankgauge.models import Store, StoreTankMapping
 from atg.services.auto_mapper import AutoMapperService
@@ -26,6 +28,12 @@ class Command(BaseCommand):
             action="store_true",
             help="Sync only mapped tank estimations.",
         )
+        parser.add_argument("--mapping", type=int, help="Limit sync to one mapping ID.")
+        parser.add_argument(
+            "--preview",
+            action="store_true",
+            help="Report the mapped scope without changing estimates.",
+        )
 
     def handle(self, *args, **options):
         if options["virtual_only"] and options["mapped_only"]:
@@ -37,9 +45,11 @@ class Command(BaseCommand):
             return
 
         service = EstimationService()
+        capacity_resolver = CapacityResolutionService()
         store_num = options.get("store")
         virtual_only = options.get("virtual_only")
         mapped_only = options.get("mapped_only")
+        mapping_id = options.get("mapping")
 
         mapped_created = 0
         mapped_failed = 0
@@ -49,6 +59,8 @@ class Command(BaseCommand):
         stores = Store.objects.all()
         if store_num is not None:
             stores = stores.filter(store_num=store_num)
+        if mapping_id is not None:
+            stores = stores.filter(tank_mappings__id=mapping_id).distinct()
 
         store_ids = list(stores.values_list("id", flat=True))
         if not store_ids:
@@ -61,6 +73,17 @@ class Command(BaseCommand):
                 .select_related("store", "tank_type")
                 .all()
             )
+            if mapping_id is not None:
+                mappings = mappings.filter(id=mapping_id)
+
+            if options.get("preview"):
+                count = mappings.count()
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"PREVIEW | mapped_candidates={count} virtual_candidates=0"
+                    )
+                )
+                return
 
             for mapping in mappings:
                 estimation = service.run_estimation_for_tank(mapping)
@@ -71,7 +94,10 @@ class Command(BaseCommand):
 
         if not mapped_only:
             virtual_groups = (
-                VeederReading.objects.filter(ticket__store_id__in=store_ids)
+                VeederReading.objects.filter(
+                    ticket__store_id__in=store_ids,
+                    acceptance_status="ACCEPTED",
+                )
                 .values("ticket__store_id", "fuel_type__name", "tank_index")
                 .distinct()
             )
@@ -101,13 +127,30 @@ class Command(BaseCommand):
                     ticket__store_id=store_id,
                     tank_index=tank_index,
                     fuel_type__name__iexact=fuel_key,
+                    acceptance_status="ACCEPTED",
                 ).select_related("ticket")
 
                 if not readings.exists():
                     continue
 
-                latest = readings.order_by("-ticket__uploaded_at").first()
-                total_capacity = float(latest.volume + latest.ullage)
+                latest = readings.order_by(
+                    F("ticket__ticket_timestamp").desc(nulls_last=True),
+                    F("ticket__uploaded_at").desc(nulls_last=True),
+                    F("created_at").desc(nulls_last=True),
+                    F("id").desc(nulls_last=True),
+                ).first()
+                if latest.volume is None or latest.ullage is None:
+                    virtual_failed += 1
+                    continue
+                resolution = capacity_resolver.resolve_virtual(
+                    total_capacity_gallons=latest.volume + latest.ullage,
+                    evidence_ids=(str(latest.id),),
+                    basis_percent_exact=latest.ullage_endpoint_percent_exact,
+                )
+                if not resolution.usable:
+                    virtual_failed += 1
+                    continue
+                total_capacity = float(resolution.physical_capacity_gallons)
                 observations = [(float(r.height), float(r.volume)) for r in readings]
 
                 estimation = service.run_virtual_estimation(

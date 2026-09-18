@@ -1,0 +1,17 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<h1>Backfill Veeder Capacity Evidence</h1>
+<p>Preview is the default. Apply writes only missing legacy profiles and does not recalculate geometry.</p>
+<form method="post">
+    {% csrf_token %}
+    <p><label for="id_store">Store number (optional)</label>
+    <input id="id_store" name="store" type="number" min="1"></p>
+    <p><label><input name="apply" type="checkbox"> Apply changes</label></p>
+    <button type="submit" class="button default">RUN BACKFILL</button>
+</form>
+{% if output %}
+<h2>{% if applied %}Applied{% else %}Preview{% endif %} result</h2>
+<pre>{{ output }}</pre>
+{% endif %}
+{% endblock %}

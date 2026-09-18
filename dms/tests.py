@@ -16,6 +16,8 @@ from dms.models import Category, Collection, Document, TemporaryUpload, Tag
 from dms.services.upload_service import DocumentUploadService
 from dms.services.download_service import DocumentDownloadService
 from dms.services.search_service import DocumentSearchService
+from dms.services.document_email_service import DocumentEmailService
+from genericcharts.models import GenericChartGeneration
 from dms.management.commands.purge_deleted_documents import Command as PurgeCommand
 from siteintel.models import Location, LocationType
 from tankgauge.models.store_models import Store
@@ -155,6 +157,91 @@ class DMSTestCase(APITestCase):
         # Verify download count incremented
         doc.refresh_from_db()
         self.assertEqual(doc.download_count, 1)
+
+    def test_download_blocks_known_unsafe_generic_chart(self):
+        raw_result = DocumentUploadService.handle_raw_upload(
+            self.test_file, self.staff_user
+        )
+        doc = DocumentUploadService.finalize_upload(
+            temp_id=raw_result["temp_id"],
+            user=self.staff_user,
+            title="Unsafe Generic Chart",
+            category_id=Category.objects.create(name="FNG", slug="fng").id,
+            is_public=True,
+        )
+        chart_tag = Tag.objects.create(
+            name="Generic Tank Charts", slug="generic-tank-charts"
+        )
+        doc.tags.add(chart_tag)
+        generation = GenericChartGeneration.objects.create(
+            state="FULL",
+            generator_version="1.0.0",
+            requested_by=self.staff_user,
+            status=GenericChartGeneration.Status.COMPLETED,
+            summary={"source_validity": [{"estimate_status": "UNSAFE"}]},
+            document=doc,
+        )
+
+        with self.assertRaisesMessage(ValueError, "no longer current"):
+            DocumentDownloadService.prepare_download(doc.id, self.staff_user)
+
+        doc.refresh_from_db()
+        self.assertIsNotNone(doc.invalidated_at)
+        self.assertEqual(doc.invalidation_reason, "profile_version_changed")
+
+        doc.refresh_from_db()
+        self.assertEqual(doc.download_count, 0)
+        self.assertEqual(generation.document_id, doc.id)
+
+    def test_email_blocks_known_unsafe_generic_chart(self):
+        raw_result = DocumentUploadService.handle_raw_upload(
+            self.test_file, self.staff_user
+        )
+        doc = DocumentUploadService.finalize_upload(
+            temp_id=raw_result["temp_id"],
+            user=self.staff_user,
+            title="Unsafe Email Chart",
+            category_id=Category.objects.create(name="FNG Email", slug="fng-email").id,
+            is_public=True,
+        )
+        chart_tag = Tag.objects.create(
+            name="Generic Tank Charts Email", slug="generic-tank-charts"
+        )
+        doc.tags.add(chart_tag)
+        GenericChartGeneration.objects.create(
+            state="FULL",
+            generator_version="1.0.0",
+            requested_by=self.staff_user,
+            status=GenericChartGeneration.Status.COMPLETED,
+            summary={"source_validity": [{"estimate_status": "UNSAFE"}]},
+            document=doc,
+        )
+
+        result = DocumentEmailService().send_document(
+            document=doc, recipient_email="operator@example.com"
+        )
+
+        self.assertEqual(result["code"], "document_not_current")
+
+    def test_document_operational_state_blocks_retained_artifact(self):
+        raw_result = DocumentUploadService.handle_raw_upload(
+            self.test_file, self.staff_user
+        )
+        doc = DocumentUploadService.finalize_upload(
+            temp_id=raw_result["temp_id"],
+            user=self.staff_user,
+            title="Retained Unsafe Artifact",
+            category_id=self.category_safety.id,
+            is_public=True,
+        )
+        doc.operational_state = "UNSAFE"
+        doc.invalidation_reason = "profile_version_changed"
+        doc.save(
+            update_fields=["operational_state", "invalidation_reason", "updated_at"]
+        )
+
+        with self.assertRaisesMessage(ValueError, "no longer current"):
+            DocumentDownloadService.prepare_download(doc.id, self.staff_user)
 
     def test_search_and_filter_service(self):
         # Ingest and finalize two documents

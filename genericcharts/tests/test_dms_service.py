@@ -4,6 +4,7 @@ from django.test import TestCase, override_settings
 from dms.models import Category, Document
 from genericcharts.models import GenericChartGeneration
 from genericcharts.services.dms_service import GenericChartDMSService
+from dms.services.chart_artifact_safety import chart_document_safety_reason
 from tankgauge.models import StoreType
 
 
@@ -88,3 +89,28 @@ class GenericChartDMSServiceTests(TestCase):
         self.assertIn("Exxon", first_document.title)
         self.assertTrue(first_document.tags.filter(slug="store-type-exxon").exists())
         self.assertFalse(second_document.tags.filter(slug="store-type-exxon").exists())
+
+    def test_publish_retains_source_validity_for_delivery_safety(self):
+        generation = self._generation()
+        generation.summary = {
+            "source_validity": [
+                {"estimate_status": "UNSAFE", "profile_status": "READY"}
+            ]
+        }
+        generation.save(update_fields=["summary"])
+
+        document = self.service.publish(
+            generation=generation,
+            pdf_bytes=b"%PDF unsafe source",
+            summary=generation.summary,
+        )
+
+        generation.document = document
+        generation.status = GenericChartGeneration.Status.COMPLETED
+        generation.save(update_fields=["document", "status"])
+        self.assertEqual(
+            generation.summary["source_validity"][0]["estimate_status"], "UNSAFE"
+        )
+        self.assertEqual(
+            chart_document_safety_reason(document), "generic_estimate_unsafe"
+        )

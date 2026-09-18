@@ -1,8 +1,12 @@
 import math
 import logging
+import hashlib
+import json
+from django.utils import timezone
 from typing import Optional, List, Tuple
 from django.conf import settings
 from django.db import transaction
+from django.db.models import F
 from tankgauge.models import (
     StoreTankMapping,
     TankEstimation,
@@ -12,6 +16,7 @@ from tankgauge.models import (
 from atg.models import VeederReading
 from .geometry import GeometryEngine
 from .utils import canonicalize_fuel
+from .capacity_resolution import CapacityResolutionService
 
 logger = logging.getLogger("tankgauge")
 
@@ -35,6 +40,7 @@ class EstimationService:
 
     def __init__(self):
         self.engine = GeometryEngine()
+        self.capacity_resolver = CapacityResolutionService()
 
     def run_estimation_for_tank(
         self, tank_mapping: StoreTankMapping
@@ -55,13 +61,47 @@ class EstimationService:
         )
 
         # 1. ACQUIRE RAW DATA
-        readings = VeederReading.objects.filter(
-            ticket__store=tank_mapping.store,
-            tank_index=tank_mapping.tank_index,
-            fuel_type__name__iexact=canonicalize_fuel(tank_mapping.fuel_type),
-        ).select_related("ticket")
+        readings = (
+            VeederReading.objects.filter(
+                ticket__store=tank_mapping.store,
+                tank_index=tank_mapping.tank_index,
+                fuel_type__name__iexact=canonicalize_fuel(tank_mapping.fuel_type),
+            )
+            .select_related("ticket")
+            .order_by(
+                F("ticket__ticket_timestamp").asc(nulls_last=True),
+                "ticket__uploaded_at",
+                "created_at",
+                "id",
+            )
+        )
 
-        if not readings.exists():
+        observation_cutoff = timezone.now()
+        all_readings = list(readings)
+        eligible = [
+            reading
+            for reading in all_readings
+            if reading.acceptance_status == "ACCEPTED"
+            and reading.volume is not None
+            and reading.height is not None
+            and reading.volume >= 0
+            and reading.height >= 0
+            and reading.created_at <= observation_cutoff
+        ]
+        excluded = [
+            {
+                "id": str(reading.id),
+                "reason_code": (
+                    "not_accepted"
+                    if reading.acceptance_status != "ACCEPTED"
+                    else "invalid_observation"
+                ),
+            }
+            for reading in all_readings
+            if reading not in eligible
+        ]
+
+        if not eligible:
             logger.warning(
                 "ESTIMATION_FAILED",
                 extra={
@@ -71,16 +111,9 @@ class EstimationService:
             )
             return None
 
-        # 2. SOURCE TOTAL CAPACITY
-        # We try to get capacity from the most recent reading (vol + ullage)
-        latest_reading = readings.order_by("-ticket__uploaded_at").first()
-        total_capacity = float(latest_reading.volume + latest_reading.ullage)
-
-        if total_capacity <= 0:
-            # Fallback to TankType capacity if available
-            total_capacity = float(tank_mapping.tank_type.capacity or 0)
-
-        if total_capacity <= 0:
+        # 2. Resolve physical capacity through the canonical profile boundary.
+        resolution = self.capacity_resolver.resolve_mapping(tank_mapping)
+        if not resolution.usable:
             logger.error(
                 "ESTIMATION_FAILED",
                 extra={
@@ -89,9 +122,21 @@ class EstimationService:
                 },
             )
             return None
+        total_capacity = float(resolution.physical_capacity_gallons)
 
         # 3. EXTRACT (HEIGHT, VOLUME) OBSERVATIONS
-        observations = [(float(r.height), float(r.volume)) for r in readings]
+        observations = [(float(r.height), float(r.volume)) for r in eligible]
+        observation_rows = [
+            {
+                "id": str(reading.id),
+                "volume_gallons": str(reading.volume),
+                "height_inches": str(reading.height),
+            }
+            for reading in eligible
+        ]
+        observation_hash = hashlib.sha256(
+            json.dumps(observation_rows, sort_keys=True).encode("utf-8")
+        ).hexdigest()
 
         # 4. EVALUATE CONFIDENCE GATES (Thresholds)
         if not self._passes_confidence_gates(observations):
@@ -120,14 +165,26 @@ class EstimationService:
 
         # 6. PERSIST IMMUTABLE RESULT
         with transaction.atomic():
+            locked_mapping = StoreTankMapping.objects.select_for_update().get(
+                pk=tank_mapping.pk
+            )
+            if locked_mapping.profile_version != resolution.profile_version:
+                logger.warning(
+                    "ESTIMATION_STALE_PROFILE",
+                    extra={
+                        "tank_mapping_id": tank_mapping.id,
+                        "reason_code": "stale_profile_version",
+                    },
+                )
+                return None
             # Deactivate previous estimates for this tank
-            TankEstimation.objects.filter(tank_mapping=tank_mapping).update(
-                is_active=False
+            TankEstimation.objects.filter(tank_mapping=locked_mapping).update(
+                is_active=False, active_slot=None
             )
 
             # Create new versioned estimate
             estimation = TankEstimation.objects.create(
-                tank_mapping=tank_mapping,
+                tank_mapping=locked_mapping,
                 radius=result["radius"],
                 length=result["length"],
                 confidence=result["confidence"],
@@ -135,32 +192,55 @@ class EstimationService:
                 max_error=result["diagnostics"].get("max_error"),
                 sample_count=result["diagnostics"].get("sample_count"),
                 algorithm_version=result["algorithm_version"],
-                diagnostics={**result["diagnostics"], "capacity": total_capacity},
+                active_slot="ACTIVE",
+                physical_capacity_gallons=resolution.physical_capacity_gallons,
+                capacity_source=resolution.authority,
+                capacity_verified=locked_mapping.capacity_verified,
+                profile_version=resolution.profile_version,
+                estimate_status=(
+                    "VALID" if resolution.status == "READY" else "LEGACY_UNVERIFIED"
+                ),
+                diagnostics={
+                    **result["diagnostics"],
+                    "capacity": total_capacity,
+                    "capacity_source": resolution.authority,
+                    "capacity_status": resolution.status,
+                    "capacity_verified": locked_mapping.capacity_verified,
+                    "profile_version": resolution.profile_version,
+                    "warning_codes": list(resolution.warning_codes),
+                    "snapshot_schema_version": 1,
+                    "observation_cutoff": observation_cutoff.isoformat(),
+                    "observation_set_hash": observation_hash,
+                    "included_readings": observation_rows,
+                    "excluded_readings": excluded,
+                    "source_evidence_ids": list(resolution.evidence_ids),
+                    "calculated_at": timezone.now().isoformat(),
+                },
                 is_active=True,
             )
 
             # Supersede any active virtual estimation for the same physical tank.
             # The mapped estimation is authoritative; the virtual was written
             # earlier while this tank was still unmapped (see auto_mapper).
-            fuel_key = canonicalize_fuel(tank_mapping.fuel_type)
+            fuel_key = canonicalize_fuel(locked_mapping.fuel_type)
             stale_virtual_ids = list(
                 VirtualTankEstimation.objects.filter(
-                    store=tank_mapping.store,
+                    store=locked_mapping.store,
                     fuel_type=fuel_key,
-                    tank_index=tank_mapping.tank_index,
+                    tank_index=locked_mapping.tank_index,
                     is_active=True,
                 ).values_list("id", flat=True)
             )
             if stale_virtual_ids:
                 VirtualTankEstimation.objects.filter(id__in=stale_virtual_ids).update(
-                    is_active=False
+                    is_active=False, active_slot=None
                 )
                 logger.info(
                     "STALE_VIRTUAL_SUPERSEDED",
                     extra={
-                        "store_id": tank_mapping.store_id,
-                        "store_num": tank_mapping.store.store_num,
-                        "tank_index": tank_mapping.tank_index,
+                        "store_id": locked_mapping.store_id,
+                        "store_num": locked_mapping.store.store_num,
+                        "tank_index": locked_mapping.tank_index,
                         "fuel_type": fuel_key,
                         "virtual_ids": stale_virtual_ids,
                         "estimation_id": estimation.id,
@@ -171,9 +251,9 @@ class EstimationService:
             # 7. Optional generated chart materialization (legacy compatibility)
             self.generate_tank_chart_from_estimation(
                 estimation,
-                tank_mapping.store,
-                tank_mapping.fuel_type,
-                tank_mapping.tank_index,
+                locked_mapping.store,
+                locked_mapping.fuel_type,
+                locked_mapping.tank_index,
             )
 
         logger.info(
@@ -204,6 +284,17 @@ class EstimationService:
         signature = self._build_virtual_signature(
             observations, total_capacity, latest_uploaded_at
         )
+        observation_rows = [
+            {
+                "id": None,
+                "volume_gallons": str(volume),
+                "height_inches": str(height),
+            }
+            for height, volume in observations
+        ]
+        observation_hash = hashlib.sha256(
+            json.dumps(observation_rows, sort_keys=True).encode("utf-8")
+        ).hexdigest()
 
         # 1. Check for existing active estimation
         existing = VirtualTankEstimation.objects.filter(
@@ -232,7 +323,7 @@ class EstimationService:
             )
             if superseded_ids:
                 VirtualTankEstimation.objects.filter(id__in=superseded_ids).update(
-                    is_active=False
+                    is_active=False, active_slot=None
                 )
                 logger.info(
                     "STALE_VIRTUAL_SUPERSEDED",
@@ -277,13 +368,16 @@ class EstimationService:
             return None
 
         # 4. PERSIST IMMUTABLE RESULT
+        resolution = self.capacity_resolver.resolve_virtual(
+            total_capacity_gallons=total_capacity,
+        )
         with transaction.atomic():
             VirtualTankEstimation.objects.filter(
                 store=store,
                 fuel_type=fuel_key,
                 tank_index=tank_index,
                 is_active=True,
-            ).update(is_active=False)
+            ).update(is_active=False, active_slot=None)
 
             # Create new versioned estimate
             estimation = VirtualTankEstimation.objects.create(
@@ -297,10 +391,23 @@ class EstimationService:
                 max_error=result["diagnostics"].get("max_error"),
                 sample_count=result["diagnostics"].get("sample_count"),
                 algorithm_version=result["algorithm_version"],
+                active_slot="ACTIVE",
+                physical_capacity_gallons=resolution.physical_capacity_gallons,
+                capacity_source=resolution.authority,
+                capacity_verified=False,
+                estimate_status="LEGACY_UNVERIFIED",
                 diagnostics={
                     **result["diagnostics"],
                     "capacity": total_capacity,
+                    "capacity_source": resolution.authority,
+                    "capacity_status": resolution.status,
+                    "warning_codes": list(resolution.warning_codes),
                     **signature,
+                    "snapshot_schema_version": 1,
+                    "observation_set_hash": observation_hash,
+                    "included_readings": observation_rows,
+                    "excluded_readings": [],
+                    "calculated_at": timezone.now().isoformat(),
                 },
                 is_active=True,
             )

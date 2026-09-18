@@ -28,6 +28,10 @@ and foreign-key relationships after the reference list has been reviewed.
 - Keep complex calculations in `logic/` rather than models or views.
 - Preserve source and estimation history; do not silently destroy operational
   evidence.
+- `StoreTankMapping.canonical_fuel_type` is the stored identity key for profile
+  resolution. Capacity edits are versioned in `TankCapacityProfileHistory`; the
+  backfill command is preview-only unless `--apply` is supplied and never
+  recalculates geometry implicitly.
 - Use migrations for schema changes and regenerate
   `instructions/database_schema.dbml` afterward.
 

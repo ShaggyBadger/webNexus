@@ -5,6 +5,7 @@ from django.db import transaction
 
 from atg.models import VeederReading
 from tankgauge.logic.estimation_service import EstimationService
+from tankgauge.logic.capacity_resolution import CapacityResolutionService
 from tankgauge.logic.utils import canonicalize_fuel
 from tankgauge.models import Store, StoreTankMapping, TankType
 
@@ -64,6 +65,7 @@ class AutoMapperService:
                 ticket__store=store,
                 tank_index=old_index,
                 fuel_type__name__iexact=fuel_key,
+                acceptance_status="ACCEPTED",
             ).exists()
 
             if not old_index_has_readings:
@@ -105,6 +107,7 @@ class AutoMapperService:
             ticket__store=store,
             tank_index=tank_index,
             fuel_type__name__iexact=fuel_key,
+            acceptance_status="ACCEPTED",
         ).select_related("ticket")
 
         reading_count = readings.count()
@@ -128,14 +131,19 @@ class AutoMapperService:
             )
             return False
 
-        total_capacity = float(latest.volume + latest.ullage)
-        if total_capacity <= 0:
+        resolution = CapacityResolutionService().resolve_virtual(
+            total_capacity_gallons=latest.volume + latest.ullage,
+            evidence_ids=(str(latest.id),),
+            basis_percent_exact=latest.ullage_endpoint_percent_exact,
+        )
+        if not resolution.usable:
             logger.warning(
                 "AUTO_MAPPER: Non-positive capacity derived for Store %s Tank %s.",
                 store.store_num,
                 tank_index,
             )
             return False
+        total_capacity = float(resolution.physical_capacity_gallons)
 
         service = EstimationService()
         estimation = service.run_virtual_estimation(
@@ -227,10 +235,18 @@ class AutoMapperService:
                 ticket__store=store,
                 tank_index=tank_index,
                 fuel_type__name__iexact=fuel_key,
+                acceptance_status="ACCEPTED",
             ).select_related("ticket")
             if readings.exists():
                 latest = readings.order_by("-ticket__uploaded_at").first()
-                total_capacity = float(latest.volume + latest.ullage)
+                resolution = CapacityResolutionService().resolve_virtual(
+                    total_capacity_gallons=latest.volume + latest.ullage,
+                    evidence_ids=(str(latest.id),),
+                    basis_percent_exact=latest.ullage_endpoint_percent_exact,
+                )
+                if not resolution.usable:
+                    return
+                total_capacity = float(resolution.physical_capacity_gallons)
                 observations = [(float(r.height), float(r.volume)) for r in readings]
                 service.run_virtual_estimation(
                     store,

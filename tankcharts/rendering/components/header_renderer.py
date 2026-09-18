@@ -14,12 +14,18 @@ class HeaderRenderer:
         city_state_zip = ", ".join(
             [part for part in [chart.city, chart.state, chart.zip_code] if part]
         )
+        capacity_label = (
+            f"{chart.capacity_gallons:,} gal"
+            if chart.capacity_gallons is not None
+            else "capacity unknown"
+        )
         title_line = (
             f"STORE {chart.store_num}"
             f" | RISO {chart.riso_num or 'Unknown'}"
             f" | TANK {chart.tank_index} {chart.fuel_type.upper()}"
-            f" | {chart.capacity_gallons:,} gal"
+            f" | {capacity_label}"
             f" | {chart.max_depth_inches} in"
+            f" | {chart.capacity_status}/{chart.capacity_source}"
             f" | N={chart.veeder_observation_count or chart.estimation_sample_count}"
         )
         location_line = (

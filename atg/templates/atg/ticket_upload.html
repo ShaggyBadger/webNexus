@@ -80,43 +80,46 @@
                                     <strong x-text="'Tank ' + reading.tank_index + ' // ' + reading.fuel_type_name"></strong>
                                     <span class="text-muted-custom" x-text="reading.locked_identity ? 'CONFIRMED LOCKED' : 'UNVERIFIED EDITABLE'"></span>
                                 </div>
+                                <div class="mono small mb-2">
+                                    <span class="text-muted-custom">TANK_INDEX</span>
+                                    <span x-text="reading.tank_index"></span>
+                                    <span class="text-muted-custom ms-3">FUEL</span>
+                                    <span x-text="reading.fuel_type_name"></span>
+                                </div>
                                 <div class="row g-2">
                                     <div class="col-md-3 col-6">
-                                        <label class="form-label">Tank Index</label>
-                                        <input type="number" class="form-control form-control-sm mono" x-model="reading.tank_index" :disabled="reading.locked_identity" min="1" inputmode="numeric">
-                                    </div>
-                                    <div class="col-md-3 col-6">
-                                        <label class="form-label">Fuel Type</label>
-                                        <template x-if="reading.locked_identity">
-                                            <input type="text" class="form-control form-control-sm mono" :value="reading.fuel_type_name" disabled>
-                                        </template>
-                                        <template x-if="!reading.locked_identity">
-                                            <select class="form-select form-select-sm mono" x-model="reading.fuel_type_id">
-                                                <option value="">-- SELECT --</option>
-                                                <template x-for="fuel in fuelTypes" :key="fuel.id">
-                                                    <option :value="fuel.id" x-text="fuel.name.toUpperCase()"></option>
-                                                </template>
-                                            </select>
-                                        </template>
-                                    </div>
-                                    <div class="col-md-2 col-6">
                                         <label class="form-label">Volume</label>
                                         <input type="number" step="any" class="form-control form-control-sm mono" x-model="reading.volume" @input="onKnownVolumeInput(reading)" inputmode="decimal">
                                     </div>
-                                    <div class="col-md-2 col-6">
+                                    <div class="col-md-3 col-6">
                                         <label class="form-label">Height</label>
                                         <input type="number" step="0.01" class="form-control form-control-sm mono" x-model="reading.height" inputmode="decimal">
                                     </div>
-                                    <div class="col-md-2 col-12">
-                                        <label class="form-label">Ullage</label>
-                                        <input type="number" step="any" class="form-control form-control-sm mono" x-model="reading.ullage" @input="markUllageOverridden(reading)" inputmode="decimal">
+                                    <div class="col-md-3 col-6">
+                                        <label class="form-label">Expected Ullage (locked)</label>
+                                        <input type="number" step="any" class="form-control form-control-sm mono" x-model="reading.ullage" readonly aria-readonly="true" inputmode="decimal">
+                                    </div>
+                                    <div class="col-md-3 col-6">
+                                        <label class="form-label">Physical Capacity</label>
+                                        <div class="form-control form-control-sm mono" x-text="reading.physical_capacity_gallons_exact ?? '--'"></div>
                                     </div>
                                 </div>
-                                <div class="mono small text-muted-custom mt-2" x-show="reading.baseline_capacity">
-                                    BASELINE_CAPACITY <span x-text="reading.baseline_capacity"></span> GAL // EXPECTED_ULLAGE <span x-text="reading.expected_ullage ?? '--'"></span>
+                                <div class="mono small text-muted-custom mt-2">
+                                    BASIS <span x-text="reading.basis_display_percent ? reading.basis_display_percent + '%' : '--'"></span>
+                                    // EXACT_BASIS <span x-text="reading.ullage_endpoint_percent_exact ?? '--'"></span>%
+                                    // SOURCE <span x-text="reading.capacity_source ?? '--'"></span>
                                 </div>
-                                <div class="mono small text-muted-custom" x-show="reading.baseline_source">
-                                    BASELINE_SOURCE <span x-text="reading.baseline_source"></span>
+                                <div class="mono small text-warning mt-1" x-show="reading.verification_warning">
+                                    <i class="fa-solid fa-triangle-exclamation"></i>
+                                    <span x-text="reading.verification_warning"></span>
+                                </div>
+                                <div class="mt-2" x-show="!reading.capacity_verified && reading.mapping_id">
+                                    <label class="form-label mono small">VERIFICATION_REASON</label>
+                                    <input type="text" class="form-control form-control-sm mono" x-model="reading.capacity_verification_reason" placeholder="Why is this capacity confirmed?">
+                                    <div class="form-check mt-2">
+                                        <input class="form-check-input" type="checkbox" x-model="reading.capacity_verification_requested" @change="verifyCapacity(reading)">
+                                        <label class="form-check-label mono small">CAPACITY VERIFIED</label>
+                                    </div>
                                 </div>
                             </div>
                         </template>
@@ -152,6 +155,10 @@
                                     <div class="col-md-2 col-4">
                                         <label class="form-label">Ullage</label>
                                         <input type="number" step="any" class="form-control form-control-sm mono" x-model="reading.ullage" inputmode="decimal">
+                                    </div>
+                                    <div class="col-md-3 col-12">
+                                        <label class="form-label">Printed Physical Capacity</label>
+                                        <input type="number" step="any" class="form-control form-control-sm mono" x-model="reading.printed_physical_capacity_gallons" min="0" inputmode="decimal" placeholder="Optional evidence">
                                     </div>
                                 </div>
                             </div>

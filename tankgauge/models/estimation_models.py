@@ -46,6 +46,29 @@ class TankEstimation(models.Model):
         default=True,
         help_text="True if this is the designated 'current' estimate for this tank.",
     )
+    active_slot = models.CharField(
+        max_length=20,
+        null=True,
+        blank=True,
+        help_text="Non-null only for the current estimate; supports MySQL uniqueness.",
+    )
+    physical_capacity_gallons = models.DecimalField(
+        max_digits=12, decimal_places=3, null=True, blank=True
+    )
+    capacity_source = models.CharField(max_length=40, blank=True)
+    capacity_verified = models.BooleanField(default=False)
+    profile_version = models.PositiveIntegerField(null=True, blank=True)
+    estimate_status = models.CharField(
+        max_length=24,
+        default="LEGACY_UNVERIFIED",
+        choices=(
+            ("VALID", "Valid"),
+            ("LEGACY_UNVERIFIED", "Legacy unverified"),
+            ("STALE", "Stale"),
+            ("UNSAFE", "Unsafe"),
+            ("BLOCKED", "Blocked"),
+        ),
+    )
 
     # Diagnostics (Stored as JSON for future-proofing)
     diagnostics = models.JSONField(
@@ -59,6 +82,12 @@ class TankEstimation(models.Model):
         verbose_name = "Tank Estimation"
         verbose_name_plural = "Tank Estimations"
         ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["tank_mapping", "active_slot"],
+                name="uniq_active_mapped_estimation_slot",
+            )
+        ]
 
     def __str__(self):
         return (

@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from dms.models import Category, Collection, Document, TemporaryUpload, Tag
+from dms.services.chart_artifact_safety import chart_document_safety_reason
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -98,10 +99,12 @@ class DocumentSerializer(serializers.ModelSerializer):
             "linked_object",
         ]
 
-    def get_download_url(self, obj: Document) -> str:
+    def get_download_url(self, obj: Document) -> str | None:
         """
         Return the application download endpoint path.
         """
+        if chart_document_safety_reason(obj):
+            return None
         return f"/dms/documents/{obj.id}/download/"
 
     def get_linked_object(self, obj: Document) -> dict | None:

@@ -22,6 +22,7 @@ from tankgauge.models import (
     VirtualTankEstimation,
 )
 from tankgauge.models import StoreType
+from tankgauge.logic.capacity_resolution import CapacityResolutionService
 
 
 def select_stores(spec: SelectionSpec) -> tuple[SelectedStore, ...]:
@@ -71,9 +72,9 @@ def select_stores(spec: SelectionSpec) -> tuple[SelectedStore, ...]:
 def select_generated_tanks(spec: SelectionSpec) -> tuple[GeneratedTank, ...]:
     """Select active mapped/virtual geometry with one record per physical tank.
 
-    Mapped geometry wins over virtual geometry. Invalid mapped geometry is not
-    allowed to block a valid virtual fallback, matching the existing export
-    command's source-selection behavior.
+    Mapped geometry wins over virtual geometry. A mapped physical key with an
+    unresolved, conflicting, or unsafe profile remains blocked from virtual
+    fallback even when its mapped geometry cannot be generated.
     """
 
     stores = select_stores(spec)
@@ -88,6 +89,8 @@ def select_generated_tanks(spec: SelectionSpec) -> tuple[GeneratedTank, ...]:
         .order_by("store__store_num", "tank_index", "id")
     }
     candidates: dict[tuple[int, int | None], GeneratedTank] = {}
+    blocked_keys: set[tuple[int, int | None]] = set()
+    capacity_resolver = CapacityResolutionService()
 
     active_mapped = (
         TankEstimation.objects.filter(
@@ -103,6 +106,10 @@ def select_generated_tanks(spec: SelectionSpec) -> tuple[GeneratedTank, ...]:
 
     for mapping_id, estimation in latest_by_mapping.items():
         mapping = mappings[mapping_id]
+        resolution = capacity_resolver.resolve_mapping(mapping)
+        key = (mapping.store_id, mapping.tank_index)
+        if _mapping_blocks_virtual_fallback(mapping, estimation, resolution):
+            blocked_keys.add(key)
         candidate = _generated_tank_from_estimation(
             mapping=mapping,
             radius_inches=estimation.radius,
@@ -111,9 +118,27 @@ def select_generated_tanks(spec: SelectionSpec) -> tuple[GeneratedTank, ...]:
             sample_count=estimation.sample_count,
             source="mapped_estimation",
             algorithm_version=estimation.algorithm_version,
+            capacity_status=resolution.status,
+            capacity_source=resolution.authority,
+            estimate_status=estimation.estimate_status,
+            profile_version=resolution.profile_version,
+            profile_status=mapping.profile_status,
+            estimate_id=estimation.id,
         )
-        if candidate is not None:
+        if (
+            candidate is not None
+            and candidate.estimate_status not in {"STALE", "UNSAFE", "BLOCKED"}
+            and key not in blocked_keys
+        ):
             _add_candidate(candidates, candidate)
+
+    for mapping in mappings.values():
+        key = (mapping.store_id, mapping.tank_index)
+        if key in latest_by_mapping:
+            continue
+        resolution = capacity_resolver.resolve_mapping(mapping)
+        if _mapping_blocks_virtual_fallback(mapping, None, resolution):
+            blocked_keys.add(key)
 
     active_virtual = (
         VirtualTankEstimation.objects.filter(store_id__in=store_ids, is_active=True)
@@ -133,8 +158,14 @@ def select_generated_tanks(spec: SelectionSpec) -> tuple[GeneratedTank, ...]:
         candidate = _generated_tank_from_virtual(
             estimation=estimation,
             mapping=mapping,
+            capacity_resolver=capacity_resolver,
         )
-        if candidate is not None:
+        key = (estimation.store_id, estimation.tank_index)
+        if (
+            candidate is not None
+            and candidate.estimate_status not in {"STALE", "UNSAFE", "BLOCKED"}
+            and key not in blocked_keys
+        ):
             _add_candidate(candidates, candidate)
 
     return tuple(
@@ -212,6 +243,12 @@ def _generated_tank_from_estimation(
     sample_count: int,
     source: str,
     algorithm_version: str,
+    capacity_status: str,
+    capacity_source: str,
+    estimate_status: str,
+    profile_version: int | None,
+    profile_status: str | None = None,
+    estimate_id: int | None = None,
 ) -> GeneratedTank | None:
     tank_type = mapping.tank_type
     return _build_generated_tank(
@@ -227,13 +264,26 @@ def _generated_tank_from_estimation(
         sample_count=sample_count,
         source=source,
         algorithm_version=algorithm_version,
+        capacity_status=capacity_status,
+        capacity_source=capacity_source,
+        estimate_status=estimate_status,
+        profile_version=profile_version,
+        profile_status=profile_status,
+        estimate_id=estimate_id,
     )
 
 
 def _generated_tank_from_virtual(
-    *, estimation: VirtualTankEstimation, mapping: StoreTankMapping | None
+    *,
+    estimation: VirtualTankEstimation,
+    mapping: StoreTankMapping | None,
+    capacity_resolver: CapacityResolutionService,
 ) -> GeneratedTank | None:
     tank_type = mapping.tank_type if mapping else None
+    resolution = capacity_resolver.resolve_virtual(
+        total_capacity_gallons=estimation.physical_capacity_gallons
+        or (tank_type.capacity if tank_type else None)
+    )
     return _build_generated_tank(
         store_id=estimation.store_id,
         store_number=estimation.store.store_num,
@@ -247,6 +297,31 @@ def _generated_tank_from_virtual(
         sample_count=estimation.sample_count,
         source="virtual_estimation",
         algorithm_version=estimation.algorithm_version,
+        capacity_status=resolution.status,
+        capacity_source=resolution.authority,
+        estimate_status=estimation.estimate_status,
+        profile_version=(mapping.profile_version if mapping else None),
+        profile_status=mapping.profile_status if mapping else None,
+        estimate_id=estimation.id,
+    )
+
+
+def _mapping_blocks_virtual_fallback(mapping, estimation, resolution) -> bool:
+    """Keep a mapped physical key authoritative when its profile is unsafe."""
+
+    if resolution.status == "UNRESOLVED":
+        return True
+    if mapping.capacity_source == "CONFLICTING":
+        return True
+    if mapping.profile_status in {
+        "REVIEW_REQUIRED",
+        "UNRESOLVED",
+        "CONFLICTING",
+        "UNSAFE",
+    }:
+        return True
+    return bool(
+        estimation and estimation.estimate_status in {"STALE", "UNSAFE", "BLOCKED"}
     )
 
 

@@ -1,3 +1,6 @@
+const DEFAULT_CAPACITY_VERIFICATION_REASON =
+  "Capacity verified during Veeder-Root ticket review.";
+
 function atgTicketUploadApp() {
   return {
     step: 1,
@@ -228,12 +231,20 @@ function atgTicketUploadApp() {
           locked_identity: !!tank.locked_identity,
           baseline_capacity: tank.baseline_capacity,
           baseline_source: tank.baseline_source,
+          physical_capacity_gallons_exact: tank.physical_capacity_gallons_exact ?? tank.capacity_gallons_exact,
+          capacity_source: tank.capacity_source ?? tank.source,
+          ullage_endpoint_percent_exact: tank.ullage_endpoint_percent_exact,
+          basis_display_percent: tank.basis_display_percent,
+          verification_warning: tank.verification_warning,
+          capacity_verified: !!tank.capacity_verified,
+          profile_version: tank.profile_version,
+          capacity_verification_reason: DEFAULT_CAPACITY_VERIFICATION_REASON,
+          capacity_verification_requested: false,
           max_depth: tank.max_depth,
           volume: "",
           height: "",
           ullage: "",
           expected_ullage: null,
-          ullage_overridden: false,
         }));
 
         if (this.knownReadings.length === 0) {
@@ -262,6 +273,7 @@ function atgTicketUploadApp() {
         volume: "",
         height: "",
         ullage: "",
+        printed_physical_capacity_gallons: "",
       });
       this.step = Math.max(this.step, 2);
     },
@@ -279,8 +291,10 @@ function atgTicketUploadApp() {
     },
 
     onKnownVolumeInput(reading) {
-      if (!reading.baseline_capacity || reading.volume === "") {
+      const capacity = Number(reading.physical_capacity_gallons_exact ?? reading.baseline_capacity);
+      if (!capacity || reading.volume === "") {
         reading.expected_ullage = null;
+        reading.ullage = "";
         return;
       }
 
@@ -289,17 +303,50 @@ function atgTicketUploadApp() {
         return;
       }
 
-      const expected = Math.round(reading.baseline_capacity - numericVolume);
+      const basisPercent = Number(reading.ullage_endpoint_percent_exact);
+      const endpointModifier = basisPercent > 0 ? basisPercent / 100 : 1;
+      const expected = Number(
+        (capacity * endpointModifier - numericVolume).toFixed(3),
+      );
       reading.expected_ullage = expected;
-
-      if (!reading.ullage_overridden) {
-        reading.ullage = expected;
-      }
+      reading.ullage = expected;
     },
 
-    markUllageOverridden(reading) {
-      if (reading.source === "known") {
-        reading.ullage_overridden = true;
+    async verifyCapacity(reading) {
+      if (!reading.capacity_verification_requested) {
+        return;
+      }
+      if (!reading.capacity_verification_reason?.trim()) {
+        reading.capacity_verification_requested = false;
+        this.showStatus("Enter a verification reason first.", "error");
+        return;
+      }
+      try {
+        const csrf = document.querySelector("[name=csrfmiddlewaretoken]")?.value;
+        const response = await fetch("/atg/api/v1/tank-profile/verify/", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },
+          credentials: "same-origin",
+          body: JSON.stringify({
+            mapping_id: reading.mapping_id,
+            physical_capacity_gallons: reading.physical_capacity_gallons_exact,
+            ullage_endpoint_percent_exact: reading.ullage_endpoint_percent_exact || 100,
+            profile_version: reading.profile_version,
+            reason: reading.capacity_verification_reason,
+          }),
+        });
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload?.error?.message || "Capacity verification failed.");
+        }
+        reading.capacity_verified = true;
+        reading.verification_warning = null;
+        reading.verification_status = "verified";
+        reading.profile_version = payload.profile_version;
+        this.showStatus("Tank capacity verified.", "success");
+      } catch (error) {
+        reading.capacity_verification_requested = false;
+        this.showStatus(error.message, "error");
       }
     },
 
@@ -337,6 +384,9 @@ function atgTicketUploadApp() {
           volume,
           ullage,
           height,
+          ...(item.printed_physical_capacity_gallons !== "" && item.printed_physical_capacity_gallons != null
+            ? { printed_physical_capacity_gallons: Number(item.printed_physical_capacity_gallons) }
+            : {}),
           is_user_corrected: true,
           confidence_score: 1.0,
           raw_line_text: locked

@@ -6,6 +6,7 @@ from django.core.management.base import BaseCommand
 from django.db import models as db_models
 
 from atg.models import VeederReading
+from tankgauge.logic.capacity_resolution import CapacityResolutionService
 from tankgauge.logic.curve_generator import generate_inch_gallon_curve
 from tankgauge.logic.geometry import GeometryEngine
 from tankgauge.logic.utils import canonicalize_fuel
@@ -269,7 +270,10 @@ class Command(BaseCommand):
             (mapping.store_id, mapping.tank_index): mapping for mapping in mappings
         }
         readings = (
-            VeederReading.objects.filter(ticket__store_id__in=store_ids)
+            VeederReading.objects.filter(
+                ticket__store_id__in=store_ids,
+                acceptance_status="ACCEPTED",
+            )
             .select_related("ticket", "fuel_type")
             .order_by("ticket__uploaded_at", "id")
         )
@@ -299,6 +303,7 @@ class Command(BaseCommand):
             )
 
         geometry_engine = GeometryEngine()
+        capacity_resolver = CapacityResolutionService()
         for reading_key, reading_group in readings_by_key.items():
             store_id, tank_index, fuel_type = reading_key
             candidate_key = (store_id, tank_index)
@@ -306,6 +311,16 @@ class Command(BaseCommand):
                 continue
 
             latest_reading, total_capacity, _, _ = reading_group[-1]
+            if latest_reading.volume is None or latest_reading.ullage is None:
+                continue
+            resolution = capacity_resolver.resolve_virtual(
+                total_capacity_gallons=latest_reading.volume + latest_reading.ullage,
+                evidence_ids=(str(latest_reading.id),),
+                basis_percent_exact=latest_reading.ullage_endpoint_percent_exact,
+            )
+            if not resolution.usable:
+                continue
+            total_capacity = float(resolution.physical_capacity_gallons)
             observations = [(height, volume) for _, _, height, volume in reading_group]
             result = geometry_engine.calculate_best_fit(total_capacity, observations)
             if result.get("status") != "SUCCESS":
@@ -338,6 +353,8 @@ class Command(BaseCommand):
                 "sample_count": result["diagnostics"].get("sample_count"),
                 "estimation_method": "HORIZONTAL_CYLINDER",
                 "algorithm_version": result["algorithm_version"],
+                "capacity_status": resolution.status,
+                "capacity_warning_codes": list(resolution.warning_codes),
                 "chart": chart,
             }
             candidates[candidate_key] = ((2, 0, 0), recovered_record)
@@ -350,6 +367,7 @@ class Command(BaseCommand):
                     "reading_count": len(reading_group),
                     "latest_reading_id": latest_reading.id,
                     "reason": "no_active_estimation",
+                    "capacity_status": resolution.status,
                 }
             )
 

@@ -24,7 +24,7 @@ class TankFieldChartServiceTests(TestCase):
         self.tank_type = TankType.objects.create(
             name="12k96",
             capacity=11990,
-            max_depth=96,
+            max_depth=120,
         )
         self.mapping = StoreTankMapping.objects.create(
             store=self.store,
@@ -80,6 +80,12 @@ class TankFieldChartServiceTests(TestCase):
         self.assertEqual(chart.store_num, 7974)
         self.assertEqual(chart.tank_index, 1)
         self.assertEqual(chart.max_depth_inches, 96)
+        self.assertEqual(chart.capacity_gallons, 12000)
+        self.assertEqual(chart.capacity_status, "LEGACY_UNVERIFIED")
+        self.assertEqual(chart.capacity_source, "LEGACY_ASSUMED")
+        self.assertNotEqual(
+            chart.geometry_implied_capacity_gallons, chart.capacity_gallons
+        )
         self.assertFalse(chart.has_official_chart)
         self.assertIsNone(chart.official_chart_source)
         self.assertEqual(len(chart.table_rows), 96)
@@ -89,6 +95,19 @@ class TankFieldChartServiceTests(TestCase):
         self.assertIn("Veeder", chart.curves[0]["label"])
         self.assertGreaterEqual(chart.coverage_percent, 0.0)
         self.assertGreaterEqual(chart.veeder_observation_count, 2)
+
+    def test_build_uses_mapping_capacity_resolution_over_tank_type_capacity(self):
+        self.mapping.physical_capacity_gallons = "14981.700"
+        self.mapping.capacity_verified = True
+        self.mapping.capacity_source = "MANUAL_VERIFIED"
+        self.mapping.save()
+
+        chart = TankFieldChartService().build(store_num=7974, tank_index=1)
+
+        self.assertEqual(chart.capacity_gallons, 14982)
+        self.assertEqual(chart.capacity_status, "READY")
+        self.assertEqual(chart.capacity_source, "MANUAL_VERIFIED")
+        self.assertEqual(chart.max_depth_inches, 96)
 
     def test_compute_coverage_empty_is_zero(self):
         service = TankFieldChartService()
@@ -122,6 +141,9 @@ class TankFieldChartServiceTests(TestCase):
 
         self.assertEqual(store_chart.store_num, self.store.store_num)
         self.assertEqual([tank.tank_index for tank in store_chart.tanks], [1])
+        self.assertEqual(store_chart.tanks[0].capacity_gallons, 12000)
+        self.assertEqual(store_chart.tanks[0].capacity_status, "LEGACY_UNVERIFIED")
+        self.assertEqual(store_chart.tanks[0].capacity_source, "LEGACY_ASSUMED")
         self.assertGreater(len(store_chart.combined_table_rows), 0)
         first_row = store_chart.combined_table_rows[0]
         self.assertIn("tank_1_gallons", first_row)

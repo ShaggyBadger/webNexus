@@ -84,13 +84,30 @@ class GenericChartDMSService:
                 version=version,
                 category=category,
                 is_public=True,
+                operational_state=(
+                    "UNSAFE"
+                    if any(
+                        item.get("estimate_status") in {"UNSAFE", "BLOCKED"}
+                        or item.get("profile_status") in {"UNSAFE", "REVIEW_REQUIRED"}
+                        for item in (summary or {}).get("source_validity", ())
+                    )
+                    else "USABLE"
+                ),
             )
             document.tags.add(*tags)
             default_storage.save(file_path, ContentFile(pdf_bytes))
             for old_document in previous:
                 old_document.status = "SUPERSEDED"
                 old_document.is_public = False
-                old_document.save(update_fields=["status", "is_public", "updated_at"])
+                old_document.operational_state = "SUPERSEDED"
+                old_document.save(
+                    update_fields=[
+                        "status",
+                        "is_public",
+                        "operational_state",
+                        "updated_at",
+                    ]
+                )
         return document
 
     def _tags(self, state: str, store_type_ids=()):

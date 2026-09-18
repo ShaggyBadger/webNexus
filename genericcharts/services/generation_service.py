@@ -107,6 +107,17 @@ def run_generation(generation_id: int) -> GenericChartGeneration | None:
             "catalog_size": len(package.catalog),
             "coverage": package.coverage_report,
             "package_scope_key": generation.package_scope_key,
+            "source_validity": [
+                {
+                    "store_id": tank.store_id,
+                    "tank_index": tank.tank_index,
+                    "estimate_id": tank.estimate_id,
+                    "estimate_status": tank.estimate_status,
+                    "profile_status": tank.profile_status,
+                    "profile_version": tank.profile_version,
+                }
+                for tank in package.generated_tanks
+            ],
         }
         document = GenericChartDMSService().publish(
             generation=generation,

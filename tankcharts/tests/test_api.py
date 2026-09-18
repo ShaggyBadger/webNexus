@@ -62,6 +62,10 @@ class TankChartAPITests(TestCase):
         payload = response.json()
         self.assertEqual(payload["status"], "success")
         self.assertEqual(payload["data"]["store_num"], self.store_num)
+        self.assertEqual(payload["data"]["capacity_gallons"], 12000)
+        self.assertEqual(payload["data"]["capacity_status"], "LEGACY_UNVERIFIED")
+        self.assertEqual(payload["data"]["capacity_source"], "LEGACY_ASSUMED")
+        self.assertIn("geometry_implied_capacity_gallons", payload["data"])
         self.assertNotIn("confidence_level", payload["data"])
 
     def test_chart_endpoint_redirects_to_dms_download(self):

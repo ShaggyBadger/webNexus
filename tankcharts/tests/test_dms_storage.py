@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.test import TestCase
 
 from atg.models import VeederTicket
@@ -74,8 +76,47 @@ class DMSChartStorageServiceTests(TestCase):
             metadata=metadata,
         )
 
-        VeederTicket.objects.create(store=self.store)
+        ticket = VeederTicket.objects.create(store=self.store)
+        ticket.uploaded_at = document.uploaded_at + timedelta(seconds=1)
+        ticket.save(update_fields=["uploaded_at"])
 
         self.assertTrue(
             service.is_stale(document=document, store_num=4630, tank_index=5)
+        )
+
+    def test_unsafe_metadata_is_not_given_a_download_url(self):
+        self.mapping.profile_status = "READY"
+        self.mapping.save(update_fields=["profile_status"])
+        service = DMSChartStorageService()
+        document = service.store(
+            store_num=4630,
+            fuel_type="regular",
+            tank_index=5,
+            pdf_bytes=b"%PDF-1.4 unsafe",
+            metadata={"estimate_status": "UNSAFE"},
+        )
+
+        self.assertIsNone(
+            service.get_download_url(store_num=4630, fuel_type="regular", tank_index=5)
+        )
+        self.assertEqual(document.status, "ACTIVE")
+
+    def test_stale_metadata_is_not_given_a_download_url(self):
+        self.mapping.profile_status = "READY"
+        self.mapping.save(update_fields=["profile_status"])
+        service = DMSChartStorageService()
+        document = service.store(
+            store_num=4630,
+            fuel_type="regular",
+            tank_index=5,
+            pdf_bytes=b"%PDF-1.4 current",
+            metadata={"profile_status": "READY"},
+        )
+        ticket = VeederTicket.objects.create(store=self.store)
+        ticket.uploaded_at = document.uploaded_at + timedelta(seconds=1)
+        ticket.save(update_fields=["uploaded_at"])
+
+        self.assertIsNotNone(service.document_safety_reason(document))
+        self.assertIsNone(
+            service.get_download_url(store_num=4630, fuel_type="regular", tank_index=5)
         )

@@ -2,6 +2,7 @@ import logging
 
 import magic
 from django.db import transaction
+from django.utils import timezone
 
 from ..models import VeederTicket, VeederReading
 from .auto_mapper import AutoMapperService
@@ -130,6 +131,21 @@ class VeederUploadService:
                                 volume=validated_reading.get("volume"),
                                 ullage=validated_reading.get("ullage"),
                                 height=validated_reading.get("height"),
+                                printed_physical_capacity_gallons=validated_reading.get(
+                                    "printed_physical_capacity_gallons"
+                                ),
+                                printed_capacity_text=validated_reading.get(
+                                    "printed_capacity_text"
+                                ),
+                                ullage_endpoint_gallons=validated_reading.get(
+                                    "ullage_endpoint_gallons"
+                                ),
+                                ullage_endpoint_percent_exact=validated_reading.get(
+                                    "ullage_endpoint_percent_exact"
+                                ),
+                                basis_status=validated_reading.get(
+                                    "basis_status", "UNKNOWN"
+                                ),
                                 temp=validated_reading.get("temp"),
                                 water=validated_reading.get("water"),
                                 raw_line_text=validated_reading.get("raw_line_text"),
@@ -138,6 +154,13 @@ class VeederUploadService:
                                 ),
                                 is_user_corrected=validated_reading.get(
                                     "is_user_corrected", False
+                                ),
+                                acceptance_status="ACCEPTED",
+                                accepted_at=timezone.now(),
+                                accepted_by=(
+                                    user
+                                    if getattr(user, "is_authenticated", False)
+                                    else None
                                 ),
                             )
                         )
