@@ -212,9 +212,7 @@ def _get_throttle_code(*, request) -> str | None:
     day_key = now_utc.strftime("%Y%m%d")
     user_limit = int(getattr(settings, "MISSIONLOG_REPORT_USER_RATE_PER_MINUTE", 6))
     ip_limit = int(getattr(settings, "MISSIONLOG_REPORT_IP_RATE_PER_MINUTE", 12))
-    user_day_limit = int(
-        getattr(settings, "MISSIONLOG_REPORT_USER_RATE_PER_DAY", 10)
-    )
+    user_day_limit = int(getattr(settings, "MISSIONLOG_REPORT_USER_RATE_PER_DAY", 10))
     ip_day_limit = int(getattr(settings, "MISSIONLOG_REPORT_IP_RATE_PER_DAY", 30))
 
     user_cache_key = f"missionlog_report_email:user:{request.user.id}:{minute_key}"
@@ -222,9 +220,7 @@ def _get_throttle_code(*, request) -> str | None:
         f"missionlog_report_email:ip:{request.META.get('REMOTE_ADDR', '')}:{minute_key}"
     )
     user_day_cache_key = f"missionlog_report_email:user:{request.user.id}:day:{day_key}"
-    ip_day_cache_key = (
-        f"missionlog_report_email:ip:{request.META.get('REMOTE_ADDR', '')}:day:{day_key}"
-    )
+    ip_day_cache_key = f"missionlog_report_email:ip:{request.META.get('REMOTE_ADDR', '')}:day:{day_key}"
 
     user_count = _increment_cache_counter(user_cache_key, timeout=80)
     ip_count = _increment_cache_counter(ip_cache_key, timeout=80)

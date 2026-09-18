@@ -88,16 +88,20 @@ class StoreDirectorySearchView(ListView):
         if not query:
             return Store.objects.none()
 
-        return Store.objects.select_related("location").filter(
-            Q(store_num__icontains=query)
-            | Q(riso_num__icontains=query)
-            | Q(store_name__icontains=query)
-            | Q(address__icontains=query)
-            | Q(city__icontains=query)
-            | Q(state__icontains=query)
-            | Q(zip_code__icontains=query)
-            | Q(county__icontains=query)
-        ).order_by("store_num")
+        return (
+            Store.objects.select_related("location")
+            .filter(
+                Q(store_num__icontains=query)
+                | Q(riso_num__icontains=query)
+                | Q(store_name__icontains=query)
+                | Q(address__icontains=query)
+                | Q(city__icontains=query)
+                | Q(state__icontains=query)
+                | Q(zip_code__icontains=query)
+                | Q(county__icontains=query)
+            )
+            .order_by("store_num")
+        )
 
 
 class SiteSelectorView(TemplateView):

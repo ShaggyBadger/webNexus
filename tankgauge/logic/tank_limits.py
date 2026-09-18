@@ -91,9 +91,7 @@ def _veeder_limits(mapping) -> dict:
     # Until the one-time profile backfill runs, preserve the existing behavior
     # for legacy mappings by using fitted geometry when no explicit profile
     # capacity exists. Once a profile value is present, it is authoritative.
-    has_explicit_profile_capacity = (
-        mapping.physical_capacity_gallons is not None
-    )
+    has_explicit_profile_capacity = mapping.physical_capacity_gallons is not None
     capacity_gallons = (
         int(round(capacity_resolution.physical_capacity_gallons))
         if has_explicit_profile_capacity

@@ -608,9 +608,7 @@ class VerifyTankCapacityAPIView(APIView):
         try:
             mapping = CapacityProfileService.verify_mapping(
                 mapping_id=request.data.get("mapping_id"),
-                physical_capacity_gallons=request.data.get(
-                    "physical_capacity_gallons"
-                ),
+                physical_capacity_gallons=request.data.get("physical_capacity_gallons"),
                 ullage_endpoint_percent_exact=request.data.get(
                     "ullage_endpoint_percent_exact"
                 ),
@@ -620,14 +618,23 @@ class VerifyTankCapacityAPIView(APIView):
             )
         except StoreTankMapping.DoesNotExist:
             return Response(
-                {"error": {"code": "mapping_not_found", "message": "Tank mapping not found."}},
+                {
+                    "error": {
+                        "code": "mapping_not_found",
+                        "message": "Tank mapping not found.",
+                    }
+                },
                 status=status.HTTP_404_NOT_FOUND,
             )
         except (TypeError, ValueError) as exc:
             code = getattr(exc, "code", "invalid_capacity_profile")
             return Response(
                 {"error": {"code": code, "message": str(exc)}},
-                status=status.HTTP_409_CONFLICT if code == "stale_profile_version" else status.HTTP_400_BAD_REQUEST,
+                status=(
+                    status.HTTP_409_CONFLICT
+                    if code == "stale_profile_version"
+                    else status.HTTP_400_BAD_REQUEST
+                ),
             )
 
         return Response(

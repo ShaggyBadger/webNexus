@@ -34,9 +34,7 @@ class StoreDirectorySearchTests(TestCase):
         )
 
     def test_search_is_public_and_matches_address_fields(self):
-        response = self.client.get(
-            reverse("siteintel:store_search"), {"q": "Richmond"}
-        )
+        response = self.client.get(reverse("siteintel:store_search"), {"q": "Richmond"})
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "42695")

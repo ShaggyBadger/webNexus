@@ -89,10 +89,8 @@ class VeederReadingSerializer(serializers.ModelSerializer):
             endpoint = volume + ullage
             attrs["ullage_endpoint_gallons"] = endpoint
             attrs["ullage_endpoint_percent_exact"] = (
-                (endpoint / printed_capacity * Decimal("100")).quantize(
-                    Decimal("0.0001")
-                )
-            )
+                endpoint / printed_capacity * Decimal("100")
+            ).quantize(Decimal("0.0001"))
             if "basis_status" not in attrs or attrs["basis_status"] == "UNKNOWN":
                 attrs["basis_status"] = "SUGGESTED"
 
