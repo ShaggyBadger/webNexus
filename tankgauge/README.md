@@ -32,6 +32,9 @@ and foreign-key relationships after the reference list has been reviewed.
   resolution. Capacity edits are versioned in `TankCapacityProfileHistory`; the
   backfill command is preview-only unless `--apply` is supplied and never
   recalculates geometry implicitly.
+- `StoreTankMapping.tank_index` is unique within a store because it identifies
+  one physical ATG tank. Admin validation rejects duplicate assignments; repair
+  legacy duplicates before changing profile data.
 - Use migrations for schema changes and regenerate
   `instructions/database_schema.dbml` afterward.
 

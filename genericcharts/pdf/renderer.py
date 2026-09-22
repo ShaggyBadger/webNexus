@@ -728,7 +728,7 @@ class CoreStarterPackPDFRenderer:
         return sorted(
             package.stores,
             key=lambda store: (
-                "" if state_label != "FULL" else store.state.casefold(),
+                "" if state_label != "FULL" else _state_abbreviation(store.state),
                 store.city.casefold(),
                 store.store_number or 0,
             ),

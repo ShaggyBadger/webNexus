@@ -111,6 +111,7 @@ def run_generation(generation_id: int) -> GenericChartGeneration | None:
                 {
                     "store_id": tank.store_id,
                     "tank_index": tank.tank_index,
+                    "fuel_type": tank.fuel_type,
                     "estimate_id": tank.estimate_id,
                     "estimate_status": tank.estimate_status,
                     "profile_status": tank.profile_status,

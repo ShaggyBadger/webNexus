@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.test import TestCase, override_settings
 
 from dms.models import Category, Document
@@ -6,6 +7,7 @@ from genericcharts.models import GenericChartGeneration
 from genericcharts.services.dms_service import GenericChartDMSService
 from dms.services.chart_artifact_safety import chart_document_safety_reason
 from tankgauge.models import StoreType
+from tankgauge.models import Store, StoreTankMapping, TankEstimation, TankType
 
 
 @override_settings(MEDIA_ROOT="/tmp/webnexus-genericcharts-tests")
@@ -114,3 +116,57 @@ class GenericChartDMSServiceTests(TestCase):
         self.assertEqual(
             chart_document_safety_reason(document), "generic_estimate_unsafe"
         )
+
+    def test_safety_uses_fuel_identity_when_tank_indexes_repeat(self):
+        store = Store.objects.create(store_num=9, state="NC")
+        tank_type = TankType.objects.create(name="10k")
+        StoreTankMapping.objects.create(
+            store=store,
+            tank_type=tank_type,
+            fuel_type="kerosene",
+            tank_index=2,
+            profile_version=1,
+        )
+        regular = StoreTankMapping.objects.create(
+            store=store,
+            tank_type=tank_type,
+            fuel_type="regular",
+            tank_index=2,
+            profile_version=2,
+            profile_status="LEGACY_UNVERIFIED",
+        )
+        with self.assertRaises(ValidationError):
+            regular.full_clean()
+        estimation = TankEstimation.objects.create(
+            tank_mapping=regular,
+            radius=60,
+            length=100,
+            confidence=1,
+            sample_count=2,
+            algorithm_version="test",
+            estimate_status="LEGACY_UNVERIFIED",
+        )
+        generation = self._generation()
+        generation.summary = {
+            "source_validity": [
+                {
+                    "store_id": store.id,
+                    "tank_index": 2,
+                    "fuel_type": "regular",
+                    "estimate_id": estimation.id,
+                    "estimate_status": "LEGACY_UNVERIFIED",
+                    "profile_status": "LEGACY_UNVERIFIED",
+                    "profile_version": 2,
+                }
+            ]
+        }
+        document = self.service.publish(
+            generation=generation,
+            pdf_bytes=b"%PDF matching fuel",
+            summary=generation.summary,
+        )
+        generation.document = document
+        generation.status = GenericChartGeneration.Status.COMPLETED
+        generation.save(update_fields=["document", "status"])
+
+        self.assertIsNone(chart_document_safety_reason(document))

@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 from tankgauge.logic.utils import canonicalize_fuel
 
@@ -143,6 +144,22 @@ class StoreTankMapping(models.Model):
     def save(self, *args, **kwargs):
         self.canonical_fuel_type = canonicalize_fuel(self.fuel_type)
         super().save(*args, **kwargs)
+
+    def clean(self):
+        super().clean()
+        if self.store_id and self.tank_index is not None:
+            duplicate = StoreTankMapping.objects.filter(
+                store_id=self.store_id, tank_index=self.tank_index
+            ).exclude(pk=self.pk)
+            if duplicate.exists():
+                raise ValidationError(
+                    {
+                        "tank_index": (
+                            "This store already has a mapping for this tank index. "
+                            "Each physical tank index must identify one tank."
+                        )
+                    }
+                )
 
     def __str__(self):
         return f"{self.store} - {self.tank_type} ({self.fuel_type})"

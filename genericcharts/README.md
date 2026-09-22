@@ -52,6 +52,9 @@ webNexus data.
   New source data and regeneration timestamps do not require a version bump.
 - Publish the current DMS document as public `ACTIVE`; supersede older versions
   without deleting them automatically.
+- Persist fuel identity in source-validity metadata so delivery checks resolve a
+  mapping by store, tank index, and canonical fuel rather than an arbitrary
+  duplicate-index row.
 - Prefill an editable human-readable DMS description during review; retain
   detailed coverage data in the generation summary instead of the public
   document description.

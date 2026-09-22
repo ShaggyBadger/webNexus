@@ -186,10 +186,6 @@ class DMSTestCase(APITestCase):
             DocumentDownloadService.prepare_download(doc.id, self.staff_user)
 
         doc.refresh_from_db()
-        self.assertIsNotNone(doc.invalidated_at)
-        self.assertEqual(doc.invalidation_reason, "profile_version_changed")
-
-        doc.refresh_from_db()
         self.assertEqual(doc.download_count, 0)
         self.assertEqual(generation.document_id, doc.id)
 

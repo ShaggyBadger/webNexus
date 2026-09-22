@@ -7,17 +7,13 @@ import logging
 from django.utils import timezone
 
 from dms.models import Document
+from tankgauge.logic.utils import canonicalize_fuel
 
 logger = logging.getLogger(__name__)
 
 
 def chart_document_safety_reason(document: Document) -> str | None:
     """Return a stable blocking reason for a generated chart, if one exists."""
-    if document.operational_state == "UNSAFE":
-        _record_invalidation(
-            document, "UNSAFE", document.invalidation_reason or "unsafe"
-        )
-        return "document_marked_unsafe"
     if document.operational_state in {"STALE", "SUPERSEDED"}:
         _record_invalidation(
             document, document.operational_state, "document_not_current"
@@ -30,7 +26,15 @@ def chart_document_safety_reason(document: Document) -> str | None:
         return DMSChartStorageService().document_safety_reason(document)
 
     if document.tags.filter(slug="generic-tank-charts").exists():
-        return _generic_chart_safety_reason(document)
+        reason = _generic_chart_safety_reason(document)
+        if reason:
+            return reason
+
+    if document.operational_state == "UNSAFE":
+        _record_invalidation(
+            document, "UNSAFE", document.invalidation_reason or "unsafe"
+        )
+        return "document_marked_unsafe"
 
     return None
 
@@ -61,9 +65,15 @@ def _generic_chart_safety_reason(document: Document) -> str | None:
         if source.get("store_id") is not None and source.get("tank_index") is not None:
             from tankgauge.models import StoreTankMapping, TankEstimation
 
-            mapping = StoreTankMapping.objects.filter(
+            mappings = StoreTankMapping.objects.filter(
                 store_id=source["store_id"], tank_index=source["tank_index"]
-            ).first()
+            )
+            fuel_type = source.get("fuel_type")
+            if fuel_type:
+                mappings = mappings.filter(
+                    canonical_fuel_type=canonicalize_fuel(fuel_type)
+                )
+            mapping = mappings.first()
             if mapping is not None:
                 if source.get("profile_version") is not None and (
                     mapping.profile_version != source["profile_version"]

@@ -46,6 +46,32 @@ def make_tank():
 
 
 class CoreStarterPackPDFTests(SimpleTestCase):
+    def test_map_sort_normalizes_state_aliases_before_city(self):
+        package = SimpleNamespace(
+            stores=(
+                SimpleNamespace(
+                    state="North Carolina", city="Charlotte", store_number=2
+                ),
+                SimpleNamespace(state="NC", city="Raleigh", store_number=1),
+                SimpleNamespace(state="NC", city="Charlotte", store_number=3),
+                SimpleNamespace(
+                    state="South Carolina", city="Anderson", store_number=4
+                ),
+            )
+        )
+
+        ordered = CoreStarterPackPDFRenderer._sorted_stores(package, "FULL")
+
+        self.assertEqual(
+            [(store.state, store.city) for store in ordered],
+            [
+                ("North Carolina", "Charlotte"),
+                ("NC", "Charlotte"),
+                ("NC", "Raleigh"),
+                ("South Carolina", "Anderson"),
+            ],
+        )
+
     def test_store_identifier_includes_riso_when_present(self):
         store = SimpleNamespace(store_id=1, store_number=6947, riso_number=44643)
 
