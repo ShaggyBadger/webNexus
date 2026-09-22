@@ -1,0 +1,19 @@
+<section
+  class="weather-strip mono"
+  x-data="weatherStrip()"
+  aria-labelledby="weather-strip-title"
+>
+  <div class="weather-strip-header">
+    <span id="weather-strip-title" class="text-muted-custom">WX:</span>
+    <span
+      class="weather-strip-status"
+      :class="{
+        'weather-strip-alert': advisory?.level === 'ADVERSE',
+        'weather-strip-watch': advisory?.level === 'WATCH'
+      }"
+      aria-live="polite"
+      x-text="hasWeather ? currentLine : status"
+    ></span>
+    <span class="weather-strip-freshness" x-show="hasWeather" x-text="freshnessLine"></span>
+  </div>
+</section>

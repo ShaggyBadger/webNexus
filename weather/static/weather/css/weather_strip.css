@@ -1,0 +1,32 @@
+.weather-strip {
+  margin-top: 0.2rem;
+  color: var(--text-color);
+  font-size: 0.65rem;
+  letter-spacing: 0.04em;
+}
+
+.weather-strip-header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  min-height: 1.1rem;
+  flex-wrap: wrap;
+}
+
+.weather-strip-status {
+  color: var(--primary-color);
+}
+
+.weather-strip-freshness {
+  color: var(--muted-text-color);
+  font-size: 0.55rem;
+}
+
+.weather-strip-alert,
+.weather-strip-watch {
+  color: var(--status-red);
+}
+
+.weather-strip-watch {
+  color: var(--status-amber);
+}

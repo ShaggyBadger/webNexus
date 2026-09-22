@@ -6,6 +6,7 @@
 {% block extra_head %}
 <link rel="stylesheet" href="{% static 'css/tactical_effects.css' %}" />
 <link rel="stylesheet" href="{% static 'homepage/css/index.css' %}" />
+<link rel="stylesheet" href="{% static 'weather/css/weather_strip.css' %}" />
 {% endblock %}
 
 {% block content %}
@@ -34,6 +35,7 @@
         VER: <span class="text-primary">{{ VERSION }}</span>
       </div>
       {% include 'homepage/components/tactical_loc.html' %}
+    {% include 'weather/components/weather_strip.html' %}
       {% include 'homepage/components/system_status.html' %}
     </div>
   </header>
@@ -64,4 +66,5 @@
 {% block extra_scripts %}
 <script src="{% static 'js/siteintel/rack_manager.js' %}"></script>
 <script src="{% static 'homepage/js/homepage_shell.js' %}"></script>
+<script src="{% static 'weather/js/weather_strip.js' %}"></script>
 {% endblock %}

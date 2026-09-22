@@ -53,6 +53,14 @@ DMS_DOCUMENT_TOKEN_THRESHOLD = int(os.environ.get("DMS_DOCUMENT_TOKEN_THRESHOLD"
 
 CHART_MIN_READINGS = int(os.environ.get("CHART_MIN_READINGS", "10"))
 
+WEATHER_CACHE_RADIUS_MILES = float(os.environ.get("WEATHER_CACHE_RADIUS_MILES", "15"))
+WEATHER_PROVIDER_MAX_ATTEMPTS = int(
+    os.environ.get("WEATHER_PROVIDER_MAX_ATTEMPTS", "400")
+)
+WEATHER_PROVIDER_WINDOW_HOURS = int(
+    os.environ.get("WEATHER_PROVIDER_WINDOW_HOURS", "24")
+)
+
 # FEEDBACK_MAX_METADATA_BYTES:
 # Maximum serialized JSON size accepted for feedback page metadata payloads.
 FEEDBACK_MAX_METADATA_BYTES = int(
@@ -112,6 +120,7 @@ INSTALLED_APPS = [
     "atg",
     "feedback",
     "tankcharts",
+    "weather",
     "genericcharts",
 ]
 
@@ -382,6 +391,7 @@ REST_FRAMEWORK = {
     ],
     "EXCEPTION_HANDLER": "dms.exceptions.dms_exception_handler",
     "DEFAULT_THROTTLE_RATES": {
+        "weather_current": os.environ.get("WEATHER_CURRENT_THROTTLE_RATE", "30/min"),
         "feedback_initiate": os.environ.get(
             "FEEDBACK_THROTTLE_INITIATE_RATE", "30/min"
         ),

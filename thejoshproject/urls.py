@@ -50,5 +50,6 @@ urlpatterns = [
     path("atg/", include("atg.urls")),
     path("feedback/", include("feedback.urls")),
     path("tankcharts/", include("tankcharts.urls")),
+    path("weather/", include("weather.urls")),
     path("system/health/", health_check, name="health_check"),
 ]
