@@ -1,0 +1,37 @@
+body.theme-darkly .main-header,
+body.theme-darkly .brand-link {
+    background-color: #121417;
+}
+
+body.theme-darkly .brand-link,
+body.theme-darkly .main-header .nav-link,
+body.theme-darkly .sidebar .nav-link {
+    color: #f8f9fa;
+}
+
+body.theme-darkly .sidebar .nav-link.active,
+body.theme-darkly .sidebar .nav-link:hover,
+body.theme-darkly .main-header .nav-link:hover {
+    color: #121417;
+    background-color: #ffb86c;
+}
+
+body.theme-darkly .btn-primary,
+body.theme-darkly .page-item.active .page-link {
+    color: #121417;
+    background-color: #ffb86c;
+    border-color: #ffb86c;
+}
+
+body.theme-darkly .btn-primary:hover,
+body.theme-darkly .btn-primary:focus {
+    color: #121417;
+    background-color: #ffc98f;
+    border-color: #ffc98f;
+}
+
+body.theme-darkly .form-control:focus,
+body.theme-darkly .custom-select:focus {
+    border-color: #ffb86c;
+    box-shadow: 0 0 0 0.2rem rgb(255 184 108 / 25%);
+}

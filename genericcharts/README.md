@@ -51,7 +51,9 @@ webNexus data.
 - Increment `PACKAGE_VERSION` only when generator behavior or PDF output changes.
   New source data and regeneration timestamps do not require a version bump.
 - Publish the current DMS document as public `ACTIVE`; supersede older versions
-  without deleting them automatically.
+  without deleting them automatically. Each active package remains an available
+  snapshot even when its source profiles or estimates later change. Operators
+  refresh package data by generating a new package for that same scope.
 - Persist fuel identity in source-validity metadata so delivery checks resolve a
   mapping by store, tank index, and canonical fuel rather than an arbitrary
   duplicate-index row.

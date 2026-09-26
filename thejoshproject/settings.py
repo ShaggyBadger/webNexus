@@ -103,6 +103,7 @@ ALLOWED_HOSTS = [
 # Application definition
 
 INSTALLED_APPS = [
+    "jazzmin",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -123,6 +124,61 @@ INSTALLED_APPS = [
     "weather",
     "genericcharts",
 ]
+
+JAZZMIN_SETTINGS = {
+    "site_title": "webNexus Admin",
+    "site_header": "WEBNEXUS",
+    "site_brand": "WEBNEXUS",
+    "welcome_sign": "Operations Administration",
+    "copyright": "webNexus",
+    "search_model": [
+        "dms.Document",
+        "dms.DocumentDownloadFailure",
+        "auth.User",
+    ],
+    "show_sidebar": True,
+    "navigation_expanded": False,
+    "hide_apps": ["contenttypes", "sessions"],
+    "order_with_respect_to": [
+        "dms",
+        "tankgauge",
+        "genericcharts",
+        "atg",
+        "siteintel",
+        "missionlog",
+        "tankcharts",
+        "feedback",
+        "weather",
+        "accounts",
+        "auth",
+    ],
+    "icons": {
+        "dms": "fas fa-folder-open",
+        "dms.documentdownloadfailure": "fas fa-exclamation-triangle",
+        "dms.document": "fas fa-file-alt",
+        "tankgauge": "fas fa-gas-pump",
+        "genericcharts": "fas fa-chart-line",
+        "atg": "fas fa-tachometer-alt",
+        "siteintel": "fas fa-map-marked-alt",
+        "missionlog": "fas fa-clipboard-list",
+        "auth.user": "fas fa-user",
+        "auth.group": "fas fa-users",
+    },
+    "default_icon_parents": "fas fa-chevron-circle-right",
+    "default_icon_children": "fas fa-circle",
+    "custom_css": "css/admin_jazzmin.css",
+    "use_google_fonts_cdn": False,
+    "show_ui_builder": False,
+}
+
+JAZZMIN_UI_TWEAKS = {
+    "theme": "darkly",
+    "default_theme_mode": "dark",
+    "accent": "accent-warning",
+    "sidebar_nav_compact_style": True,
+    "sidebar_nav_child_indent": True,
+    "sidebar_nav_flat_style": True,
+}
 
 
 MIDDLEWARE = [

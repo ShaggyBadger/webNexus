@@ -10,9 +10,15 @@ from rest_framework.views import APIView
 
 from dms.api.mixins import StandardAPIResponseMixin
 from dms.api.permissions import IsStaffOrAdminPermission
-from dms.models import Document, Tag
+from dms.api_contract import get_trace_id
+from dms.models import Document, DocumentDownloadFailure, Tag
 from dms.pagination import DMSSerializedPagination
 from dms.serializers import DocumentSerializer, DocumentUpdateSerializer
+from dms.services.download_errors import (
+    DocumentDownloadFileNotFoundError,
+    DocumentDownloadPermissionError,
+    DocumentDownloadValueError,
+)
 from dms.services.download_service import DocumentDownloadService
 from dms.services.search_service import DocumentSearchService
 
@@ -218,6 +224,38 @@ class DocumentDownloadView(APIView):
 
     permission_classes = [permissions.AllowAny]
 
+    @staticmethod
+    def _record_download_failure(request, requested_document_id, error) -> None:
+        if not isinstance(
+            error,
+            (
+                DocumentDownloadValueError,
+                DocumentDownloadPermissionError,
+                DocumentDownloadFileNotFoundError,
+            ),
+        ):
+            return
+
+        document = error.document
+        user = request.user if request.user.is_authenticated else None
+        try:
+            DocumentDownloadFailure.objects.create(
+                document=document,
+                document_ulid=error.document_id or requested_document_id,
+                document_title=document.title if document is not None else "",
+                reason_code=error.reason_code,
+                user=user,
+                trace_id=get_trace_id(request) or "",
+            )
+        except Exception:
+            # Preserve the established 404 response even if diagnostic storage fails.
+            logger.exception(
+                "dms.api.document.download_failure_record_failed "
+                "document_id=%s reason_code=%s",
+                requested_document_id,
+                error.reason_code,
+            )
+
     def get(self, request, ulid: str) -> FileResponse:
         try:
             file_obj, filename, mime_type = DocumentDownloadService.prepare_download(
@@ -226,7 +264,8 @@ class DocumentDownloadView(APIView):
             response = FileResponse(file_obj, content_type=mime_type)
             response["Content-Disposition"] = f'attachment; filename="{filename}"'
             return response
-        except PermissionError:
+        except PermissionError as error:
+            self._record_download_failure(request, ulid, error)
             logger.warning(
                 "dms.api.document.download_denied document_id=%s user_id=%s",
                 ulid,
@@ -234,6 +273,7 @@ class DocumentDownloadView(APIView):
             )
             raise Http404("Document not found.")
         except ValueError as value_error:
+            self._record_download_failure(request, ulid, value_error)
             logger.warning(
                 "dms.api.document.download_invalid document_id=%s user_id=%s message=%s",
                 ulid,
@@ -242,6 +282,7 @@ class DocumentDownloadView(APIView):
             )
             raise Http404(str(value_error))
         except FileNotFoundError as not_found_error:
+            self._record_download_failure(request, ulid, not_found_error)
             logger.error(
                 "dms.api.document.download_file_missing document_id=%s user_id=%s message=%s",
                 ulid,

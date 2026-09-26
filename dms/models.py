@@ -1,4 +1,6 @@
 import ulid
+from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
@@ -201,6 +203,72 @@ class Document(models.Model):
 
     def __str__(self) -> str:
         return f"{self.title} (v{self.version})"
+
+
+class DocumentDownloadFailure(models.Model):
+    """Immutable diagnostic event for a failed routed document download."""
+
+    REASON_CHOICES = [
+        ("document_missing", "Document not found"),
+        ("document_inactive", "Document inactive"),
+        ("document_not_current", "Document is no longer current"),
+        ("document_marked_unsafe", "Document marked unsafe"),
+        ("generic_generation_not_current", "Generated chart is not current"),
+        ("generic_estimate_unsafe", "Generated chart estimate is unsafe"),
+        ("generic_profile_unsafe", "Generated chart profile is unsafe"),
+        ("generic_profile_changed", "Generated chart profile changed"),
+        ("generic_estimate_changed", "Generated chart estimate changed"),
+        ("estimate_unsafe", "Tank chart estimate is unsafe"),
+        ("profile_unsafe", "Tank chart profile is unsafe"),
+        ("source_data_newer_than_document", "Source data is newer than chart"),
+        ("tank_mapping_missing", "Tank mapping is missing"),
+        ("profile_version_changed", "Tank profile changed"),
+        ("estimate_changed", "Tank estimate changed"),
+        ("access_denied", "Access denied"),
+        ("file_missing", "File missing from storage"),
+    ]
+
+    document = models.ForeignKey(
+        Document,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="download_failures",
+    )
+    document_ulid = models.CharField(max_length=26, db_index=True)
+    document_title = models.CharField(max_length=255, blank=True)
+    reason_code = models.CharField(max_length=40, choices=REASON_CHOICES)
+    occurred_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="document_download_failures",
+    )
+    trace_id = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        ordering = ["-occurred_at"]
+        indexes = [
+            models.Index(
+                fields=["reason_code", "occurred_at"],
+                name="dms_dl_fail_reason_time_idx",
+            ),
+        ]
+        verbose_name = "Document Download Failure"
+        verbose_name_plural = "Document Download Failures"
+
+    def __str__(self) -> str:
+        return f"{self.document_ulid}: {self.get_reason_code_display()}"
+
+    def save(self, *args, **kwargs) -> None:
+        if self.pk and type(self).objects.filter(pk=self.pk).exists():
+            raise ValidationError("Download failure events are append-only.")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Download failure events are append-only.")
 
 
 class Collection(models.Model):

@@ -84,7 +84,7 @@ class DMSChartStorageServiceTests(TestCase):
             service.is_stale(document=document, store_num=4630, tank_index=5)
         )
 
-    def test_unsafe_metadata_is_not_given_a_download_url(self):
+    def test_active_unsafe_metadata_remains_downloadable(self):
         self.mapping.profile_status = "READY"
         self.mapping.save(update_fields=["profile_status"])
         service = DMSChartStorageService()
@@ -96,12 +96,12 @@ class DMSChartStorageServiceTests(TestCase):
             metadata={"estimate_status": "UNSAFE"},
         )
 
-        self.assertIsNone(
+        self.assertIsNotNone(
             service.get_download_url(store_num=4630, fuel_type="regular", tank_index=5)
         )
         self.assertEqual(document.status, "ACTIVE")
 
-    def test_stale_metadata_is_not_given_a_download_url(self):
+    def test_active_chart_remains_downloadable_after_source_changes(self):
         self.mapping.profile_status = "READY"
         self.mapping.save(update_fields=["profile_status"])
         service = DMSChartStorageService()
@@ -116,7 +116,26 @@ class DMSChartStorageServiceTests(TestCase):
         ticket.uploaded_at = document.uploaded_at + timedelta(seconds=1)
         ticket.save(update_fields=["uploaded_at"])
 
-        self.assertIsNotNone(service.document_safety_reason(document))
+        self.assertIsNone(service.document_safety_reason(document))
+        self.assertIsNotNone(
+            service.get_download_url(store_num=4630, fuel_type="regular", tank_index=5)
+        )
+
+    def test_superseded_chart_is_not_given_a_download_url(self):
+        service = DMSChartStorageService()
+        document = service.store(
+            store_num=4630,
+            fuel_type="regular",
+            tank_index=5,
+            pdf_bytes=b"%PDF-1.4 superseded",
+            metadata={},
+        )
+        document.status = "SUPERSEDED"
+        document.save(update_fields=["status"])
+
+        self.assertEqual(
+            service.document_safety_reason(document), "document_not_current"
+        )
         self.assertIsNone(
             service.get_download_url(store_num=4630, fuel_type="regular", tank_index=5)
         )

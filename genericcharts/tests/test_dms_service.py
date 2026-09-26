@@ -92,7 +92,7 @@ class GenericChartDMSServiceTests(TestCase):
         self.assertTrue(first_document.tags.filter(slug="store-type-exxon").exists())
         self.assertFalse(second_document.tags.filter(slug="store-type-exxon").exists())
 
-    def test_publish_retains_source_validity_for_delivery_safety(self):
+    def test_active_package_remains_available_with_unsafe_generation_snapshot(self):
         generation = self._generation()
         generation.summary = {
             "source_validity": [
@@ -110,14 +110,15 @@ class GenericChartDMSServiceTests(TestCase):
         generation.document = document
         generation.status = GenericChartGeneration.Status.COMPLETED
         generation.save(update_fields=["document", "status"])
+        document.operational_state = "UNSAFE"
+        document.invalidation_reason = "generic_estimate_unsafe"
+        document.save(update_fields=["operational_state", "invalidation_reason"])
         self.assertEqual(
             generation.summary["source_validity"][0]["estimate_status"], "UNSAFE"
         )
-        self.assertEqual(
-            chart_document_safety_reason(document), "generic_estimate_unsafe"
-        )
+        self.assertIsNone(chart_document_safety_reason(document))
 
-    def test_safety_uses_fuel_identity_when_tank_indexes_repeat(self):
+    def test_active_package_remains_available_after_profile_and_estimate_changes(self):
         store = Store.objects.create(store_num=9, state="NC")
         tank_type = TankType.objects.create(name="10k")
         StoreTankMapping.objects.create(
@@ -153,10 +154,10 @@ class GenericChartDMSServiceTests(TestCase):
                     "store_id": store.id,
                     "tank_index": 2,
                     "fuel_type": "regular",
-                    "estimate_id": estimation.id,
+                    "estimate_id": estimation.id + 1000,
                     "estimate_status": "LEGACY_UNVERIFIED",
                     "profile_status": "LEGACY_UNVERIFIED",
-                    "profile_version": 2,
+                    "profile_version": 1,
                 }
             ]
         }

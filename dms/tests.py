@@ -3,16 +3,27 @@ import shutil
 import tempfile
 from datetime import timedelta
 from unittest.mock import patch
+from django.contrib import admin
 from django.contrib.auth.models import User
+from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import ValidationError
+from django.core.files.storage import default_storage
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase, override_settings
+from django.test import RequestFactory, TestCase, override_settings
 from django.utils import timezone
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from dms.models import Category, Collection, Document, TemporaryUpload, Tag
+from dms.models import (
+    Category,
+    Collection,
+    Document,
+    DocumentDownloadFailure,
+    TemporaryUpload,
+    Tag,
+)
 from dms.services.upload_service import DocumentUploadService
 from dms.services.download_service import DocumentDownloadService
 from dms.services.search_service import DocumentSearchService
@@ -81,6 +92,23 @@ class DMSTestCase(APITestCase):
         # Clean up temporary media directory
         if os.path.exists(TEMP_MEDIA_DIR):
             shutil.rmtree(TEMP_MEDIA_DIR)
+
+    def _create_document(self, *, title, is_public=False):
+        raw_result = DocumentUploadService.handle_raw_upload(
+            SimpleUploadedFile(
+                "download_test.pdf",
+                self.file_content,
+                content_type="application/pdf",
+            ),
+            self.staff_user,
+        )
+        return DocumentUploadService.finalize_upload(
+            temp_id=raw_result["temp_id"],
+            user=self.staff_user,
+            title=title,
+            category_id=self.category_safety.id,
+            is_public=is_public,
+        )
 
     def test_category_slug_and_sort(self):
         self.assertEqual(str(self.category_safety), "Safety Guidelines")
@@ -158,7 +186,7 @@ class DMSTestCase(APITestCase):
         doc.refresh_from_db()
         self.assertEqual(doc.download_count, 1)
 
-    def test_download_blocks_known_unsafe_generic_chart(self):
+    def test_active_generic_chart_download_ignores_unsafe_generation_snapshot(self):
         raw_result = DocumentUploadService.handle_raw_upload(
             self.test_file, self.staff_user
         )
@@ -181,15 +209,22 @@ class DMSTestCase(APITestCase):
             summary={"source_validity": [{"estimate_status": "UNSAFE"}]},
             document=doc,
         )
+        doc.operational_state = "STALE"
+        doc.invalidation_reason = "generic_profile_changed"
+        doc.save(update_fields=["operational_state", "invalidation_reason"])
 
-        with self.assertRaisesMessage(ValueError, "no longer current"):
-            DocumentDownloadService.prepare_download(doc.id, self.staff_user)
+        file_obj, filename, mime_type = DocumentDownloadService.prepare_download(
+            doc.id, self.staff_user
+        )
 
+        self.assertEqual(filename, "test_guide.pdf")
+        self.assertEqual(mime_type, "application/pdf")
+        file_obj.close()
         doc.refresh_from_db()
-        self.assertEqual(doc.download_count, 0)
+        self.assertEqual(doc.download_count, 1)
         self.assertEqual(generation.document_id, doc.id)
 
-    def test_email_blocks_known_unsafe_generic_chart(self):
+    def test_active_generic_chart_email_ignores_unsafe_generation_snapshot(self):
         raw_result = DocumentUploadService.handle_raw_upload(
             self.test_file, self.staff_user
         )
@@ -213,11 +248,15 @@ class DMSTestCase(APITestCase):
             document=doc,
         )
 
-        result = DocumentEmailService().send_document(
-            document=doc, recipient_email="operator@example.com"
-        )
+        with patch(
+            "dms.services.document_email_service.EmailMultiAlternatives.send"
+        ) as send_mock:
+            result = DocumentEmailService().send_document(
+                document=doc, recipient_email="operator@example.com"
+            )
 
-        self.assertEqual(result["code"], "document_not_current")
+        self.assertEqual(result["status"], "success")
+        send_mock.assert_called_once()
 
     def test_document_operational_state_blocks_retained_artifact(self):
         raw_result = DocumentUploadService.handle_raw_upload(
@@ -347,12 +386,124 @@ class DMSTestCase(APITestCase):
         response = self.client.get(reverse("dms:document_download", args=[doc.id]))
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
+        failure = DocumentDownloadFailure.objects.get(document_ulid=doc.id)
+        self.assertEqual(failure.reason_code, "access_denied")
+        self.assertEqual(failure.document, doc)
+        self.assertEqual(failure.document_title, doc.title)
+        self.assertIsNone(failure.user)
+
         doc.refresh_from_db()
         self.assertEqual(doc.download_count, 0)
 
         self.client.force_login(self.standard_user)
         response = self.client.get(reverse("dms:document_download", args=[doc.id]))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_missing_document_download_records_stable_failure(self):
+        missing_id = "0" * 26
+
+        response = self.client.get(
+            reverse("dms:document_download", args=[missing_id]),
+            HTTP_X_TRACE_ID="trace-missing-document",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        failure = DocumentDownloadFailure.objects.get(document_ulid=missing_id)
+        self.assertEqual(failure.reason_code, "document_missing")
+        self.assertIsNone(failure.document)
+        self.assertEqual(failure.trace_id, "trace-missing-document")
+
+    def test_missing_storage_file_download_records_failure(self):
+        doc = self._create_document(title="Missing Storage PDF", is_public=True)
+        default_storage.delete(doc.file_path)
+
+        response = self.client.get(reverse("dms:document_download", args=[doc.id]))
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        failure = DocumentDownloadFailure.objects.get(document_ulid=doc.id)
+        self.assertEqual(failure.reason_code, "file_missing")
+        self.assertEqual(failure.document, doc)
+        self.assertNotIn(doc.file_path, str(failure.__dict__))
+
+    def test_active_generic_chart_download_does_not_log_stale_snapshot_failure(self):
+        doc = self._create_document(title="Unsafe Chart PDF", is_public=True)
+        chart_tag = Tag.objects.create(
+            name="Generic Tank Charts", slug="generic-tank-charts"
+        )
+        doc.tags.add(chart_tag)
+        GenericChartGeneration.objects.create(
+            state="FULL",
+            generator_version="1.0.0",
+            requested_by=self.staff_user,
+            status=GenericChartGeneration.Status.COMPLETED,
+            summary={"source_validity": [{"estimate_status": "UNSAFE"}]},
+            document=doc,
+        )
+        self.client.force_login(self.staff_user)
+
+        response = self.client.get(
+            reverse("dms:document_download", args=[doc.id]),
+            HTTP_X_REQUEST_ID="request-unsafe-chart",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(
+            DocumentDownloadFailure.objects.filter(document_ulid=doc.id).exists()
+        )
+        doc.refresh_from_db()
+        self.assertEqual(doc.download_count, 1)
+
+    def test_jazzmin_admin_renders_and_failure_list_is_read_only_searchable(self):
+        doc = self._create_document(title="Admin Search Marker")
+        DocumentDownloadFailure.objects.create(
+            document=doc,
+            document_ulid=doc.id,
+            document_title=doc.title,
+            reason_code="file_missing",
+            user=self.staff_user,
+            trace_id="admin-trace-123",
+        )
+        viewer = User.objects.create_user(
+            username="dms-log-viewer", password="viewer-password", is_staff=True
+        )
+        permission = Permission.objects.get(
+            content_type__app_label="dms",
+            codename="view_documentdownloadfailure",
+        )
+        viewer.user_permissions.add(permission)
+        self.client.force_login(viewer)
+
+        response = self.client.get(
+            reverse("admin:dms_documentdownloadfailure_changelist"),
+            {"q": "Admin Search Marker"},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertContains(response, "Admin Search Marker")
+        self.assertContains(response, "css/admin_jazzmin.css")
+        model_admin = admin.site._registry[DocumentDownloadFailure]
+        request = RequestFactory().get("/admin/dms/documentdownloadfailure/")
+        request.user = viewer
+        self.assertFalse(model_admin.has_add_permission(request))
+        self.assertFalse(model_admin.has_change_permission(request))
+        self.assertFalse(model_admin.has_delete_permission(request))
+
+        self.client.force_login(self.admin_user)
+        index_response = self.client.get(reverse("admin:index"))
+        self.assertEqual(index_response.status_code, status.HTTP_200_OK)
+        self.assertContains(index_response, "WEBNEXUS")
+
+    def test_download_failure_events_cannot_be_changed_or_deleted(self):
+        failure = DocumentDownloadFailure.objects.create(
+            document_ulid="0" * 26,
+            reason_code="document_missing",
+        )
+
+        failure.document_title = "Changed title"
+        with self.assertRaisesMessage(ValidationError, "append-only"):
+            failure.save()
+        with self.assertRaisesMessage(ValidationError, "append-only"):
+            failure.delete()
 
     def test_api_raw_upload_rejects_unsupported_mime(self):
         self.client.force_login(self.staff_user)

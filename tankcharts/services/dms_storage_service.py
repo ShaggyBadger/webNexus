@@ -8,7 +8,6 @@ from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.db import transaction
 from django.urls import reverse
-from django.utils import timezone as django_timezone
 from django.utils.text import slugify
 
 from atg.models import VeederTicket
@@ -321,108 +320,8 @@ class DMSChartStorageService:
         return reverse("dms:document_download", kwargs={"ulid": existing.id})
 
     def document_safety_reason(self, document: Document) -> str | None:
-        """Return a stable blocking reason for a known unsafe chart document."""
-        if document.operational_state == "UNSAFE":
-            self._record_invalidation(
-                document, "UNSAFE", document.invalidation_reason or "unsafe"
-            )
-            return "document_marked_unsafe"
-        if document.operational_state in {"STALE", "SUPERSEDED"}:
-            self._record_invalidation(
-                document, document.operational_state, "document_not_current"
-            )
-            return "document_not_current"
-        metadata = self._parse_metadata(document=document)
-        if metadata.get("estimate_status") in {"STALE", "UNSAFE", "BLOCKED"}:
-            self._record_invalidation(document, "UNSAFE", "estimate_unsafe")
-            return "estimate_unsafe"
-        if metadata.get("profile_status") == "REVIEW_REQUIRED":
-            self._record_invalidation(document, "UNSAFE", "profile_unsafe")
-            return "profile_unsafe"
-        if (
-            metadata.get("profile_status") == "UNAVAILABLE"
-            and metadata.get("estimate_status") != "LEGACY_UNVERIFIED"
-        ):
-            self._record_invalidation(document, "UNSAFE", "profile_unsafe")
-            return "profile_unsafe"
-
-        store_num = metadata.get("store_num")
-        tank_index = metadata.get("tank_index")
-        if store_num is not None and tank_index is not None:
-            if self.is_stale(
-                document=document,
-                store_num=int(store_num),
-                tank_index=int(tank_index),
-            ):
-                self._record_invalidation(
-                    document, "STALE", "source_data_newer_than_document"
-                )
-                return "source_data_newer_than_document"
-            mapping = StoreTankMapping.objects.filter(
-                store__store_num=int(store_num), tank_index=int(tank_index)
-            ).first()
-            if not mapping:
-                self._record_invalidation(document, "STALE", "tank_mapping_missing")
-                return "tank_mapping_missing"
-            if metadata.get("profile_version") is not None and (
-                mapping.profile_version != metadata["profile_version"]
-            ):
-                self._record_invalidation(document, "STALE", "profile_version_changed")
-                return "profile_version_changed"
-            estimation_id = metadata.get("estimation_id")
-            if estimation_id is not None:
-                current = (
-                    TankEstimation.objects.filter(tank_mapping=mapping, is_active=True)
-                    .order_by("-created_at")
-                    .first()
-                )
-                if current is None or current.id != estimation_id:
-                    self._record_invalidation(document, "STALE", "estimate_changed")
-                    return "estimate_changed"
-            return None
-
-        for item in metadata.get("source_validity", ()):
-            if item.get("estimate_status") in {"STALE", "UNSAFE", "BLOCKED"}:
-                self._record_invalidation(document, "UNSAFE", "estimate_unsafe")
-                return "estimate_unsafe"
-            if item.get("profile_status") == "REVIEW_REQUIRED":
-                self._record_invalidation(document, "UNSAFE", "profile_unsafe")
-                return "profile_unsafe"
-            if (
-                item.get("profile_status") == "UNAVAILABLE"
-                and item.get("estimate_status") != "LEGACY_UNVERIFIED"
-            ):
-                self._record_invalidation(document, "UNSAFE", "profile_unsafe")
-                return "profile_unsafe"
-        if store_num is not None and self.is_store_stale(
-            document=document, store_num=int(store_num)
-        ):
-            self._record_invalidation(
-                document, "STALE", "source_data_newer_than_document"
-            )
-            return "source_data_newer_than_document"
-        return None
-
-    @staticmethod
-    def _record_invalidation(document: Document, state: str, reason: str) -> None:
-        """Persist runtime invalidation metadata while retaining the artifact."""
-        if (
-            document.operational_state == state
-            and document.invalidation_reason == reason
-            and document.invalidated_at is not None
-        ):
-            return
-        document.operational_state = state
-        document.invalidation_reason = reason
-        document.invalidated_at = document.invalidated_at or django_timezone.now()
-        document.save(
-            update_fields=[
-                "operational_state",
-                "invalidation_reason",
-                "invalidated_at",
-                "updated_at",
-            ]
-        )
+        """Allow active chart snapshots; lifecycle status controls availability."""
+        return None if document.status == "ACTIVE" else "document_not_current"
 
     def batch_generate(self, *, store_num: int, force: bool = False) -> dict:
         from tankcharts.rendering import PDFRenderer

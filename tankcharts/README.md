@@ -4,13 +4,16 @@
 chart storage service owns cache replacement, source freshness checks, and the
 validity metadata embedded in generated documents.
 
-## Safety Invariants
+## Published Snapshot Availability
 
-- Active DMS status alone is not sufficient for a current chart download.
-- A chart is blocked when its captured estimate is unsafe, its profile version
-  changed, its source data is newer than the document, or its mapping vanished.
-- Email and download services repeat the safety check at delivery time; callers
-  must not trust a previously returned document object.
+- Active tank-chart documents remain downloadable and emailable as generated
+  snapshots, even when current profile versions, estimates, source data, or
+  captured validity metadata change later.
+- Superseded/archived DMS lifecycle status, access permissions, and missing files
+  still block delivery.
+- Per-store source freshness checks continue to decide whether the chart cache
+  should be regenerated; they no longer invalidate delivery of the currently
+  published chart while a replacement is unavailable.
 - Validity is currently carried in the existing `Document.description` JSON.
   No model or migration changes are part of this implementation.
 

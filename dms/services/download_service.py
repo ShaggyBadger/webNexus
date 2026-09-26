@@ -6,6 +6,11 @@ from django.db import transaction
 
 from dms.models import Document
 from dms.services.chart_artifact_safety import chart_document_safety_reason
+from dms.services.download_errors import (
+    DocumentDownloadFileNotFoundError,
+    DocumentDownloadPermissionError,
+    DocumentDownloadValueError,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -34,7 +39,11 @@ class DocumentDownloadService:
                 logger.warning(
                     "dms.download.missing_document document_id=%s", document_id
                 )
-                raise ValueError("Document not found.")
+                raise DocumentDownloadValueError(
+                    "Document not found.",
+                    reason_code="document_missing",
+                    document_id=document_id,
+                )
 
             if document.status != "ACTIVE":
                 logger.warning(
@@ -42,7 +51,11 @@ class DocumentDownloadService:
                     document_id,
                     document.status,
                 )
-                raise ValueError("Document not found or is inactive.")
+                raise DocumentDownloadValueError(
+                    "Document not found or is inactive.",
+                    reason_code="document_inactive",
+                    document=document,
+                )
 
             safety_reason = chart_document_safety_reason(document)
             if safety_reason:
@@ -51,7 +64,11 @@ class DocumentDownloadService:
                     document_id,
                     safety_reason,
                 )
-                raise ValueError("Document not found or is no longer current.")
+                raise DocumentDownloadValueError(
+                    "Document not found or is no longer current.",
+                    reason_code=safety_reason,
+                    document=document,
+                )
 
             if (
                 not is_staff_user
@@ -63,7 +80,11 @@ class DocumentDownloadService:
                     document_id,
                     getattr(user, "id", None),
                 )
-                raise PermissionError("You do not have access to this document.")
+                raise DocumentDownloadPermissionError(
+                    "You do not have access to this document.",
+                    reason_code="access_denied",
+                    document=document,
+                )
 
             if not default_storage.exists(document.file_path):
                 logger.error(
@@ -71,13 +92,24 @@ class DocumentDownloadService:
                     document_id,
                     document.file_path,
                 )
-                raise FileNotFoundError("Document file does not exist in storage.")
+                raise DocumentDownloadFileNotFoundError(
+                    "Document file does not exist in storage.",
+                    reason_code="file_missing",
+                    document=document,
+                )
 
             # Increment download count
             document.download_count += 1
             document.save(update_fields=["download_count"])
 
-        file_obj = default_storage.open(document.file_path, "rb")
+        try:
+            file_obj = default_storage.open(document.file_path, "rb")
+        except FileNotFoundError as error:
+            raise DocumentDownloadFileNotFoundError(
+                "Document file does not exist in storage.",
+                reason_code="file_missing",
+                document=document,
+            ) from error
 
         # We determine download filename: prefer original filename if it has extension, or construct from title
         download_name = document.original_filename
