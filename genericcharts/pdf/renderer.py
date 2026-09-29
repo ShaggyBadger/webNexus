@@ -6,7 +6,7 @@ import io
 import math
 import re
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import date, datetime
 from xml.sax.saxutils import escape
 
 from reportlab.lib.colors import HexColor
@@ -94,9 +94,10 @@ class _Chart:
 class _NumberedCanvas(canvas.Canvas):
     """Add final Page X/Y numbering after ReportLab has laid out all pages."""
 
-    def __init__(self, *args, package_title: str, **kwargs):
+    def __init__(self, *args, package_title: str, generated_date: date, **kwargs):
         super().__init__(*args, **kwargs)
         self.package_title = package_title
+        self.generated_date = generated_date
         self._page_states = []
 
     def showPage(self):
@@ -113,7 +114,8 @@ class _NumberedCanvas(canvas.Canvas):
             self.drawCentredString(
                 self._pagesize[0] / 2,
                 0.22 * inch,
-                f"{self.package_title} | Generator {PACKAGE_VERSION} | "
+                f"{self.package_title} | Generated {self.generated_date.isoformat()} | "
+                f"Generator {PACKAGE_VERSION} | "
                 f"Page {self._pageNumber}/{total}",
             )
             self.restoreState()
@@ -127,6 +129,7 @@ class CoreStarterPackPDFRenderer:
     def render(self, package: PackageData) -> bytes:
         state_label = "FULL" if package.selection.is_full else package.selection.state
         package_title = f"CoreStarterPack [ {state_label} ] version {PACKAGE_VERSION}"
+        generated_date = datetime.now().astimezone().date()
         document = BaseDocTemplate(
             io.BytesIO(),
             pagesize=letter,
@@ -159,17 +162,26 @@ class CoreStarterPackPDFRenderer:
             ]
         )
         styles = self._styles()
-        story = self._store_map(package, styles, state_label)
+        store_map_story = self._store_map(package, styles, state_label)
+        store_map_page_count = self._store_map_page_count(
+            store_map_story, document.width, document.height
+        )
+        story = list(store_map_story)
+        if store_map_page_count % 2:
+            story.extend(self._duplex_blank_page(styles, "STORE-TANK MAP"))
         story.extend(self._generic_chart_pages(package, styles, state_label))
-        if self._chart_page_count(package) % 2:
-            story.extend(self._duplex_blank_page(styles))
+        if self._generic_chart_page_count(package) % 2:
+            story.extend(self._duplex_blank_page(styles, "GENERIC TANK CHARTS"))
         story.extend([NextPageTemplate("landscape"), PageBreak()])
         story.extend(self._datasheet(package, styles, state_label))
         buffer = document.filename
         document.build(
             story,
             canvasmaker=lambda *args, **kwargs: _NumberedCanvas(
-                *args, package_title=package_title, **kwargs
+                *args,
+                package_title=package_title,
+                generated_date=generated_date,
+                **kwargs,
             ),
         )
         return buffer.getvalue()
@@ -428,27 +440,68 @@ class CoreStarterPackPDFRenderer:
         if not charts:
             story.extend(
                 [
+                    PageBreak(),
                     Paragraph("GENERIC TANK CHARTS", styles["heading"]),
                     Paragraph("No charts selected.", styles["small"]),
                 ]
             )
         return story
 
-    def _chart_page_count(self, package):
-        groups = {}
+    @staticmethod
+    def _store_map_page_count(story, frame_width, frame_height):
+        """Count map pages using the same splitting rules as ReportLab layout."""
+        if (
+            len(story) != 3
+            or not isinstance(story[0], Table)
+            or not isinstance(story[2], Table)
+        ):
+            raise ValueError("Store-Tank Map story must contain header, spacer, table")
+
+        _, header_height = story[0].wrap(frame_width, frame_height)
+        _, spacer_height = story[1].wrap(frame_width, frame_height - header_height)
+        available_height = frame_height - header_height - spacer_height
+        if available_height <= 0:
+            raise ValueError("Store-Tank Map header exceeds the portrait page frame")
+
+        page_count = 1
+        table = story[2]
+        while True:
+            _, table_height = table.wrap(frame_width, available_height)
+            if table_height <= available_height:
+                return page_count
+
+            table_parts = table.split(frame_width, available_height)
+            if len(table_parts) < 2:
+                if available_height < frame_height:
+                    # ReportLab moves an unsplittable row to a fresh page.
+                    page_count += 1
+                    available_height = frame_height
+                    continue
+                raise ValueError(
+                    "A Store-Tank Map row is too tall to fit on a portrait page"
+                )
+
+            table = table_parts[-1]
+            page_count += 1
+            available_height = frame_height
+
+    def _generic_chart_page_count(self, package):
+        """Count chart pages across all depth groups for section alignment."""
+        chart_counts_by_depth = {}
         for chart in self._charts(package):
-            groups.setdefault(chart.depth, 0)
-            groups[chart.depth] += 1
+            chart_counts_by_depth[chart.depth] = (
+                chart_counts_by_depth.get(chart.depth, 0) + 1
+            )
         return sum(
             math.ceil(chart_count / MAX_CHARTS_PER_PAGE)
-            for chart_count in groups.values()
+            for chart_count in chart_counts_by_depth.values()
         )
 
     @staticmethod
-    def _duplex_blank_page(styles):
+    def _duplex_blank_page(styles, section_label):
         return [
             PageBreak(),
-            Paragraph("GENERIC CHART SECTION", styles["subtitle"]),
+            Paragraph(f"{section_label} SECTION", styles["subtitle"]),
             Spacer(1, 3.0 * inch),
             Paragraph("INTENTIONALLY BLANK", styles["blank_title"]),
             Spacer(1, 0.12 * inch),

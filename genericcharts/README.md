@@ -42,6 +42,16 @@ webNexus data.
   and allowlist ordering must resolve to the same key.
 - Keep naming, metadata, footer, and page-numbering logic in dedicated modules.
 - Render one final master PDF; do not retain intermediate chart PDFs.
+- The Store-Tank Map section ends on an even-numbered page for duplex printing:
+  add an intentionally blank page after the map only when its actual rendered
+  page count is odd. Keep this page before generic tank charts, including when
+  no generic charts were selected.
+- The generic tank chart section is independently padded to an even page count:
+  count the rendered chart pages across all depths and add one blank before the
+  final datasheet only when that total is odd. The datasheet starts on its own
+  landscape page.
+- Print the PDF generation date in the footer on every page so separated pages
+  retain their package date.
 - Preserve the printable contract from `~/pyProjects/extracttankdata/`: map rows
   use compact RUL, PREM, PLUS, DSL, and KERO fuel columns, generic charts use
   two-sided lookup tables, and the datasheet uses the landscape layout.
