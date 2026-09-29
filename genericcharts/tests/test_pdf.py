@@ -192,12 +192,15 @@ class CoreStarterPackPDFTests(SimpleTestCase):
         package = make_package()
         renderer = CoreStarterPackPDFRenderer()
         footer_texts = []
+        document_end_pages = []
         generated_at = datetime(2026, 9, 29, 12, tzinfo=timezone.utc)
         draw_centred_string = _NumberedCanvas.drawCentredString
 
         def capture_footer(canvas, x, y, text):
             if " | Generated " in text:
                 footer_texts.append(text)
+            if text == "DOCUMENT END // INTENTIONALLY BLANK":
+                document_end_pages.append((canvas._pageNumber, canvas._pagesize))
             draw_centred_string(canvas, x, y, text)
 
         with (
@@ -214,11 +217,13 @@ class CoreStarterPackPDFTests(SimpleTestCase):
 
         self.assertTrue(pdf_bytes.startswith(b"%PDF"))
         page_count = len(re.findall(rb"/Type\s*/Page\b", pdf_bytes))
-        self.assertEqual(page_count, 5)
+        self.assertEqual(page_count, 6)
         self.assertEqual(len(footer_texts), page_count)
         self.assertTrue(
             all("Generated 2026-09-29" in footer for footer in footer_texts)
         )
+        self.assertIn("Page 6/6", footer_texts[-1])
+        self.assertEqual(document_end_pages, [(6, (letter[1], letter[0]))])
         self.assertEqual(
             [call.args[1] for call in blank_page.call_args_list],
             ["STORE-TANK MAP", "GENERIC TANK CHARTS"],
@@ -245,7 +250,7 @@ class CoreStarterPackPDFTests(SimpleTestCase):
             [call.args[1] for call in blank_page.call_args_list],
             ["GENERIC TANK CHARTS"],
         )
-        self.assertEqual(len(re.findall(rb"/Type\s*/Page\b", pdf_bytes)), 5)
+        self.assertEqual(len(re.findall(rb"/Type\s*/Page\b", pdf_bytes)), 6)
 
     def test_chart_page_count_combines_depth_groups_before_padding(self):
         package = make_package(with_chart=False)
@@ -280,11 +285,19 @@ class CoreStarterPackPDFTests(SimpleTestCase):
             [call.args[1] for call in blank_page.call_args_list],
             ["STORE-TANK MAP"],
         )
-        self.assertEqual(len(re.findall(rb"/Type\s*/Page\b", pdf_bytes)), 5)
+        self.assertEqual(len(re.findall(rb"/Type\s*/Page\b", pdf_bytes)), 6)
 
     def test_odd_map_gets_blank_even_when_no_generic_charts_are_selected(self):
         package = make_package(with_chart=False)
         renderer = CoreStarterPackPDFRenderer()
+        document_end_pages = []
+        draw_centred_string = _NumberedCanvas.drawCentredString
+
+        def capture_document_end(canvas, x, y, text):
+            if text == "DOCUMENT END // INTENTIONALLY BLANK":
+                document_end_pages.append(canvas._pageNumber)
+            draw_centred_string(canvas, x, y, text)
+
         styles = renderer._styles()
         map_story = renderer._store_map(package, styles, "NC")
         self.assertEqual(
@@ -298,13 +311,21 @@ class CoreStarterPackPDFTests(SimpleTestCase):
             "STORE-TANK MAP SECTION",
         )
 
-        with patch.object(
-            renderer,
-            "_duplex_blank_page",
-            wraps=renderer._duplex_blank_page,
-        ) as blank_page:
+        with (
+            patch.object(
+                renderer,
+                "_duplex_blank_page",
+                wraps=renderer._duplex_blank_page,
+            ) as blank_page,
+            patch.object(
+                _NumberedCanvas,
+                "drawCentredString",
+                capture_document_end,
+            ),
+        ):
             pdf_bytes = renderer.render(package)
 
         blank_page.assert_called_once()
         self.assertEqual(blank_page.call_args.args[1], "STORE-TANK MAP")
+        self.assertEqual(document_end_pages, [])
         self.assertEqual(len(re.findall(rb"/Type\s*/Page\b", pdf_bytes)), 4)

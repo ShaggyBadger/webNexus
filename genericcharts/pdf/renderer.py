@@ -105,6 +105,20 @@ class _NumberedCanvas(canvas.Canvas):
         self._startPage()
 
     def save(self):
+        # The landscape datasheet can change the final physical page count, so
+        # package-level parity must be decided after ReportLab has laid it out.
+        if len(self._page_states) % 2:
+            self.saveState()
+            self.setFont(BODY_FONT, 10)
+            self.setFillColor(SECONDARY)
+            self.drawCentredString(
+                self._pagesize[0] / 2,
+                self._pagesize[1] / 2,
+                "DOCUMENT END // INTENTIONALLY BLANK",
+            )
+            self.restoreState()
+            self.showPage()
+
         total = len(self._page_states)
         for state in self._page_states:
             self.__dict__.update(state)

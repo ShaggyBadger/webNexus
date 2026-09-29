@@ -50,6 +50,9 @@ webNexus data.
   count the rendered chart pages across all depths and add one blank before the
   final datasheet only when that total is odd. The datasheet starts on its own
   landscape page.
+- After all sections are laid out, the complete PDF is padded with a final blank
+  page when necessary so its total page count is always even. The final page
+  count and generated-date footer include this page.
 - Print the PDF generation date in the footer on every page so separated pages
   retain their package date.
 - Preserve the printable contract from `~/pyProjects/extracttankdata/`: map rows
