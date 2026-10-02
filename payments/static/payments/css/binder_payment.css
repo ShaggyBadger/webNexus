@@ -1,0 +1,98 @@
+.binder-payment-page {
+    min-height: min(72vh, 52rem);
+    display: grid;
+    place-items: center;
+    padding: clamp(2rem, 6vw, 5rem) 1rem;
+}
+
+.binder-offer {
+    width: min(100%, 38rem);
+    padding: clamp(1.5rem, 5vw, 3rem);
+    background: #1c1f23;
+    border: 1px solid #2a2e33;
+    text-align: center;
+}
+
+.binder-offer h1 {
+    margin: 0 0 1rem;
+    color: #f8f9fa;
+    font-family: "JetBrains Mono", monospace;
+    font-size: clamp(1.5rem, 5vw, 2.25rem);
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.binder-description {
+    max-width: 34rem;
+    margin: 0 auto;
+    color: #d6d9dd;
+    font-size: 1rem;
+    line-height: 1.65;
+}
+
+.binder-price {
+    margin: 1.75rem 0 0.25rem;
+    color: #ffb86c;
+    font-family: "JetBrains Mono", monospace;
+    font-size: clamp(2.5rem, 10vw, 4rem);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+}
+
+.binder-fulfillment {
+    margin: 0 0 1.5rem;
+    color: #c3c8ce;
+    font-size: 0.95rem;
+}
+
+.binder-pay-button {
+    display: flex;
+    min-height: 48px;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 2px solid #8da35d;
+    background: #8da35d;
+    color: #121417;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 1rem;
+    font-weight: 700;
+    text-decoration: none;
+    transition: filter 140ms ease, transform 140ms ease;
+}
+
+.binder-pay-button:hover {
+    color: #121417;
+    filter: brightness(1.1);
+}
+
+.binder-pay-button:active {
+    transform: scale(0.99);
+}
+
+.binder-pay-button:focus-visible {
+    outline: 3px solid #ffb86c;
+    outline-offset: 3px;
+}
+
+.binder-checkout-note {
+    margin: 0.9rem 0 0;
+    color: #c3c8ce;
+    font-size: 0.875rem;
+}
+
+.binder-checkout-unavailable {
+    margin: 1.5rem 0 0;
+    padding: 1rem;
+    border: 1px solid #e94560;
+    color: #ffc1cb;
+    line-height: 1.5;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .binder-pay-button {
+        transition: none;
+    }
+}

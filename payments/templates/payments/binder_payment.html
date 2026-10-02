@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Tank Chart Binder | {{ SITE_NAME }}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'payments/css/binder_payment.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="binder-payment-page">
+    <section class="binder-offer" aria-labelledby="binder-title">
+        <h1 id="binder-title">Tank Chart Binder</h1>
+        <p class="binder-description">A printed binder of tank charts, handed to you in person.</p>
+
+        <p class="binder-price" aria-label="Price: 20 dollars">$20</p>
+        <p class="binder-fulfillment">One-time payment · Hand-delivered</p>
+
+        {% if payment_link_url %}
+            <a class="binder-pay-button" href="{{ payment_link_url }}">
+                Pay $20
+            </a>
+            <p class="binder-checkout-note">Secure checkout opens on Stripe.</p>
+        {% else %}
+            <p class="binder-checkout-unavailable" role="status">
+                Checkout is temporarily unavailable. Please try again later.
+            </p>
+        {% endif %}
+    </section>
+</div>
+{% endblock %}

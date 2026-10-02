@@ -17,6 +17,9 @@ load_dotenv(BASE_DIR / ".env", override=True)
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY")
 ATG_REMOTE_OCR_KEY = os.environ.get("ATG_REMOTE_OCR_KEY")
+STRIPE_BINDER_PAYMENT_LINK_URL = os.environ.get(
+    "STRIPE_BINDER_PAYMENT_LINK_URL", ""
+).strip()
 ATG_REMOTE_OCR_ENABLED = os.environ.get("ATG_REMOTE_OCR_ENABLED", "False").lower() in (
     "true",
     "1",
@@ -123,6 +126,7 @@ INSTALLED_APPS = [
     "tankcharts",
     "weather",
     "genericcharts",
+    "payments",
 ]
 
 JAZZMIN_SETTINGS = {
