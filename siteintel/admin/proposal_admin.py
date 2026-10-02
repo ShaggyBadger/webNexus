@@ -125,38 +125,65 @@ class StoreUpdateAdmin(admin.ModelAdmin):
 
     def save_model(self, request, obj, form, change):
         """
-        Auto-capture the approving user when status is set to APPROVED.
-        Also triggers apply_update() if status is changing to APPROVED.
+        Save proposal fields and remember approval state for post-inline sync.
         """
-        is_becoming_approved = False
+        previous_state = None
         if obj.status == "APPROVED":
-            if not change:  # New record created as APPROVED
-                is_becoming_approved = True
+            if change:
+                previous = StoreUpdate.objects.only(
+                    "status", "approved_by", "approved_at"
+                ).get(pk=obj.pk)
+                if previous.status != "APPROVED":
+                    previous_state = {
+                        "status": previous.status,
+                        "approved_by_id": previous.approved_by_id,
+                        "approved_at": previous.approved_at,
+                    }
             else:
-                # Use a fresh fetch to see what's currently in the DB
-                old_status = StoreUpdate.objects.get(pk=obj.pk).status
-                if old_status != "APPROVED":
-                    is_becoming_approved = True
+                previous_state = {
+                    "status": "PENDING",
+                    "approved_by_id": None,
+                    "approved_at": None,
+                }
 
-        if is_becoming_approved:
-            if not obj.approved_by:
+        if previous_state is not None:
+            if not obj.approved_by_id:
                 obj.approved_by = request.user
             if not obj.approved_at:
                 obj.approved_at = timezone.now()
 
-            # Canonical synchronization
-            try:
-                # We save before applying to ensure the status is 'APPROVED'
-                # inside apply_update's check.
-                super().save_model(request, obj, form, change)
-                obj.apply_update()
-                return  # Skip the final super().save_model below
-            except Exception as e:
-                from django.contrib import messages
-
-                messages.error(request, f"SYNC_ERROR: {str(e)}")
-
         super().save_model(request, obj, form, change)
+
+        if previous_state is not None:
+            # Inline TankUpdate rows are saved later by Django's save_related
+            # lifecycle. Defer synchronization to that hook so it sees them.
+            obj._siteintel_previous_approval_state = previous_state
+
+    def save_related(self, request, form, formsets, change):
+        """Apply approval after the submitted inline tank proposals are saved."""
+        super().save_related(request, form, formsets, change)
+
+        obj = form.instance
+        previous_state = getattr(obj, "_siteintel_previous_approval_state", None)
+        if previous_state is None:
+            return
+
+        try:
+            obj.apply_update()
+        except Exception as exc:
+            # apply_update rolls back canonical changes in its atomic block.
+            # Restore only approval metadata: keep submitted proposal edits so
+            # an administrator can correct the cause and retry.
+            obj.status = previous_state["status"]
+            obj.approved_by_id = previous_state["approved_by_id"]
+            obj.approved_at = previous_state["approved_at"]
+            obj.save(update_fields=("status", "approved_by", "approved_at"))
+
+            from django.contrib import messages
+
+            messages.error(request, f"SYNC_ERROR: {str(exc)}")
+        finally:
+            delattr(obj, "_siteintel_previous_approval_state")
 
 
 @admin.register(MapOverlayUpdate)

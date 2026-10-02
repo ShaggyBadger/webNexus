@@ -1,6 +1,7 @@
 from django.db import transaction
 import logging
-from tankgauge.models import Store, StoreTankMapping
+from tankgauge.models import Store
+from .tank_mapping_sync import sync_store_tank_mappings
 
 # Tactical Logger
 logger = logging.getLogger("webnexus")
@@ -147,27 +148,28 @@ def _sync_store(proposal):
             f"SYNC_STEP: Updated Store specialized metadata for #{proposal.store.store_num}"
         )
 
-    # TANK_SYNCHRONIZATION
-    tank_updates = proposal.tank_updates.all()
-    if tank_updates.exists():
+    # Tank mappings are durable identities for capacity history and estimation
+    # evidence, so proposals update/add assignments without replacing the set.
+    tank_updates = list(proposal.tank_updates.all())
+    if tank_updates:
         logger.info(
-            f"SYNC_STEP: Mirroring {tank_updates.count()} tank configurations for Store #{proposal.store.store_num}"
+            f"SYNC_STEP: Applying {len(tank_updates)} proposed tank assignments "
+            f"for Store #{proposal.store.store_num}"
         )
-        deleted_count, _ = StoreTankMapping.objects.filter(
-            store=proposal.store
-        ).delete()
-        if deleted_count:
-            logger.info(
-                f"SYNC_STEP: Purged {deleted_count} stale/conflicting mappings."
-            )
-
-        for tu in tank_updates:
-            StoreTankMapping.objects.create(
-                store=proposal.store,
-                tank_index=tu.tank_index,
-                tank_type=tu.tank_type,
-                fuel_type=tu.fuel_type.lower(),
-            )
+        result = sync_store_tank_mappings(
+            store=proposal.store,
+            tank_updates=tank_updates,
+        )
+        logger.info(
+            "SYNC_TANK_MAPPINGS_COMPLETE",
+            extra={
+                "store_id": proposal.store_id,
+                "created_count": result.created,
+                "updated_count": result.updated,
+                "unchanged_count": result.unchanged,
+                "reason_code": "non_destructive_tank_upsert",
+            },
+        )
 
 
 def _sync_fuel_rack(proposal):

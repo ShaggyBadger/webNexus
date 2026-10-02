@@ -14,6 +14,9 @@ validity metadata embedded in generated documents.
 - Per-store source freshness checks continue to decide whether the chart cache
   should be regenerated; they no longer invalidate delivery of the currently
   published chart while a replacement is unavailable.
+- Creating a `StoreTankMapping`, or changing its chart-relevant assignment or
+  capacity-profile fields, schedules a store chart refresh after the database
+  transaction commits. Changes to notes alone do not trigger a refresh.
 - Validity is currently carried in the existing `Document.description` JSON.
   No model or migration changes are part of this implementation.
 
@@ -21,6 +24,7 @@ validity metadata embedded in generated documents.
 
 ```bash
 python manage.py test tankcharts.tests.test_dms_storage
+python manage.py test tankcharts.tests.test_signals --noinput
 python manage.py test genericcharts.tests.test_dms_service dms.tests
 ```
 

@@ -1,7 +1,7 @@
 import logging
 
 from django.db import transaction
-from django.db.models.signals import post_save
+from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 
 from tankcharts.services.chart_service import TankChartService
@@ -13,6 +13,54 @@ from tankgauge.models import (
 )
 
 logger = logging.getLogger(__name__)
+
+MAPPING_CHART_INPUT_FIELDS = (
+    "store",
+    "tank_type",
+    "fuel_type",
+    "canonical_fuel_type",
+    "tank_index",
+    "physical_capacity_gallons",
+    "capacity_verified",
+    "capacity_source",
+    "profile_status",
+    "ullage_endpoint_percent_exact",
+    "profile_version",
+)
+
+
+@receiver(pre_save, sender=StoreTankMapping)
+def track_mapping_chart_input_changes(sender, instance, update_fields=None, **kwargs):
+    """Record whether this save changes tank data embedded in store charts."""
+    if instance._state.adding:
+        instance._tank_chart_inputs_changed = True
+        return
+
+    fields_to_compare = MAPPING_CHART_INPUT_FIELDS
+    if update_fields is not None:
+        fields_to_compare = tuple(
+            field_name
+            for field_name in MAPPING_CHART_INPUT_FIELDS
+            if field_name in update_fields
+        )
+        if not fields_to_compare:
+            instance._tank_chart_inputs_changed = False
+            return
+
+    field_attname = {
+        field_name: sender._meta.get_field(field_name).attname
+        for field_name in fields_to_compare
+    }
+    previous_values = (
+        sender.objects.filter(pk=instance.pk).values(*field_attname.values()).first()
+    )
+    instance._tank_chart_inputs_changed = bool(
+        previous_values
+        and any(
+            previous_values[attname] != getattr(instance, attname)
+            for attname in field_attname.values()
+        )
+    )
 
 
 def regenerate_store_chart_for_store_id(*, store_id: int, reason_code: str) -> None:
@@ -108,12 +156,13 @@ def auto_regenerate_on_tank_estimation(
 def auto_regenerate_on_mapping_created(
     sender, instance: StoreTankMapping, created: bool, **kwargs
 ) -> None:
-    """Retry a missing store chart when auto-mapping creates a tank mapping."""
-    if not created:
+    """Refresh store charts after creation or a chart-relevant mapping change."""
+    if not created and not getattr(instance, "_tank_chart_inputs_changed", False):
         return
+    reason_code = "tank_mapping_created" if created else "tank_mapping_updated"
     regenerate_store_chart_for_store_id(
         store_id=instance.store_id,
-        reason_code="tank_mapping_created",
+        reason_code=reason_code,
     )
 
 
